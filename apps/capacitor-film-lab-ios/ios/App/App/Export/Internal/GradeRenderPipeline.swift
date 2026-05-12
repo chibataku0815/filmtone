@@ -121,6 +121,19 @@ final class GradeRenderPipeline {
         ]) ?? image
     }
 
+    func applyShadowLatitudeStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
+        guard params.shadowLatitude > 0.0001 else {
+            return image
+        }
+        guard let kernel = OpticalKernels.toeSeparation else {
+            return image
+        }
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.shadowLatitude,
+        ]) ?? image
+    }
+
     func applyDetailSoftnessStage(
         to image: CIImage,
         params: Phase0ParamsDTO,

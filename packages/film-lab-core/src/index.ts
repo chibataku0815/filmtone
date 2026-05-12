@@ -261,6 +261,13 @@ export {
   type FilmCompressionV3Options,
 } from "./film-compression-v3";
 export {
+  SHADOW_LATITUDE_CONSTANTS,
+  applyShadowLatitudeSample,
+  shadowLatitudeLuma,
+  type ShadowLatitudeOptions,
+  type ShadowLatitudeRgb,
+} from "./shadow-latitude";
+export {
   resolveSourceDetailCompensation,
   type SourceDetailCompensationInput,
   type SourceDetailConfidence,

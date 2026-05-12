@@ -11,7 +11,7 @@ import SwiftUI
 //   FilmtoneDesktop --export-still \
 //     --input <path/to/source.png> \
 //     --output <path/to/output.png> \
-//     [--preset reset|iphone|softBlue|amberGlow] \
+//     [--preset <generated preset id>] \
 //     [--look filmtone-creative-pack-01-stone|filmtone-creative-pack-01-urban] \
 //     [--strength 0.0..1.0] \
 //     [--format png|jpeg] [--no-sidecar]

@@ -183,6 +183,7 @@ final class OpticsCompositor {
             trailIntensity: params.trailIntensity,
             fade: params.fade,
             shadowTone: params.shadowTone,
+            shadowLatitude: params.shadowLatitude,
             highlightTone: params.highlightTone,
             shadowHue: params.shadowHue,
             highlightHue: params.highlightHue,

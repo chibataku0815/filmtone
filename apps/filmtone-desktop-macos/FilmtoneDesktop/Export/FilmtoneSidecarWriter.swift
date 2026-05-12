@@ -322,6 +322,7 @@ enum FilmtoneSidecarWriter {
             "trailIntensity": p.trailIntensity,
             "fade": p.fade,
             "shadowTone": p.shadowTone,
+            "shadowLatitude": p.shadowLatitude,
             "highlightTone": p.highlightTone,
             "shadowHue": p.shadowHue,
             "highlightHue": p.highlightHue,

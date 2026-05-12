@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail", "fade", "highlights", "shadows", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail", "fade", "highlights", "shadows", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 declare const FILM_GRAIN_INTENSITY_MAX = 0.1;
 declare function clampGrainIntensity(value: number): number;
@@ -82,6 +82,8 @@ interface Params {
     highlights: number;
     shadows: number;
     shadowTone: number;
+    /** 黒の芯を固定したまま暗部中間の分離を戻す toe separation（0〜1）。 */
+    shadowLatitude: number;
     highlightTone: number;
     /** シャドウスプリットトーンの色相（度 0〜360） */
     shadowHue: number;
@@ -170,6 +172,7 @@ declare const PRESETS: {
     ektar100: Params;
     superia400: Params;
     cinestill800t: Params;
+    vision3500t: Params;
     velvia50: Params;
 };
 type PresetName = keyof typeof PRESETS;
@@ -248,7 +251,7 @@ declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 declare const PHASE0_SCHEMA_VERSION: 2;
 declare const PHASE0_PRESET_DEFAULT = "reset";
 declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
-declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
 declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
@@ -299,6 +302,7 @@ declare const phase0ParamsSchema: z.ZodObject<{
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
+    shadowLatitude: z.ZodDefault<z.ZodNumber>;
     highlightTone: z.ZodDefault<z.ZodNumber>;
     shadowHue: z.ZodDefault<z.ZodNumber>;
     highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -360,6 +364,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         trailIntensity: z.ZodOptional<z.ZodNumber>;
         fade: z.ZodOptional<z.ZodNumber>;
         shadowTone: z.ZodOptional<z.ZodNumber>;
+        shadowLatitude: z.ZodOptional<z.ZodNumber>;
         highlightTone: z.ZodOptional<z.ZodNumber>;
         shadowHue: z.ZodOptional<z.ZodNumber>;
         highlightHue: z.ZodOptional<z.ZodNumber>;
@@ -392,7 +397,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         preserveAudio: z.ZodDefault<z.ZodBoolean>;
     }, z.core.$strip>;
 }, z.core.$strip>, z.ZodTransform<{
-    presetName: "reset" | "cinematic" | "portra" | "gold200" | "pro400h" | "bw" | "ektar100" | "superia400" | "cinestill800t" | "velvia50";
+    presetName: "reset" | "cinematic" | "portra" | "gold200" | "pro400h" | "bw" | "ektar100" | "superia400" | "cinestill800t" | "vision3500t" | "velvia50";
     params: Phase0Params;
     inputLut: {
         title: string;
@@ -467,6 +472,7 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         trailIntensity?: number | undefined;
         fade?: number | undefined;
         shadowTone?: number | undefined;
+        shadowLatitude?: number | undefined;
         highlightTone?: number | undefined;
         shadowHue?: number | undefined;
         highlightHue?: number | undefined;
@@ -520,6 +526,7 @@ interface Phase0QuickTarget {
     rgbShift: number;
     lensSoftness: number;
     detailSoftness: number;
+    shadowLatitude: number;
     fade: number;
     vignette: number;
     grainIntensity: number;
@@ -853,6 +860,7 @@ declare const filmLabParamsSchema: z.ZodObject<{
     highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -980,6 +988,7 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -1683,7 +1692,7 @@ declare const FILMTONE_IOS_PRESET_NAMES: readonly ["reset", "iphone", "softBlue"
 type FilmtoneIosPresetName = (typeof FILMTONE_IOS_PRESET_NAMES)[number];
 
 declare const IOS_PHASE0_SCHEMA_VERSION: 2;
-declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type IosPhase0ParamKey = Phase0ParamKey;
 type IosPhase0Params = Phase0Params;
 declare const iosPhase0ParamsSchema: z.ZodObject<{
@@ -1718,6 +1727,7 @@ declare const iosPhase0ParamsSchema: z.ZodObject<{
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
+    shadowLatitude: z.ZodDefault<z.ZodNumber>;
     highlightTone: z.ZodDefault<z.ZodNumber>;
     shadowHue: z.ZodDefault<z.ZodNumber>;
     highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -1878,6 +1888,7 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
+        shadowLatitude: z.ZodDefault<z.ZodNumber>;
         highlightTone: z.ZodDefault<z.ZodNumber>;
         shadowHue: z.ZodDefault<z.ZodNumber>;
         highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -2111,6 +2122,7 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
+        shadowLatitude: z.ZodDefault<z.ZodNumber>;
         highlightTone: z.ZodDefault<z.ZodNumber>;
         shadowHue: z.ZodDefault<z.ZodNumber>;
         highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -2559,6 +2571,25 @@ declare function filmCompressionLuma(rgb: FilmCompressionRgb): number;
 declare function filmCompressionChromaMagnitude(rgb: FilmCompressionRgb): number;
 declare function applyFilmCompressionV3Sample(rgb: FilmCompressionRgb, amount: number, range: number, options?: FilmCompressionV3Options): FilmCompressionRgb;
 
+interface ShadowLatitudeRgb {
+    r: number;
+    g: number;
+    b: number;
+}
+interface ShadowLatitudeOptions {
+    clampOutput?: boolean;
+}
+declare const SHADOW_LATITUDE_CONSTANTS: {
+    readonly blackAnchor: 0.025;
+    readonly mainBandStart: 0.055;
+    readonly mainBandEnd: 0.18;
+    readonly releaseEnd: 0.3;
+    readonly lumaGainMax: 0.22;
+    readonly chromaRetentionMax: 0.08;
+};
+declare function shadowLatitudeLuma(rgb: ShadowLatitudeRgb): number;
+declare function applyShadowLatitudeSample(rgb: ShadowLatitudeRgb, amount: number, options?: ShadowLatitudeOptions): ShadowLatitudeRgb;
+
 type SourceDetailConfidence = "high" | "medium" | "low" | "none";
 type SourceDetailTransferClass = "rec709-consumer" | "rec709-cinema" | "log-consumer" | "log-cinema" | "unknown";
 interface SourceDetailProfile {
@@ -2606,4 +2637,4 @@ interface SourceDetailCompensationInput {
  */
 declare function resolveSourceDetailCompensation(input?: SourceDetailCompensationInput): SourceDetailProfile;
 
-export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, DETAIL_SOFTNESS_EFFECTIVE_MAX, type DetailSoftnessOptions, type DetailSoftnessUniforms, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_COMPRESSION_V3_CONSTANTS, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmCompressionRgb, type FilmCompressionV3Options, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type SourceColorClass, type SourceColorMetadata, type SourceDetailCompensationInput, type SourceDetailConfidence, type SourceDetailProfile, type SourceDetailTransferClass, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmCompressionV3Sample, applyQuickStateToParams, applyQuickStateToPhase0Params, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deriveDetailSoftnessUniforms, deserializeCubeLutData, diagonalMaxDelta, filmCompressionChromaMagnitude, filmCompressionLuma, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, resolveSourceDetailCompensation, serializeCreativeCubeToText, serializeCubeLut };
+export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, DETAIL_SOFTNESS_EFFECTIVE_MAX, type DetailSoftnessOptions, type DetailSoftnessUniforms, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_COMPRESSION_V3_CONSTANTS, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmCompressionRgb, type FilmCompressionV3Options, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SHADOW_LATITUDE_CONSTANTS, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type ShadowLatitudeOptions, type ShadowLatitudeRgb, type SourceColorClass, type SourceColorMetadata, type SourceDetailCompensationInput, type SourceDetailConfidence, type SourceDetailProfile, type SourceDetailTransferClass, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmCompressionV3Sample, applyQuickStateToParams, applyQuickStateToPhase0Params, applyShadowLatitudeSample, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deriveDetailSoftnessUniforms, deserializeCubeLutData, diagonalMaxDelta, filmCompressionChromaMagnitude, filmCompressionLuma, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, resolveSourceDetailCompensation, serializeCreativeCubeToText, serializeCubeLut, shadowLatitudeLuma };

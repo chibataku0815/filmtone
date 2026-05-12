@@ -37,6 +37,21 @@ enum FilmtoneCreativePackCatalog {
         let paramOverridesPatch: FilmtonePhase0ParamsPatch
     }
 
+    /// Preset-only built-in Look. Carries no bundled cube; the full
+    /// color expression lives in `paramOverridesPatch` on top of
+    /// `FilmtonePresetCatalog.defaultName` ("reset"). Mirrors the iOS
+    /// `BuiltInLook` shape's `creativeLut: nil` case. Kept as a
+    /// distinct struct so the cube-bound code paths
+    /// (`FilmtoneSidecarWriter` / `FilmtoneCreativeLutLoader` /
+    /// `EditorState.lookSlug` lookup) never have to handle an empty
+    /// filename / sha.
+    struct BuiltInPresetLook: Equatable {
+        let slug: String
+        let canonicalUUID: UUID
+        let englishName: String
+        let paramOverridesPatch: FilmtonePhase0ParamsPatch
+    }
+
     /// Color-op neutralization shared by every Pack 01 patch. Mirrors
     /// `creativePack01ColorOpNeutralEntries` in iOS.
     private static let colorOpNeutralEntries: [String: Double] = [
@@ -105,6 +120,57 @@ enum FilmtoneCreativePackCatalog {
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
+    /// Twilight — preset-only Look (no cube). Patch ports the
+    /// native-supported subset of `vision3500t` Phase0 from
+    /// `packages/film-lab-core/src/presets.ts:632-689` on top of
+    /// `presetName: "reset"`. The web preset's `highlights` /
+    /// `shadows` legs are intentionally dropped because they are not
+    /// declared in `FilmtonePhase0Generated.paramKeys` — adding them
+    /// would expand the Phase0 schema and is out of scope for this
+    /// bundled-Look lane. The native tone is reproduced through
+    /// `shadowTone` / `highlightTone` / `compressionAmount` /
+    /// `printContrast` instead. Mirrored verbatim with
+    /// `FilmtoneBuiltInCatalog.twilightPatch` on iOS — `bun run
+    /// scripts/check-filmtone-context-sync.mjs` (or the parity grep
+    /// described in `active.md`) catches drift.
+    private static let twilightPatch: FilmtonePhase0ParamsPatch = {
+        var values: [String: Double] = [:]
+        values["exposure"] = -0.04
+        values["contrast"] = 1.22
+        values["saturation"] = 1.02
+        values["temperature"] = -0.40
+        values["tint"] = 0.04
+        values["rgbShift"] = 0.0015
+        values["lensSoftness"] = 0.12
+        values["detailSoftness"] = 0.18
+        values["grainIntensity"] = 0.10
+        values["grainSize"] = 0.52
+        values["vignette"] = 0.36
+        values["bloomThreshold"] = 0.72
+        values["bloomStrength"] = 0.16
+        values["bloomRadius"] = 0.56
+        values["diffusion"] = 0.12
+        values["halationIntensity"] = 0.06
+        values["halationSpread"] = 24
+        values["halationHue"] = 16
+        values["halationThreshold"] = 0.72
+        values["halationRadius"] = 0.44
+        values["bloomSoftKnee"] = 0.62
+        values["halationSoftKnee"] = 0.42
+        values["fade"] = 0.012
+        values["shadowTone"] = 0.18
+        values["highlightTone"] = 0.12
+        values["shadowHue"] = 225
+        values["highlightHue"] = 214
+        values["compressionAmount"] = 0.34
+        values["compressionRange"] = 0.62
+        values["printContrast"] = 0.16
+        values["cyan"] = 0.06
+        values["magenta"] = 0.04
+        values["yellow"] = -0.08
+        return FilmtonePhase0ParamsPatch(values: values)
+    }()
+
     static let all: [BuiltInLook] = [
         BuiltInLook(
             slug: "filmtone-creative-pack-01-stone",
@@ -138,12 +204,60 @@ enum FilmtoneCreativePackCatalog {
         ),
     ]
 
+    /// Preset-only built-in Looks (no Creative LUT). UUIDs share the
+    /// `FB1A0001-0000-4000-8000-00000000XXXX` namespace with `all`,
+    /// continuing the sequence after `...0010` (Noir). `...0008` /
+    /// `...0009` are intentionally not reused per the iOS catalog.
+    static let presetOnlyLooks: [BuiltInPresetLook] = [
+        BuiltInPresetLook(
+            slug: "filmtone-built-in-twilight",
+            canonicalUUID: UUID(uuidString: "FB1A0001-0000-4000-8000-000000000011")!,
+            englishName: "Twilight",
+            paramOverridesPatch: twilightPatch
+        ),
+    ]
+
     static func find(slug: String) -> BuiltInLook? {
         all.first { $0.slug == slug }
     }
 
     static func find(canonicalUUID id: UUID) -> BuiltInLook? {
         all.first { $0.canonicalUUID == id }
+    }
+
+    static func findPresetOnly(slug: String) -> BuiltInPresetLook? {
+        presetOnlyLooks.first { $0.slug == slug }
+    }
+
+    static func findPresetOnly(canonicalUUID id: UUID) -> BuiltInPresetLook? {
+        presetOnlyLooks.first { $0.canonicalUUID == id }
+    }
+
+    /// Unified slug lookup across cube-bound and preset-only built-ins.
+    /// Used by `FilmtoneSavedLookStore` to gate immutability / favorite
+    /// behavior without duplicating the cube vs preset-only branch at
+    /// every call site.
+    static func builtInSlug(canonicalUUID id: UUID) -> String? {
+        if let look = find(canonicalUUID: id) {
+            return look.slug
+        }
+        if let preset = findPresetOnly(canonicalUUID: id) {
+            return preset.slug
+        }
+        return nil
+    }
+
+    /// Unified materialize across cube-bound and preset-only built-ins.
+    /// Returns nil for user-saved (non-built-in) UUIDs so callers can
+    /// fall through to the on-disk lookup.
+    static func materializeAnyBuiltIn(canonicalUUID id: UUID) -> SavedLookEntry? {
+        if let look = find(canonicalUUID: id) {
+            return materializeAsSavedLookEntry(look)
+        }
+        if let preset = findPresetOnly(canonicalUUID: id) {
+            return materializeAsSavedLookEntry(preset)
+        }
+        return nil
     }
 
     /// Stable as-of date stamped onto materialized built-in
@@ -187,6 +301,31 @@ enum FilmtoneCreativePackCatalog {
             bundled: true,
             immutable: true,
             bundledSlug: builtIn.slug
+        )
+    }
+
+    /// Materialize a preset-only built-in. Mirrors the cube-bound overload
+    /// but emits `creativeLut: nil` so the resolver stays on the preset
+    /// path — `EditorState.applySavedLook` keeps `lookSlug == nil` and
+    /// the cube-bound code paths never see Twilight.
+    static func materializeAsSavedLookEntry(_ preset: BuiltInPresetLook) -> SavedLookEntry {
+        return SavedLookEntry(
+            schemaVersion: FilmtoneLibraryConstants.entrySchemaVersion,
+            id: preset.canonicalUUID,
+            name: preset.englishName,
+            createdAt: pack01FreezeDate,
+            updatedAt: pack01FreezeDate,
+            presetName: FilmtonePresetCatalog.defaultName,
+            presetVersion: FilmtonePresetCatalog.presetVersion,
+            strength: 1.0,
+            quickState: .zero,
+            paramOverrides: preset.paramOverridesPatch,
+            creativeLut: nil,
+            favorite: false,
+            thumbnailRef: nil,
+            bundled: true,
+            immutable: true,
+            bundledSlug: preset.slug
         )
     }
 }

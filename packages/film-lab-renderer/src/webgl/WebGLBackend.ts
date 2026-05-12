@@ -347,6 +347,7 @@ export class WebGLBackend implements RenderBackend {
         // 0.4.0 の現像段・プリント段で使う数値 uniform。
         uCompressionAmount: { value: 0.0 },
         uCompressionRange: { value: 0.5 },
+        uShadowLatitude: { value: 0.0 },
         uPrintContrast: { value: 0.0 },
         uCyan: { value: 0.0 },
         uMagenta: { value: 0.0 },
@@ -2352,6 +2353,7 @@ export class WebGLBackend implements RenderBackend {
       halationColor: `#${new THREE.Color(this.halationColor.x, this.halationColor.y, this.halationColor.z).getHexString()}`,
       compressionAmount: this.material.uniforms.uCompressionAmount!.value as number,
       compressionRange: this.material.uniforms.uCompressionRange!.value as number,
+      shadowLatitude: this.material.uniforms.uShadowLatitude!.value as number,
       cyan: this.material.uniforms.uCyan!.value as number,
       magenta: this.material.uniforms.uMagenta!.value as number,
       yellow: this.material.uniforms.uYellow!.value as number,
@@ -2472,6 +2474,8 @@ export class WebGLBackend implements RenderBackend {
       this.material.uniforms.uCompressionAmount!.value = params.compressionAmount as number;
     if (params.compressionRange !== undefined)
       this.material.uniforms.uCompressionRange!.value = params.compressionRange as number;
+    if (params.shadowLatitude !== undefined)
+      this.material.uniforms.uShadowLatitude!.value = params.shadowLatitude as number;
     if (params.cyan !== undefined)
       this.material.uniforms.uCyan!.value = params.cyan as number;
     if (params.magenta !== undefined)

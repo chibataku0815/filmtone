@@ -458,6 +458,13 @@ Native Desktop opens iOS `capture-package.json`/package dirs, preserves
 master/proxy provenance, restores Stone/Urban/Noir, and imports package-local
 custom LUT payloads with explicit metadata-only failure state.
 
+2026-05-12: Inserted Twilight bundled built-in Look (preset-only, no cube,
+sourced from `presets.ts:vision3500t`) into Native Desktop and iOS Look
+libraries simultaneously. Catalog UUID `…0011` mirrored across both Swift
+catalogs; macOS adds a parallel `BuiltInPresetLook` struct + `presetOnlyLooks`
+array so cube-bound code paths stay untouched. UI surface stays under the
+existing Look library — no "Preset" UI label per CLAUDE.md §6 term lock.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

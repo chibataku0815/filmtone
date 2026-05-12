@@ -15,7 +15,7 @@
  *   5: (splitPosition, lut1Intensity, lut1Enabled, lut2Intensity)
  *   6: (lut2Enabled, cyan, magenta, yellow)
  *   7: (printContrast, fitMode, imgResX, imgResY)
- *   8: (resolutionX, resolutionY, time, _pad)
+ *   8: (resolutionX, resolutionY, time, shadowLatitude)
  */
 
 import {
@@ -121,11 +121,11 @@ export function packGradeUniforms(
   out[29] = state.fitMode;
   out[30] = state.imgResX;
   out[31] = state.imgResY;
-  // vec4 8 — render resolution / time
+  // vec4 8 — render resolution / time / toe separation
   out[32] = state.resolutionX;
   out[33] = state.resolutionY;
   out[34] = state.time;
-  out[35] = 0;
+  out[35] = n("shadowLatitude", 0);
 
   return out;
 }

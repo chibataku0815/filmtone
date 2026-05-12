@@ -163,8 +163,8 @@ void main() {
     + wE + wW + wN + wS
     + wNE + wNW + wSE + wSW;
 
-  vec3 ref = sumRGB / sumW;
-  vec3 detail = srcRGB - ref;
+  vec3 referenceRgb = sumRGB / sumW;
+  vec3 detail = srcRGB - referenceRgb;
 
   float detailLuma = dot(detail, lumaWeights);
   vec3 detailLumaVec = detailLuma * lumaWeights;
@@ -1464,6 +1464,7 @@ var WebGLBackend = class _WebGLBackend {
         // 0.4.0 の現像段・プリント段で使う数値 uniform。
         uCompressionAmount: { value: 0 },
         uCompressionRange: { value: 0.5 },
+        uShadowLatitude: { value: 0 },
         uPrintContrast: { value: 0 },
         uCyan: { value: 0 },
         uMagenta: { value: 0 },
@@ -3100,6 +3101,7 @@ var WebGLBackend = class _WebGLBackend {
       halationColor: `#${new THREE3.Color(this.halationColor.x, this.halationColor.y, this.halationColor.z).getHexString()}`,
       compressionAmount: this.material.uniforms.uCompressionAmount.value,
       compressionRange: this.material.uniforms.uCompressionRange.value,
+      shadowLatitude: this.material.uniforms.uShadowLatitude.value,
       cyan: this.material.uniforms.uCyan.value,
       magenta: this.material.uniforms.uMagenta.value,
       yellow: this.material.uniforms.uYellow.value,
@@ -3212,6 +3214,8 @@ var WebGLBackend = class _WebGLBackend {
       this.material.uniforms.uCompressionAmount.value = params.compressionAmount;
     if (params.compressionRange !== void 0)
       this.material.uniforms.uCompressionRange.value = params.compressionRange;
+    if (params.shadowLatitude !== void 0)
+      this.material.uniforms.uShadowLatitude.value = params.shadowLatitude;
     if (params.cyan !== void 0)
       this.material.uniforms.uCyan.value = params.cyan;
     if (params.magenta !== void 0)
@@ -3391,6 +3395,7 @@ uniform float uLUT2Enabled;
 // 0.4.0 \u306E\u73FE\u50CF\u6BB5\u3067\u4F7F\u3046\u6570\u5024 uniform\u3002
 uniform float uCompressionAmount;  // 0\u301C1\u30010 \u3067\u7121\u52B9
 uniform float uCompressionRange;   // 0\u301C1\u30010.5 \u304C\u65E2\u5B9A
+uniform float uShadowLatitude;      // 0\u301C1\u3001toe separation
 
 // 0.4.0 \u306E\u30D7\u30EA\u30F3\u30C8\u6BB5\u3067\u4F7F\u3046\u6570\u5024 uniform\u3002
 uniform float uCyan;               // -1\u301C1\u30010 \u3067\u7121\u52B9
@@ -3532,6 +3537,22 @@ vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   return clamp(outColor, 0.0, 1.0);
 }
 
+vec3 applyShadowLatitude(vec3 rgb, float amount) {
+  float amt = clamp(amount, 0.0, 1.0);
+  if (amt < 0.001) return rgb;
+  float y = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+  float blackProtect = smoothstep(0.025, 0.055, y);
+  float release = 1.0 - smoothstep(0.18, 0.30, y);
+  float band = blackProtect * release;
+  if (band <= 0.000001) return rgb;
+  float toeShape = max(0.0, 1.0 - y / 0.30);
+  float lumaLift = y * toeShape * 0.22 * amt * band;
+  float outY = y + lumaLift;
+  float chromaScale = 1.0 + 0.08 * amt * band;
+  vec3 outColor = vec3(outY) + (rgb - vec3(y)) * chromaScale;
+  return clamp(outColor, 0.0, 1.0);
+}
+
 // \u30D7\u30EA\u30F3\u30C8\u6BB5\u306E\u6700\u7D42\u30B3\u30F3\u30C8\u30E9\u30B9\u30C8\u3092 S \u30AB\u30FC\u30D6\u3067\u6301\u3061\u4E0A\u3052\u308B\u3002
 // amount=0 \u306A\u3089\u4F55\u3082\u3057\u306A\u3044\u3002
 vec3 applyPrintContrast(vec3 rgb, float amount) {
@@ -3589,6 +3610,9 @@ void main() {
 
   // Film Compression V3. Apply before LUT2 and downstream optical stages.
   color.rgb = applyFilmCompression(color.rgb, uCompressionAmount, uCompressionRange);
+
+  // Shadow Latitude / toe separation. Apply before LUT2.
+  color.rgb = applyShadowLatitude(color.rgb, uShadowLatitude);
 
   // === Creative LUT (LUT2) === after color grading
   if (uLUT2Enabled > 0.5) {
@@ -3715,7 +3739,7 @@ var Viewport = class _Viewport {
           "[Viewport] WebGPU is required but not supported in this environment"
         );
       }
-      const { WebGPUBackend } = await import("./WebGPUBackend-54U7QS6A.js");
+      const { WebGPUBackend } = await import("./WebGPUBackend-J5HBQ5A6.js");
       const backend = await WebGPUBackend.create(canvas);
       backend.setResolution(width, height);
       return new _Viewport(null, backend);

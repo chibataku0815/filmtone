@@ -173,7 +173,7 @@ actor FilmtoneSavedLookStore {
 
     @discardableResult
     func deleteLook(id: UUID) throws -> LibrarySnapshot {
-        if let slug = FilmtoneCreativePackCatalog.find(canonicalUUID: id)?.slug {
+        if let slug = FilmtoneCreativePackCatalog.builtInSlug(canonicalUUID: id) {
             throw StoreError.immutableEntry(slug: slug)
         }
         guard looks[id] != nil else {
@@ -191,7 +191,7 @@ actor FilmtoneSavedLookStore {
     /// rename does not leave the on-disk JSON half-written.
     @discardableResult
     func renameLook(id: UUID, newName: String) throws -> SavedLookEntry {
-        if let slug = FilmtoneCreativePackCatalog.find(canonicalUUID: id)?.slug {
+        if let slug = FilmtoneCreativePackCatalog.builtInSlug(canonicalUUID: id) {
             throw StoreError.immutableEntry(slug: slug)
         }
         if !didLoad {
@@ -216,9 +216,8 @@ actor FilmtoneSavedLookStore {
     /// favorite. iOS canonical does the same split.
     @discardableResult
     func setFavorite(id: UUID, favorite: Bool) throws -> SavedLookEntry {
-        if let bundled = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+        if var entry = FilmtoneCreativePackCatalog.materializeAnyBuiltIn(canonicalUUID: id) {
             setBuiltInFavorite(id, favorite: favorite)
-            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(bundled)
             entry.favorite = favorite
             return entry
         }
@@ -239,8 +238,8 @@ actor FilmtoneSavedLookStore {
     /// `FilmtoneCreativePackCatalog` (no disk I/O); user-saved ids
     /// return the in-memory entry.
     func loadLook(id: UUID) throws -> SavedLookEntry {
-        if let builtIn = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
-            return FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(builtIn)
+        if let entry = FilmtoneCreativePackCatalog.materializeAnyBuiltIn(canonicalUUID: id) {
+            return entry
         }
         guard let entry = looks[id] else {
             throw StoreError.lookNotFound(id)
@@ -258,13 +257,21 @@ actor FilmtoneSavedLookStore {
         // materialize time so the picker shows ★ on bundled entries the
         // user has favorited (the catalog JSON itself stays immutable).
         let favorites = builtInFavorites
-        let builtInLooks: [SavedLookEntry] = FilmtoneCreativePackCatalog.all.map { cat in
+        let cubeBuiltInLooks: [SavedLookEntry] = FilmtoneCreativePackCatalog.all.map { cat in
             var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(cat)
             if favorites.contains(entry.id) {
                 entry.favorite = true
             }
             return entry
         }
+        let presetOnlyBuiltInLooks: [SavedLookEntry] = FilmtoneCreativePackCatalog.presetOnlyLooks.map { preset in
+            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(preset)
+            if favorites.contains(entry.id) {
+                entry.favorite = true
+            }
+            return entry
+        }
+        let builtInLooks = cubeBuiltInLooks + presetOnlyBuiltInLooks
         let sortedUserLooks = looks.values.sorted { lhs, rhs in
             if lhs.favorite != rhs.favorite {
                 return lhs.favorite && !rhs.favorite

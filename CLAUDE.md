@@ -27,6 +27,8 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | **不確かなら検索** | API / ASC / Capacitor / iOS SDK / WebGPU 仕様が曖昧な場合は `gemini-search` → `WebSearch` の順。記憶ベース推測は `feedback_no_guessing_davinci_plugins` / `feedback_verify_before_documenting` 違反 |
 | **handoff 鵜呑み禁止** | 旧 chat の handoff doc を引用する前に、現行 surface (`grep` / Swift / pbxproj / WGSL) と突き合わせて live/frozen を確認 (`feedback_verify_before_quoting_handoff`) |
 | **Native Desktop v2 はこのリポの 2-layer docs が正本** | `docs/filmtone/desktop/native-desktop-v2/strategy.md` → `active.md` があれば現在状態の正本にする。旧 dedicated worktree / handoff / old plan docs は参照専用 |
+| **Desktop は native macOS app が正式** | 無修飾の Desktop / macOS 作業は `apps/filmtone-desktop-macos` に行く。`apps/desktop-film-lab-batch` は legacy Electron / old Desktop / rollback と明示された時だけ触る |
+| **旧 iOS preset ID を現在 truth にしない** | `iphone` / `softBlue` / `amberGlow` は互換用 ID。現在の Preset / Look 判断は `packages/film-lab-core/src/presets.ts`、`look-ids.ts`、Native Desktop/iOS lane doc から引く。端末名の `iPhone` は platform/capture/source/copy 文脈では可 |
 | **並列 stream silently 縮退禁止** | Agent Teams や複数 chat で stream 分割時、§3 残タスクの silent 省略・lane の chat 独断 redefine は禁止。完了時は handoff §8.5 4 セクション (Plan Compliance / Cross-Stream Visibility / Scope Diff / 残タスク enumeration) で機構化 (`feedback_no_silent_stream_redefine`) |
 | **bun 必須** | `bun install` / `bun run` / `bun add`。`npm` 禁止、`bun.lock` が正本(life CLAUDE.md §パッケージマネージャ) |
 
@@ -34,9 +36,10 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 
 | パス | 内容 |
 |---|---|
-| `README.md` | workspaces + scripts(`bun run build:core` / `verify:desktop` / `verify:ios` 等) |
+| `README.md` | official surface routing + scripts(`bun run build:core` / `verify:desktop` / `verify:ios` 等) |
 | `.ai/GLOBAL.md` | AI ツール共通グローバルルール(Cursor / Codex CLI 横断) |
 | `.ai/parallel-work.md` | 並列 stream / Agent Teams 協調プロトコル |
+| `apps/filmtone-desktop-macos/README.md` | 正式 Desktop app の build / Xcode / native 方針 |
 | `docs/filmtone/desktop/native-desktop-v2/strategy.md` | Native Desktop v2 の長期戦略・マイルストーン正本 |
 | `docs/filmtone/desktop/native-desktop-v2/active.md` | Native Desktop v2 の現在進行中サブタスク。存在しなければ次タスク案を作り、実装せずレビュー待ち |
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS 専用 223 行(Swift / fastlane / pbxproj 不変条件・lane 番号・antipattern) |
@@ -82,11 +85,12 @@ doc とスクリプトが食い違ったら **スクリプトを信頼**(handoff
 
 1. **npm publishing を再導入しない** — packages は submodule 消費前提。`npm publish` は portfolio の build 経路を壊す
 2. **`packages/film-lab-renderer/dist/` `packages/film-lab-smart-look/dist/` を消さない** — submodule 即 import 用に **意図的に track**(root `.gitignore` に `dist` 除外規則は **書かない**、`.gitignore` 編集時に `dist` を ignore に追加しないこと)。再生成必要なら `bun run build:renderer` / `build:smart-look` で上書き
-3. **portfolio を実装の正本扱いしない** — 古い handoff (`2026-03-30-*`, `2026-04-09-*` 等)が `chibatakumi-portfolio/apps/desktop-film-lab-batch` を参照していても、それは pre-migration の記述。実装は **このリポ**
-4. **iOS public 版と local candidate を混ぜない** — 固定値を書かない。毎回 release truth script で public App Store state / local Xcode candidate / upstream delta を確認してから書く
-5. **用語ロック** — `動画`(× `短尺動画`)/ `video`(× `short-form video`)。canonical spec は life `docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md`、video vocabulary lock は life commit `5ce6d55`(2026-05-01)を起点
+3. **旧 Desktop を正式 Desktop と読み替えない** — Desktop / macOS の通常作業は `apps/filmtone-desktop-macos`。`apps/desktop-film-lab-batch` は legacy Electron / old Desktop / rollback と明示された時だけ触る。古い handoff (`2026-03-30-*`, `2026-04-09-*` 等)が `chibatakumi-portfolio/apps/desktop-film-lab-batch` を参照していても、それは pre-migration の記述
+4. **旧 iOS preset ID を現在 truth にしない** — `iphone` / `softBlue` / `amberGlow` は `ios-preset-overrides.ts` 由来の互換 ID。現在の Preset / Look 一覧・仕様判断は `packages/film-lab-core/src/presets.ts`、`look-ids.ts`、Native Desktop/iOS lane doc から引く
+5. **iOS public 版と local candidate を混ぜない** — 固定値を書かない。毎回 release truth script で public App Store state / local Xcode candidate / upstream delta を確認してから書く
+6. **用語ロック** — `動画`(× `短尺動画`)/ `video`(× `short-form video`)。canonical spec は life `docs/guides/2026-04-07-filmtone-tool-vocabulary-ia-spec.md`、video vocabulary lock は life commit `5ce6d55`(2026-05-01)を起点
    **Preset / Look の訂正** — `Preset` は curve / grade 土台、`Look` は Stone / Urban Creative LUT Pack 文脈専用。`feature/desktop-look-unification` の rename 前提は 2026-05-04 に撤回済み。`BaseLookName` / `BASE_LOOKS` / `lookPresetId` / `currentExportLookPreset` などの alias artifact は新規参照しない。既存 artifact は purge lane で扱う
-6. **JSX comment を return ( の直下に置かない** — `feedback_no_jsx_comment_outside_root_return` 既発火 2 回
+7. **JSX comment を return ( の直下に置かない** — `feedback_no_jsx_comment_outside_root_return` 既発火 2 回
 
 ## 7. Submodule update 手順(portfolio 側へのバンプ)
 
@@ -110,8 +114,9 @@ vercel deploy は portfolio 側の `apps/web` build に依存するので submod
 | パス | 状態 |
 |---|---|
 | `apps/capacitor-film-lab-ios/CLAUDE.md` | **既存**(223 行)。iOS の不変条件はここから引く |
-| `apps/desktop-film-lab-batch/CLAUDE.md` | **未作成**。Desktop 専用の不変条件が顕在化した時に user 指示で追加(現状は README + このファイルで足りる) |
-| `docs/filmtone/desktop/native-desktop-v2/strategy.md` + `active.md` | **既存**。Native Desktop v2 はこのリポの 2-layer docs を正本にする |
+| `apps/filmtone-desktop-macos/README.md` | **既存**。正式 Desktop app の native build / Xcode 方針 |
+| `apps/desktop-film-lab-batch/CLAUDE.md` | **未作成**。legacy Electron 専用の不変条件が顕在化した時だけ user 指示で追加 |
+| `docs/filmtone/desktop/native-desktop-v2/strategy.md` + `active.md` | **既存**。Native Desktop v2 は正式 Desktop の 2-layer docs 正本 |
 
 ## 9. 出力ルール(life CLAUDE.md §11 と整合)
 

@@ -41,16 +41,17 @@ Filmtoneという動画カラー編集アプリの note 向けリリース記事
 - Texture Softness / 質感のやわらかさ は、単純なぼかしではなく、細かい輪郭や局所コントラストの強さを少し調整するためのもの。
 - Texture Softness は万能の品質保証ではない。素材によって効き方が変わる、と明記する。
 - Source detail bias は conservative / runtime-only で、保存した Look には焼き込まない。
-- React + Capacitor は失敗扱いしない。初期の WebGPU/WebGL renderer path を iOS に持ち込むための合理的な選択だった。
+- React + Capacitor は失敗扱いしない。初期の WebGPU/WebGL renderer path を iOS に持ち込むための合理的な選択だった。**ただし shipping app の現在 runtime は iOS / Mac とも native Swift (AVFoundation + Core Image + SwiftUI / AppKit)**。WebGPU/WebGL renderer は Web 公開窓 (portfolio) で生きているが iOS / Mac の runtime path には乗っていない。「いまも WebGPU/WebGL が runtime」と書かない。
 - native SwiftUI / AVFoundation への移行は、撮影・Live Look・書き出し品質のため。Webを捨てた話ではない。
 - 色の考え方は shared core に置き、iOS/Desktopで分けない。
 
 用語ルール:
 - 「動画」を使う。「短尺動画」は使わない。
-- `Preset` は curve/grade foundation。
-- `Look` は Stone / Urban Creative LUT Pack 文脈や保存済みLook文脈で使う。
+- **`Preset` / `プリセット` は user-facing で一切使わない**。UI から Preset 概念は撤去済み。curve / grade 土台にあたるものも bundled Look として並ぶので、記事では常に `Look` に統一。
+- `Look` はすべての保存済み色設定の総称 (`Stone` / `Urban Creative` LUT Pack 文脈や、自分で保存した仕上がりを含む)。
 - `Texture Softness` / `質感のやわらかさ` は、読者に伝わるように説明を添える。
 - 「細部の硬さ」は意味が分かりにくいので使わない。
+- iOS App Store link (`https://apps.apple.com/jp/app/filmtone-%E3%83%95%E3%82%A3%E3%83%AB%E3%83%A0%E8%AA%BF%E3%82%AB%E3%83%A9%E3%82%B0%E3%83%AClut/id6762564806`) を本文末尾に必ず置く。
 
 推奨表現:
 - 「細かい輪郭の強さ」
@@ -138,7 +139,7 @@ Desktop と iOS の通常の動画書き出しで、元の素材に音声があ�
 
 `Lens softness` とは役割が違います。`Lens softness` は、レンズや周辺の柔らかさに近い調整です。`Texture softness` は、画面全体にある細かい輪郭や質感の出方を扱います。
 
-くっきり撮れた動画は見やすい一方で、色を作ったあとに、細い輪郭だけが強く残ることがあります。たとえば髪、布、葉、細かい文字、夜のノイズのような部分です。全体の色はよくても、そこだけシャープに見えすぎることがあります。
+最近の iPhone やアクションカメラの素材は、撮影時にカメラ側 (センサーや内部の画像処理) が、細かい輪郭を強めに見せる sharpening を撮って出しの段階で焼き込んでいます。Filmtone 側で色を整えても、その焼き込まれたシャープさ自体は減りません。色全体のバランスが取れたあとに、もともと立っていた細い輪郭だけが目立って見える、ということが起きやすくなります。たとえば髪、布、葉、細かい文字、夜のノイズのような部分です。
 
 ただし、普通の blur をかけたいわけではありません。文字や髪までぼやけると、ただ解像感が落ちたように見えます。やりたいのはピンぼけではなく、細かい輪郭の主張を少し弱めることです。
 
@@ -152,15 +153,15 @@ Desktop と iOS の通常の動画書き出しで、元の素材に音声があ�
 
 iOS では、撮影、編集、書き出し、Look、Optics、Source Profile まわりを feature ごとに分けています。Desktop でも、native macOS アプリとして、プレビュー、通常の動画書き出し、静止画書き出しで同じ考え方を使えるようにしています。
 
-ただし、native に寄せることは、iOS と Desktop で色の考え方を別物にするという意味ではありません。
+ただし、native に寄せることは、iOS と Desktop で色の考え方を別物にするという意味ではありません。いまの iOS と Mac の Filmtone は、どちらも Apple 純正の Swift で書かれた native アプリです。撮影と書き出しは AVFoundation、色のグレーディング処理は Core Image、画面は SwiftUI と AppKit、という形です。色の決め方そのものは、TypeScript で書いた共通の core に置き、そこから Swift コードを生成して両方のアプリが参照する作りにしています。
 
-最初の Filmtone は、WebGPU / WebGL renderer と shared TypeScript の色ロジックから始まりました。iOS の React + Capacitor も、その renderer path を iPhone に持ち込むための選択でした。その後、撮影や Live Look、書き出しの品質を上げるために、AVFoundation と SwiftUI 側の制御が必要になりました。
+なお、初期の Filmtone はブラウザ上の描画エンジン (WebGPU / WebGL) を React + Capacitor 経由で iPhone に持ち込む形で始まりました。いまもこの描画エンジンは残っていて Web 側で使われていますが、iOS / Mac の shipping アプリの runtime はそこから native Swift に移っています。
 
-今の方向は、Web と native の勝ち負けではありません。色の考え方は shared core に置き、撮影や書き出しのように runtime quality が効くところは native で持つ。Filmtone はその形に寄せています。
+今の方向は、Web と native の勝ち負けではありません。色の決め方は shared core に置き、撮影や書き出しのように runtime quality が効くところは native で持つ。Filmtone はその形に寄せています。
 
 ## 公開後に試してほしいところ
 
-公開後に試すなら、まずはいつもの Preset や Look を選び、音声付き素材を通常の動画として書き出してみてください。次に、Advanced の Texture Softness / 質感のやわらかさを少しだけ上げて、細かい輪郭の見え方がどう変わるかを見てください。
+公開後に試すなら、まずはいつもの Look を選び、音声付き素材を通常の動画として書き出してみてください。次に、Advanced の Texture Softness / 質感のやわらかさを少しだけ上げて、細かい輪郭の見え方がどう変わるかを見てください。
 
 効き方は素材によって変わります。すべての素材を自動でいい感じにする機能ではありません。輪郭が強く見えすぎる素材に対して、調整の選択肢をひとつ増やす更新として見てもらうのが近いです。
 

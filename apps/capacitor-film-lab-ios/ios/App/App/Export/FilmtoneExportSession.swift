@@ -970,6 +970,8 @@ final class FilmtoneExportSession {
         profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
         current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
         profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
+        current = gradeRenderPipeline.applyShadowLatitudeStage(to: current, params: params)
+        profileRenderSubstage(.shadowLatitude, image: current, outputSize: stageProfilingOutputSize)
         current = gradeRenderPipeline.applyDetailSoftnessStage(
             to: current,
             params: params,

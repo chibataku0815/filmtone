@@ -3,6 +3,11 @@
 This repository is the standalone implementation source of truth for Filmtone
 Desktop, Filmtone iOS, and the shared `film-lab-*` packages.
 
+Desktop means the native macOS app unless the user explicitly says legacy
+Electron, old Desktop, or rollback. The official Desktop implementation is
+`apps/filmtone-desktop-macos/`. `apps/desktop-film-lab-batch/` is the frozen
+legacy Electron rail and must not receive normal Desktop product fixes.
+
 Do not begin with broad file discovery. Route first, open the current target,
 then work on the product surface.
 
@@ -12,11 +17,12 @@ then work on the product surface.
 2. Run `git status --short --branch`.
 3. Open only the current target entry:
    - repo-wide context: `README.md`, then `CLAUDE.md` if policy details matter
-   - Desktop: `apps/desktop-film-lab-batch/` and
-     `docs/filmtone/desktop/README.md`
-   - Native Desktop v2:
+   - Desktop / macOS native app: `apps/filmtone-desktop-macos/README.md`,
+     `docs/filmtone/desktop/README.md`, and
      `docs/filmtone/desktop/native-desktop-v2/strategy.md`, then `active.md`
-     in this repository if present
+     in this repository if present for Native Desktop v2 product work
+   - Legacy Electron Desktop: `apps/desktop-film-lab-batch/` only when the
+     request explicitly says legacy Electron, old Desktop, or rollback
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
    - shared packages: the specific package under `packages/`
@@ -31,8 +37,9 @@ there directly after this file.
 
 | Request mentions | Start here | Primary check |
 |---|---|---|
-| Desktop, macOS, release, update metadata | `apps/desktop-film-lab-batch/` and `docs/filmtone/desktop/README.md` | `bun run verify:desktop` |
-| Native Desktop v2, SwiftUI Desktop, macOS native app | `docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` if present | `bun run verify:macos` |
+| Desktop, macOS, release, update metadata | `apps/filmtone-desktop-macos/`, `docs/filmtone/desktop/README.md`, and `docs/filmtone/desktop/native-desktop-v2/strategy.md`; open `active.md` if present for product work | `bun run verify:desktop` |
+| Native Desktop v2, SwiftUI Desktop, macOS native app | `apps/filmtone-desktop-macos/` plus `docs/filmtone/desktop/native-desktop-v2/strategy.md` and `active.md` if present | `bun run verify:desktop` |
+| legacy Electron Desktop, old Desktop, rollback | `apps/desktop-film-lab-batch/` | `bun run verify:legacy-desktop` |
 | iOS, App Store, Xcode, TestFlight, Swift, Capacitor | `apps/capacitor-film-lab-ios/CLAUDE.md` | `bun run verify:ios` |
 | color math, presets, LUT, schema, Swift payload | `packages/film-lab-core/` | `bun run build:core` and relevant package tests |
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
@@ -81,6 +88,8 @@ Rules:
 - Start Native Desktop v2 sessions by reading `strategy.md`, then `active.md` in
   this repository if present. If `active.md` is missing, propose the next
   subtask and wait.
+- Treat all unqualified Desktop product work as Native Desktop v2 work in
+  `apps/filmtone-desktop-macos/`. Do not route it to the legacy Electron app.
 - Do not implement without an `active.md`, and do not mix multiple subtasks into
   one `active.md`.
 - Work only inside the current `active.md` scope. If scope needs to change, stop
@@ -192,8 +201,10 @@ bun run build:core
 bun run build:renderer
 bun run build:smart-look
 bun run verify:desktop
+bun run verify:legacy-desktop
 bun run verify:macos
 bun run verify:ios
+bun run check:filmtone-reference-guards
 bun run check:filmtone-copy
 bun run check:filmtone-context
 git diff --check
@@ -201,14 +212,19 @@ git diff --check
 
 Guidance:
 
-- Desktop behavior/export changes: `bun run verify:desktop`.
-- Native Desktop v2 behavior/export changes: `bun run verify:macos`.
+- Desktop behavior/export changes: `bun run verify:desktop` (native macOS app).
+- Native Desktop v2 behavior/export changes: `bun run verify:desktop` or
+  `bun run verify:macos`.
+- Legacy Electron checks: `bun run verify:legacy-desktop`, only when the request
+  explicitly targets the old Desktop rail.
 - iOS native/bridge/export changes: `bun run verify:ios`; if Swift build risk is
   material, run the `xcodebuild` command documented in
   `apps/capacitor-film-lab-ios/CLAUDE.md`.
 - Shared package contract changes: build the package, then verify every affected
   app surface.
 - Copy changes: run `bun run check:filmtone-copy`.
+- Agent/source-of-truth routing changes: run
+  `bun run check:filmtone-reference-guards`.
 - Product changes that may affect public wording, release claims, or
   implementation history: run `bun run check:filmtone-context`.
 - Broader QA is appropriate only after the primary product result is already
@@ -219,6 +235,16 @@ Guidance:
 - Use `bun`. Do not introduce npm/yarn/pnpm lockfile churn.
 - Do not reintroduce npm publishing as the initial dependency mode. The current
   portfolio dependency mode is Git submodule.
+- Do not edit `apps/desktop-film-lab-batch/` for normal Desktop work. Use
+  `apps/filmtone-desktop-macos/` unless the user explicitly asks for legacy
+  Electron, old Desktop, or rollback work.
+- Do not use lowercase preset IDs such as `iphone`, `softBlue`, or `amberGlow`
+  as current product truth. They are compatibility IDs for the old small iOS
+  Phase 0 preset rail and generated/parity fixtures. For current preset and Look
+  truth, route to `packages/film-lab-core/src/presets.ts`,
+  `packages/film-lab-core/src/look-ids.ts`, and the active Native Desktop/iOS
+  lane docs. Uppercase `iPhone` is still valid when discussing the platform,
+  device metadata, capture, source classification, or iOS public copy.
 - Do not treat `chibatakumi-portfolio/apps/desktop-film-lab-batch` or
   `chibatakumi-portfolio/apps/capacitor-film-lab-ios` as implementation truth.
 - Do not remove `packages/film-lab-renderer/dist/` or

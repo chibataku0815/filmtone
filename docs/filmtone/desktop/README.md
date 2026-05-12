@@ -3,8 +3,16 @@
 This directory keeps current Desktop routing small. Historical handoffs and
 superseded Native Desktop v2 phase plans live under `archive/`.
 
+Desktop means the native macOS app. The current implementation lives in
+`apps/filmtone-desktop-macos/`, and Native Desktop v2 owns the public Desktop
+release rail. `apps/desktop-film-lab-batch/` is legacy Electron code and should
+only be opened when a task explicitly says legacy Electron, old Desktop, or
+rollback.
+
 ## Current Entry Points
 
+- Official Desktop app:
+  `../../../apps/filmtone-desktop-macos/`
 - Native Desktop v2 strategy:
   `native-desktop-v2/strategy.md`
 - Native Desktop v2 current task:

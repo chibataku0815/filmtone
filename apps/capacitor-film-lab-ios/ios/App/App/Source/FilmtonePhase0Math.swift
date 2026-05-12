@@ -40,6 +40,7 @@ extension FilmtonePhase0Params {
             trailIntensity: trailIntensity,
             fade: fade,
             shadowTone: shadowTone,
+            shadowLatitude: shadowLatitude,
             highlightTone: highlightTone,
             shadowHue: shadowHue,
             highlightHue: highlightHue,
@@ -529,6 +530,7 @@ enum FilmtonePhase0Math {
             return max(0, min(FilmtonePhase0Generated.grainIntensityMax, value))
         case "lensSoftness",
              "detailSoftness",
+             "shadowLatitude",
              "grainRadialMix",
              "grainSize",
              "bloomThreshold",

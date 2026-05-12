@@ -1,135 +1,131 @@
-# Filmtone 通常動画書き出しの音声保持と Texture Softness 追加 ── 実装メモ
+# Texture Softness を blur ではなく detail layer として実装する ── Filmtone の場合
 
 Status: candidate technical draft. Public release wording is gated until
 Desktop public `1.7` and iOS public `1.9` are both true.
 
 Publication switch:
 
-- Before public truth: keep `次の更新に入れている`, `候補`, `今回の方針` framing.
-- After public truth: change the opening to
-  `Filmtone Desktop 1.7 / iOS 1.9 の実装メモです。` and remove the
-  `まだ公開前の候補稿なので` sentence.
+- Before public truth: keep `次の更新に入れている` / `候補` 表現。
+- After public truth: 冒頭を `Filmtone Desktop 1.7 / iOS 1.9 で入った Texture Softness の実装メモです。` に差し替える。
 
-## この記事の位置づけ
+TOC policy: Zenn は h2 / h3 から目次を自動生成し、デスクトップでは右サイドバーに常時表示する。本文内に手動 TOC を書かない。見出しは単独で意味が通る形を保つ (目次項目になるため)。
 
-Filmtone の次の Desktop / iOS 更新に入れている、通常動画書き出しの音声保持と `Texture Softness` の実装メモです。まだ公開前の候補稿なので、公開状態の表現は控えています。
+## Filmtone とは
 
-この記事では、主に次の 3 点を扱います。
+Filmtone は、iPhone (iOS) と Mac (macOS) で動画の色味を整えるアプリです。撮影済みの動画を読み込み、curve / grade / LUT / glow / grain / print processing を組み合わせたカラーグレーディングをかけて、MP4 として書き出します。
 
-- 音声付き素材を通常動画として書き出すとき、出力 MP4 にも音声を残す。
-- 書き出し成功の判定を、処理途中ではなく完成ファイル側で確認する。
-- `Texture Softness` を、単純な blur ではなく、細かい輪郭や局所コントラストを動かす処理として設計する。
+shipping app の構成は **iOS / macOS とも native Swift**。`AVFoundation` でデコード / エンコード、`CoreImage` (CIKernel) でカラーグレーディングの GPU 処理を回し、UI は SwiftUI と AppKit という形です。色の判定 (Look の組み立て、kernel 定数、curve / compression / shadow / detail-softness / optics の resolve 順) は TypeScript で書いた一つの core (`packages/film-lab-core`) を正本とし、そこから Swift コードを生成して `packages/film-lab-swift-core` (`FilmLabSwiftCore` Swift Package) に置き、iOS / macOS の両 native app から `import FilmLabSwiftCore` で参照します。
 
-## 1. audio input を作るだけでは足りなかった
+つまり「色の正本は TypeScript」「runtime は native Swift」というのが、いまの shipping 構成です。WebGPU / WebGL の renderer (`packages/film-lab-renderer`) も維持していますが、これは portfolio 側の web 公開窓で landing demo を出すための表側専用で、iOS / macOS アプリの runtime path には乗っていません。
 
-通常の動画書き出しで必要な条件は単純です。
+この記事は、次の Desktop / iOS 更新に入れている `Texture Softness` の実装メモです。同じ release で不具合修正 (通常動画書き出しの音声欠落) も入っているので、末尾でその検証 pattern にも触れます。
 
-- source に音声トラックがある
-- 出力 MP4 にも音声トラックがある
-- 書き出し成功と表示する前に、完成ファイル側でそれを確認する
+## 問題: 機種側で焼き込まれた sharpening が強すぎる素材がある
 
-実装中は、`AVAssetWriterInput` に audio input を追加した時点で安心しがちです。ただ、Filmtone ではそこを成功条件にしないようにしました。
+最近の iPhone やアクションカメラ系の素材は、撮影時点で sensor / ISP / encoder の sharpening によって細かい輪郭の acutance がかなり強く乗っています。これは撮って出しの段階で既に焼き込まれた性質で、後段で grade を当てても弱まりません。
 
-理由は、ユーザーが使うのは writer の途中状態ではなく、完成したファイルだからです。
+curve / Look / LUT / glow / grain / print processing は輪郭を「足す」処理ではありません。ただし contrast や print stage で画全体のコントラストが整うと、もともと source 側に立っていた強めの細部が相対的に目立ちやすくなります。
 
-プレビューで音が聞こえること、writer に audio input があること、完成した MP4 に音声トラックが残っていること。この 3 つは似ていますが同じではありません。動画アプリでは、最後の 1 つだけが本番です。
+具体的に見えやすい部位は、髪、布、葉、細かい文字、夜のノイズ、街灯まわりの境界です。
 
-今回の方針はこうです。
-
-- source audio track を読む
-- 通常の動画書き出しでは AAC audio として output に書く
-- completed output file を再度開き、audio track の有無を確認する
-- audio-bearing source なのに output に音声がなければ成功扱いにしない
-
-iOS では、アプリ内録画クリップにマイク音声を含める方向も足しています。Desktop と iOS で細部の実装は違いますが、完成ファイル側で見るという考え方は揃えています。
-
-ハイライト書き出しは、今回の範囲では source-audio disabled のままです。selected timeline segments から再構成する別の出口なので、通常動画書き出しと同じ claim にはしていません。
-
-## 2. Texture Softness は blur ではない
-
-もうひとつの変更は `Texture Softness` です。
-
-目的は、画面全体をぼかすことではなく、細かい輪郭の成分 (detail layer) と局所コントラストを少しだけ弱めることです。
-
-最近の iPhone やアクションカメラ系の素材は、撮って出しの時点で細かい輪郭がかなり立っていることがあります。そのままでも見やすいのですが、Filmtone 側で Preset / LUT / glow / grain / print 処理を重ねると、細い輪郭だけが強く残ることがあります。
-
-普通の blur で解決しようとすると、別の問題になります。
+普通の blur で対処すると別の問題が起きます:
 
 - 文字が読みにくくなる
-- 髪や布のエッジが溶ける
+- 髪・布のエッジが溶ける
 - 葉や建物の線が均されすぎる
-- grain まで一緒に眠くなる
+- 自前で乗せた grain まで一緒に眠くなる
 
-やりたいのはそこではありません。強い輪郭はなるべく残し、局所的に浮いた細かい acutance を少し落とすことです。
+つまり、画面全体の解像感を落としたいのではなく、**強い edge は残したまま、source に焼き込まれた局所的に浮いた細かい acutance だけを下げたい**。これが Texture Softness の出発点です。
 
-## 3. amplitude-gated bilateral detail layer
+## 実装: amplitude-gated bilateral detail layer
 
-実装は、単純な平均化ではなく、近い明るさの周辺ピクセルから局所参照を作り、そこから浮いた detail layer を扱う形にしています。
-
-大まかにはこういう考え方です。
+Texture Softness は、画面全体に対する後段 blur ではなく、frame 単位で組む detail layer 操作として実装しています。
 
 ```text
 source frame
-  -> local edge-preserving reference
-  -> detail layer = source - reference
-  -> gate detail by local amplitude / threshold
-  -> subtract controlled detail amount
-  -> continue into optics, glow, grain, LUT, print stages
+  → edge-preserving local reference (近い明るさのピクセルから局所平均)
+  → detail layer = source - reference
+  → local amplitude / threshold で detail を gate
+  → controlled amount だけ source から差し引く
+  → 後段の optics / glow / grain / LUT / print stages へ
 ```
 
-ポイントは、Texture Softness を後段の blur として置かないことです。Desktop release notes では、edge optics、glow、grain、creative LUT、print processing の前に置いています。過剰に立った edge を glow に渡しすぎないこと、生成した grain を後から潰さないことが狙いです。
+ポイントは 2 つです。
 
-## 4. source detail bias は runtime-only にする
+**1. 単純平均ではなく edge-preserving reference を作る**。bilateral / joint filter 系の発想で、近い明るさのピクセル群から局所参照を作るので、強い edge (人物の輪郭、文字の縁) は reference 側に保たれ、その上で `detail = source - reference` を取ると、強い edge は detail layer にほとんど乗らず、細かい acutance だけが detail layer に乗ります。
 
-もうひとつ、素材情報が使える場合は conservative な `source detail bias` を足しています。
+**2. detail layer を amplitude で gate する**。detail layer をそのまま差し引くと、grain や微細テクスチャまで一緒に削れます。amplitude / threshold で「中くらいの強さの細かい acutance」だけを引き対象にすることで、大きい edge と小さい grain をどちらも残せます。
 
-ただし、これは saved Look には保存しません。
+### Pipeline 上の位置
 
-ここは重要です。iPhone 由来の素材に少し効かせたい補正を Look の中に焼き込むと、その Look を別のカメラ素材に当てたときにも補正が付いてきます。それは Look の持ち運びやすさを壊します。
+これも書く価値があります。Texture Softness を**後段の blur として置かない**ことが重要です。
 
-なので、考え方を分けています。
+Filmtone の Desktop pipeline では、Texture Softness は edge optics / glow / grain / creative LUT / print processing の**前**に置いています。理由は 2 つ:
 
-- Look / Preset: 持ち運ぶ色の意図
-- Source Profile / source metadata: その素材を読むための手がかり
-- source detail bias: runtime でだけ効く、控えめな補助
+- 過剰に立った edge を glow に渡すと halo が肥大化する。Texture Softness を glow より前に置けば、glow 入力時点で輪郭が落ち着いている
+- Texture Softness を後段に置くと、自前で乗せた grain も潰してしまう。先に detail layer を落とし、その後で grain を乗せる順序にする
 
-この分離は見た目のためだけではなく、記事や release note の claim を安全にするためにも効きます。`このカメラを完全に補正します` とは言わず、`使える素材情報がある場合に、控えめな runtime-only bias を使います` と説明できます。
+## source detail bias を Look に保存しない
 
-## 5. native runtime と shared color truth
+Texture Softness 自体は user-controllable な軸ですが、それとは別に Filmtone は素材メタデータが使える場合に、控えめな `source detail bias` (初期 detail 抑制量) を runtime で足しています。
 
-Filmtone は iOS / Desktop とも native runtime に寄っています。ただし、これは `Web を捨てた` という話ではありません。
+ここで設計判断が一つあります。**この bias を `Look` (保存可能な色の意図) には書き込まない**。
 
-初期の Filmtone は WebGPU / WebGL renderer と shared TypeScript の色ロジックから始まりました。React + Capacitor の iOS 版も、その renderer path を iPhone に持ち込むための合理的な選択でした。
+理由:
 
-その後、iOS の撮影、Live Look、AVFoundation export、Desktop の native macOS export では、その場の処理の質 (runtime quality) を native 側で持つ必要が出てきました。だから SwiftUI / AVFoundation / AppKit 側に降りています。
+- iPhone 撮って出し向けに少し効かせたい bias を、保存した Look の中に値として持たせてしまうと、別カメラ素材にその Look を当てたときにも bias が付いてくる
+- Look の portability (素材をまたいで使える) が壊れる
+- 記事 / release notes での claim が安全でなくなる (「このカメラ向けに最適化」と言ってしまうと、Look の portability claim と矛盾する)
 
-一方で、色の source of truth は shared core に置く。生成 Swift payload や検証を通して、native app が勝手に別の色思想へ分岐しないようにする。ここは Filmtone の実装方針としてかなり大事です。
+なので、3 層に責務を分けています:
 
-## 6. 検証の粒度
+```text
+Look                    : 持ち運ぶ色の意図 (curve / grade 土台も bundled Look として並ぶ)
+Source profile / metadata: その素材を読むための手がかり (runtime で参照する)
+Source detail bias       : runtime でだけ効く控えめな補助 (Look には書き込まない)
+```
 
-今回の候補では、少なくとも以下を gate にしています。
+この分離があると、release notes でも `使える素材情報がある場合に、控えめな runtime-only bias を入れています` のように、portability を壊さない説明ができます。
 
-- core / renderer / smart-look build
-- iOS verification
-- macOS verification
-- Swift package tests
-- targeted detail / schema tests
-- copy / context checks
-- `git diff --check`
+## 不具合修正: 完成ファイル側で出力 audio を検証する
 
-ただし、Texture Softness の見た目は素材依存です。テストで壊れていないことは見られますが、すべての素材で最適とは言いません。広域の visual QA は、今後も素材を足しながら見る領域です。
+同じ release で、通常動画書き出しの音声欠落も直しました。新機能ではなく bug fix ですが、検証 pattern としては書く価値があります。
+
+書き出しに必要な条件は単純です:
+
+- source に audio track がある
+- 出力 MP4 にも audio track がある
+- 成功表示の前に、完成ファイル側で確認する
+
+問題は最後です。実装中は `AVAssetWriterInput` に audio input を append できた時点で安心しがちですが、これは「writer 上で audio input を構成できた」ことしか保証しません。完成 MP4 を再度開いて audio track の有無を確認するまで、ユーザーが受け取るファイルの実態は確認できません。
+
+なので、今回は次の判定にしています:
+
+- source の audio track を読む
+- 通常動画書き出しでは AAC として output に書く
+- writer finish 後、completed output file を `AVAsset` で再オープンして audio track の有無を確認する
+- audio を持つ source なのに output に audio track がなければ成功扱いにしない
+
+iOS では、これに加えてアプリ内録画クリップにマイク音声を含める path も入れました。Desktop と iOS で writer 実装は違いますが、**writer state ではなく完成ファイルで判定する**という考え方は揃えています。
+
+なお Highlight 書き出し (selected timeline segments を再構成する別の出力 path) は今回の範囲では source-audio disabled のままです。通常動画書き出しと同じ claim にはしていません。
 
 ## まとめ
 
-今回やったことは、出口の信頼性と、細かい輪郭や局所コントラストを扱うための土台です。
+- Texture Softness は後段 blur ではなく、`amplitude-gated detail layer subtract` として実装している
+- detail layer 操作は glow / grain / LUT より**前**に置く
+- source detail bias は runtime のみ。Look には書き込まない (portability 維持のため)
+- 動画書き出しの成功判定は writer state ではなく完成ファイル側で見る
 
-音声は、完成ファイル側で見る。Texture Softness は、blur ではなく detail layer として扱う。source 由来の補正は runtime-only にして、Look の中に混ぜない。
+動画アプリではプレビューではなく完成ファイルが最後の成果物です。Texture Softness の効きも、audio の有無も、最後に書き出された MP4 で判断されます。そこに寄せて設計を詰めています。
 
-動画アプリでは、プレビューではなく完成ファイルが最後の成果物です。そこを基準にして、音声と細部の処理を少しずつ詰めています。
+---
+
+Filmtone iOS は App Store で配布しています: https://apps.apple.com/jp/app/filmtone-%E3%83%95%E3%82%A3%E3%83%AB%E3%83%A0%E8%AA%BF%E3%82%AB%E3%83%A9%E3%82%B0%E3%83%AClut/id6762564806
 
 ---
 
 公開前メモ:
 
 - Desktop public `1.7` / iOS public `1.9` が揃うまで release wording にしない。
-- Public article にする時は、冒頭を `Filmtone Desktop 1.7 / iOS 1.9 の実装メモです` に変える。
+- Public 確定後は冒頭を `Filmtone Desktop 1.7 / iOS 1.9 で入った Texture Softness の実装メモです。` に変える。

@@ -34,6 +34,7 @@ describe("phase0 schema", () => {
     expect(phase0.trailIntensity).toBe(PRESETS.cinematic.trailIntensity);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
     expect(phase0.detailSoftness).toBe(PRESETS.cinematic.detailSoftness);
+    expect(phase0.shadowLatitude).toBe(PRESETS.cinematic.shadowLatitude);
   });
 
   test("detailSoftness defaults to 0 when omitted from a phase0 patch", () => {
@@ -55,14 +56,35 @@ describe("phase0 schema", () => {
     }
   });
 
+  test("shadowLatitude defaults to 0 when omitted from a phase0 patch", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { shadowLatitude: _omit, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    expect(parsed.shadowLatitude).toBe(0);
+  });
+
+  test("shadowLatitude accepts 0/1 boundaries and rejects out-of-range values", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    for (const val of [0, 1]) {
+      expect(phase0ParamsSchema.parse({ ...reset, shadowLatitude: val }).shadowLatitude).toBe(val);
+    }
+    for (const val of [-0.01, 1.01]) {
+      expect(
+        phase0ParamsSchema.safeParse({ ...reset, shadowLatitude: val }).success,
+      ).toBe(false);
+    }
+  });
+
   test("mergePhase0Params preserves detailSoftness and still strips unknown keys", () => {
     const merged = mergePhase0Params(pickPhase0Params(PRESETS.reset), {
       detailSoftness: 0.42,
+      shadowLatitude: 0.42,
       // unknown sibling — must be stripped, not retained
       // @ts-expect-error: intentionally probing strip behavior
       bogusUnknownKey: 1,
     });
     expect(merged.detailSoftness).toBe(0.42);
+    expect(merged.shadowLatitude).toBe(0.42);
     expect((merged as Record<string, unknown>).bogusUnknownKey).toBeUndefined();
   });
 

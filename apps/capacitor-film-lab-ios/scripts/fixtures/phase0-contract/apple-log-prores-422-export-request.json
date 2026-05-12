@@ -120,6 +120,7 @@
       "trailIntensity": 0,
       "fade": 0.04,
       "shadowTone": 0,
+      "shadowLatitude": 0,
       "highlightTone": 0,
       "shadowHue": 225,
       "highlightHue": 30,

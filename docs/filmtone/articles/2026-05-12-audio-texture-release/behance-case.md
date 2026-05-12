@@ -11,57 +11,68 @@ Publication switch:
   release notes, add the App Store and Desktop download links, and replace any
   remaining `candidate` qualifiers in the body copy.
 
+TOC policy: Behance case studies are scroll-based visual sequences and do not
+expose a TOC widget. The H2 sections in this draft (Cover, Project Summary,
+Problem, Design Direction, Visual System Notes, Case Study Copy, Asset
+Checklist, Publish Guard) are production checkpoints for the layout, not
+reader navigation. Do not add a TOC, and do not rename these section
+headings to "1." / "2." style — they map to Behance project blocks, not to
+a numbered article.
+
 ## Cover
 
 Title:
 
 ```text
-Filmtone: Audio Export and Texture Softness
+Filmtone: Texture Softness
 ```
 
 Subtitle:
 
 ```text
-A release case study about preserving audio in normal video export, adding Texture Softness, and keeping source-specific compensation out of saved Looks.
+Filmtone is a small app for adjusting the color of video on iPhone and Mac. This case study covers a release that adds a new control for softening the in-camera sharpening baked into phone and action-cam footage, and keeps source-specific corrections out of saved Looks. The same release also fixes a bug where normal video exports could lose their original audio.
 ```
 
 Suggested cover visual:
 
 - Split frame: graded footage with visible fine texture.
 - Small UI crop: `Texture softness` / `質感のやわらかさ`.
-- Optional waveform strip or audio-track marker to make the audio change visible without over-explaining it.
+- No audio waveform on the cover — the audio change is a bug fix, not the headline.
 
 ## Project Summary
 
 Filmtone is a video color tool for choosing a grade, comparing it on real material, and exporting the result on iPhone and Mac.
 
-This release focuses on two product details:
+This release adds one new control:
 
-1. Normal video exports should keep audio when the source has audio.
-2. Fine digital detail should be adjustable without turning the image into a simple blur.
+- The in-camera sharpening that phone and action-cam sources bake into their files should be adjustable, without turning the image into a simple blur.
 
-The release is small in feature count, but it affects the final output file. That makes it important for a video editing tool.
+It also fixes one bug:
+
+- Normal video exports now keep audio when the source has audio.
+
+Both changes are about what the finished output file looks and sounds like — the part of a video tool that the audience actually receives.
 
 ## Problem
 
-The product problem had two parts.
+The new-control side of the problem is straightforward. Phone and action-cam sensors / ISPs / encoders apply heavy sharpening in-camera, and that sharpening is baked into the source file before any color work begins. Grading does not add to it (and cannot remove it). The picture ends up reading correctly in tonality, while the source's pre-existing fine acutance still feels too crisp.
 
-On the export side, a video could look correct in the editor while the completed file did not carry the expected audio. On the image side, highly sharpened phone or small-camera footage could keep hard fine edges after grading. The grade might be working, but small details could still feel too crisp.
+The audio side of the problem is a bug: normal video exports could look correct in the editor while the completed file did not carry the expected audio. The fix restores audio in the finished file when the source has it.
 
-Both problems show up after the edit, when the file is supposed to be finished.
+Both show up after the edit, when the file is supposed to be finished.
 
 ## Design Direction
 
 The design decision was to keep the product surface clear.
 
-Audio preservation does not need a dramatic UI. It needs a pipeline that checks the completed output file.
-
-Texture Softness does need a visible control, but it should sit in Advanced Optics, near other material/optical decisions. It is separate from Lens Softness:
+Texture Softness is the only new control in this release. It sits in Advanced Optics, near other material/optical decisions. It is separate from Lens Softness:
 
 - Lens Softness: lens/periphery character.
 - Texture Softness: fine local detail, strong edges, and local acutance.
 
-The control should feel like a small adjustment for material where hair, cloth, leaves, text, or night noise look too hard after color work.
+The control should feel like a small adjustment for material where the source's in-camera sharpening makes hair, cloth, leaves, text, or night noise look too hard — most often phone and action-cam footage.
+
+The audio fix does not need a dramatic UI. It needs a pipeline that checks the completed output file. There is no new screen attached to it.
 
 ## Visual System Notes
 
@@ -76,8 +87,18 @@ Suggested case-study sections:
    - Show the Desktop Advanced Optics panel and iOS control surface.
    - Explain that Texture Softness is not Lens Softness.
 
-3. **Output Trust**
-   - Show a minimal export flow diagram:
+3. **Portable Looks**
+   - Show a simple diagram:
+
+```text
+Look: reusable grade intent (curve / grade foundations also live here as bundled entries)
+Source metadata: material-specific reading
+Source detail bias: runtime-only assist
+```
+
+4. **Bug Fix Footnote: Audio Validation**
+   - Treat as a small footnote at the end of the visual sequence, not a main section.
+   - Optional minimal flow diagram:
 
 ```text
 Source video with audio
@@ -86,43 +107,28 @@ Source video with audio
   -> audio-track validation
 ```
 
-4. **Portable Looks**
-   - Show a simple diagram:
-
-```text
-Look / Preset: reusable grade intent
-Source metadata: material-specific reading
-Source detail bias: runtime-only assist
-```
+   - Caption as `bug fix: normal video exports now keep their original audio`.
 
 ## Case Study Copy
 
-Filmtone's release work often starts from a concrete output problem.
+Filmtone's next release adds one new control: Texture Softness softens the in-camera sharpening baked into phone and action-cam footage, without flattening readable edges. The same release also fixes a bug where normal video exports could lose their original audio.
 
-This one started with two of them: a video file should not lose its sound during normal export, and sharp footage should not always stay sharp in the same hard way after grading.
+Texture Softness is a separate control from Lens Softness. Lens Softness shapes lens-and-periphery character. Texture Softness targets the fine local acutance the source file arrives with — the in-camera sharpening baked into hair, fabric, leaves, small text, and night noise on most phone and action-cam material — without applying a general blur. The effect is material-dependent. Some footage should stay crisp.
 
-The first change is about trust. Filmtone now treats the completed file as the thing to verify. If a source has audio and the user runs a normal video export, the output should carry audio too. The pipeline writes audio into the MP4 and checks the completed file before reporting success.
+When source metadata suggests heavy in-camera sharpening (e.g. recent iPhone or action-cam profiles), Filmtone applies a conservative source detail bias at runtime. That bias never bakes into a saved Look. A Look should travel across material; source-specific correction belongs in the runtime, not in the reusable creative state.
 
-The second change is about texture. Texture Softness was added as a separate control from Lens Softness. It is not a general blur. It is meant to reduce over-sharpened fine detail while preserving readable edges.
+Normal video exports now keep their original audio in the completed MP4, and the export pipeline confirms the audio track is in the finished file before reporting success. Highlight-reel export remains source-audio disabled in this release.
 
-The visual goal is modest: reduce over-sharpened fine detail when the source is too digitally crisp. Not every source needs it. Some footage should stay sharp. But when small edges are too strong, Texture Softness gives Filmtone a more specific answer than blur.
-
-The release also keeps source-specific compensation out of saved Looks. That matters for design as much as engineering. A Look should travel. Source-specific correction should help the current material, then stay out of the reusable creative state.
-
-The result is focused product work: no huge new screen, no exaggerated promise, just a more reliable normal video export and a more precise control for image texture.
-
-That is a very Filmtone kind of update: careful about small details, but still tied to a concrete output problem.
+The result is a release that adds one new screen for fine detail and restores audio in the completed file when the source has it.
 
 ## Asset Checklist
 
-- [ ] Desktop export screenshot or short capture showing normal video export.
-- [ ] iOS export / editor screenshot after public 1.9 release.
 - [ ] Texture Softness control screenshot on Desktop.
 - [ ] Texture Softness control screenshot on iOS.
 - [ ] Before/after crop set for fine detail.
 - [ ] One full-frame before/after pair.
-- [ ] Small diagram for audio validation.
 - [ ] Small diagram for runtime-only source detail bias.
+- [ ] Optional small diagram for audio validation (bug fix footnote only).
 
 ## Publish Guard
 
@@ -133,3 +139,13 @@ Before publishing:
 - confirm iOS public `1.9`;
 - add final product/download links;
 - add actual visual assets and remove unchecked asset placeholders.
+
+## External Links
+
+Filmtone iOS is available on the App Store:
+
+```text
+https://apps.apple.com/jp/app/filmtone-%E3%83%95%E3%82%A3%E3%83%AB%E3%83%A0%E8%AA%BF%E3%82%AB%E3%83%A9%E3%82%B0%E3%83%AClut/id6762564806
+```
+
+When publishing on Behance, add this URL to the project's external link / description field. Filmtone Desktop download link is added here after Desktop public `1.7` is confirmed.

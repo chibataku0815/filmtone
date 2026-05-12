@@ -1712,7 +1712,7 @@ struct Grade {
   lut2PrintCmY: vec4f,
   // (printContrast, fitMode, imgResX, imgResY)
   printContrastFit: vec4f,
-  // (resolutionX, resolutionY, time, _pad)
+  // (resolutionX, resolutionY, time, shadowLatitude)
   resolutionTime: vec4f,
 };
 
@@ -1861,6 +1861,26 @@ fn applyFilmCompression(rgb: vec3f, amount: f32, range: f32) -> vec3f {
   return out;
 }
 
+fn applyShadowLatitude(rgb: vec3f, amount: f32) -> vec3f {
+  let amt = clamp(amount, 0.0, 1.0);
+  if (amt < 0.001) {
+    return rgb;
+  }
+  let y = dot(rgb, LUMA_R709);
+  let blackProtect = smoothstep(0.025, 0.055, y);
+  let release = 1.0 - smoothstep(0.18, 0.30, y);
+  let band = blackProtect * release;
+  if (band <= 0.000001) {
+    return rgb;
+  }
+  let toeShape = max(0.0, 1.0 - y / 0.30);
+  let lumaLift = y * toeShape * 0.22 * amt * band;
+  let outY = y + lumaLift;
+  let chromaScale = 1.0 + 0.08 * amt * band;
+  let outColor = vec3f(outY) + (rgb - vec3f(y)) * chromaScale;
+  return clamp(outColor, vec3f(0.0), vec3f(1.0));
+}
+
 @fragment
 fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let resolution = uGrade.resolutionTime.xy;
@@ -1945,8 +1965,12 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
   let compRange = uGrade.highlightsShadowsComp.w;
   color = vec4f(applyFilmCompression(color.rgb, compAmount, compRange), color.a);
 
+  // 13. Shadow latitude \u2014 toe separation without lifting the black anchor.
+  let shadowLatitude = uGrade.resolutionTime.w;
+  color = vec4f(applyShadowLatitude(color.rgb, shadowLatitude), color.a);
+
   // --- HDR boundary ---
-  // 13. LUT2 (Creative) \u2014 the soft-shaper above prepares the bounded input
+  // 14. LUT2 (Creative) \u2014 the soft-shaper above prepares the bounded input
   // so highlight >1 values fold gently into the lookup domain instead of
   // hard-clipping. LUT2 output mixes back against the pre-shaped color so
   // LUT intensity keeps its usual "how creative" meaning.
@@ -1959,7 +1983,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     color = vec4f(mix(color.rgb, lut2Sample, lut2Intensity), color.a);
   }
 
-  // 14. Print CMY cast \u2014 C = -R, M = -G, Y = -B darkroom analog.
+  // 15. Print CMY cast \u2014 C = -R, M = -G, Y = -B darkroom analog.
   let cyan = uGrade.lut2PrintCmY.y;
   let magenta = uGrade.lut2PrintCmY.z;
   let yellow = uGrade.lut2PrintCmY.w;
@@ -1971,7 +1995,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     color.a,
   );
 
-  // 15. Print contrast \u2014 final paper-hardness S-curve.
+  // 16. Print contrast \u2014 final paper-hardness S-curve.
   let printContrast = uGrade.printContrastFit.x;
   color = vec4f(applyPrintContrast(color.rgb, printContrast), color.a);
 
@@ -2514,8 +2538,8 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     + wE + wW + wN + wS
     + wNE + wNW + wSE + wSW;
 
-  let ref = sumRGB / sumW;
-  let detail = srcRGB - ref;
+  let referenceRgb = sumRGB / sumW;
+  let detail = srcRGB - referenceRgb;
   let detailLuma = dot(detail, lumaWeights);
   let detailLumaVec = detailLuma * lumaWeights;
   let detailChroma = detail - detailLumaVec;
@@ -3289,7 +3313,7 @@ function packGradeUniforms(state, out = new Float32Array(GRADE_UNIFORM_FLOATS)) 
   out[32] = state.resolutionX;
   out[33] = state.resolutionY;
   out[34] = state.time;
-  out[35] = 0;
+  out[35] = n("shadowLatitude", 0);
   return out;
 }
 

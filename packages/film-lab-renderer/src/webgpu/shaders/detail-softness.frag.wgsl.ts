@@ -78,8 +78,8 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     + wE + wW + wN + wS
     + wNE + wNW + wSE + wSW;
 
-  let ref = sumRGB / sumW;
-  let detail = srcRGB - ref;
+  let referenceRgb = sumRGB / sumW;
+  let detail = srcRGB - referenceRgb;
   let detailLuma = dot(detail, lumaWeights);
   let detailLumaVec = detailLuma * lumaWeights;
   let detailChroma = detail - detailLumaVec;

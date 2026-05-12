@@ -97,6 +97,15 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
       expect(look.paramOverrides.highlightTone).toBe(0);
     }
   });
+
+  test("runtime toe separation stays neutral until an authored pass adopts it", () => {
+    expect(BAKE_COLOR_PARAM_KEYS).not.toContain("shadowLatitude");
+    expect(CREATIVE_PACK_01_LOOKS.map((look) => look.paramOverrides.shadowLatitude)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
 });
 
 describe("Creative LUT Pack 01 — generated cubes", () => {

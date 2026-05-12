@@ -190,6 +190,32 @@ kernel vec4 filmCompressionV3(__sample image, float amount, float range) {
 }
 """)
 
+    static let toeSeparation = CIColorKernel(source: """
+kernel vec4 toeSeparation(__sample image, float amount) {
+    vec4 color = image;
+    float amt = clamp(amount, 0.0, 1.0);
+    if (amt < 0.001) {
+        return color;
+    }
+
+    float y = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float blackProtect = smoothstep(0.025, 0.055, y);
+    float release = 1.0 - smoothstep(0.18, 0.30, y);
+    float band = blackProtect * release;
+    if (band <= 0.000001) {
+        return color;
+    }
+
+    float toeShape = max(0.0, 1.0 - y / 0.30);
+    float lumaLift = y * toeShape * 0.22 * amt * band;
+    float outY = y + lumaLift;
+    float chromaScale = 1.0 + 0.08 * amt * band;
+    vec3 outColor = vec3(outY) + (color.rgb - vec3(y)) * chromaScale;
+    color.rgb = clamp(outColor, 0.0, 1.0);
+    return color;
+}
+""")
+
     // Phase 5-B Detail Softness — amplitude-gated bilateral detail-layer
     // attenuation. See packages/film-lab-core/src/detail-softness.ts for
     // the algorithm narrative and the canonical uniform set.

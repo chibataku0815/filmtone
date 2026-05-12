@@ -313,6 +313,7 @@ struct Phase0ParamsDTO: Codable {
     let trailIntensity: Double
     let fade: Double
     let shadowTone: Double
+    let shadowLatitude: Double
     let highlightTone: Double
     let shadowHue: Double
     let highlightHue: Double

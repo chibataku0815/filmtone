@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { PARAM_KEYS } from "./params";
+import { FILM_GRAIN_INTENSITY_MAX, PARAM_KEYS } from "./params";
+import { LOOK_ID_BY_PRESET, lookIdForPreset } from "./look-ids";
 import {
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
@@ -45,5 +46,30 @@ describe("Filmtone Web/Desktop default look", () => {
       subtitle: "Clean Base",
       category: "utility",
     });
+  });
+
+  test("adds Vision3 500T as a restrained blue-hour tungsten negative preset", () => {
+    const preset = PRESETS.vision3500t;
+
+    expect(PRESET_BUTTONS.find((button) => button.name === "vision3500t")).toEqual({
+      name: "vision3500t",
+      label: "Vision3 500T",
+      subtitle: "Blue Hour",
+      category: "filmStock",
+      printMedium: "tungsten_cinema",
+    });
+    expect(LOOK_ID_BY_PRESET.vision3500t).toBe(lookIdForPreset("vision3500t"));
+    expect(findMatchingPreset(preset)).toBe("vision3500t");
+
+    expect(preset.temperature).toBeLessThan(PRESETS.cinestill800t.temperature);
+    expect(preset.bloomStrength).toBeLessThan(PRESETS.cinestill800t.bloomStrength);
+    expect(preset.halationIntensity).toBeLessThan(PRESETS.cinestill800t.halationIntensity);
+    expect(preset.grainIntensity).toBe(FILM_GRAIN_INTENSITY_MAX);
+    expect(preset.grainSize).toBeGreaterThan(PRESETS.superia400.grainSize);
+    expect(preset.shadowHue).toBe(225);
+    expect(preset.highlightHue).toBe(214);
+    expect(preset.shadowLatitude).toBe(0);
+    expect(preset.compressionAmount).toBeGreaterThan(0);
+    expect(preset.printContrast).toBeGreaterThan(0);
   });
 });

@@ -44,6 +44,7 @@ uniform float uLUT2Enabled;
 // 0.4.0 の現像段で使う数値 uniform。
 uniform float uCompressionAmount;  // 0〜1、0 で無効
 uniform float uCompressionRange;   // 0〜1、0.5 が既定
+uniform float uShadowLatitude;      // 0〜1、toe separation
 
 // 0.4.0 のプリント段で使う数値 uniform。
 uniform float uCyan;               // -1〜1、0 で無効
@@ -185,6 +186,22 @@ vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   return clamp(outColor, 0.0, 1.0);
 }
 
+vec3 applyShadowLatitude(vec3 rgb, float amount) {
+  float amt = clamp(amount, 0.0, 1.0);
+  if (amt < 0.001) return rgb;
+  float y = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+  float blackProtect = smoothstep(0.025, 0.055, y);
+  float release = 1.0 - smoothstep(0.18, 0.30, y);
+  float band = blackProtect * release;
+  if (band <= 0.000001) return rgb;
+  float toeShape = max(0.0, 1.0 - y / 0.30);
+  float lumaLift = y * toeShape * 0.22 * amt * band;
+  float outY = y + lumaLift;
+  float chromaScale = 1.0 + 0.08 * amt * band;
+  vec3 outColor = vec3(outY) + (rgb - vec3(y)) * chromaScale;
+  return clamp(outColor, 0.0, 1.0);
+}
+
 // プリント段の最終コントラストを S カーブで持ち上げる。
 // amount=0 なら何もしない。
 vec3 applyPrintContrast(vec3 rgb, float amount) {
@@ -242,6 +259,9 @@ void main() {
 
   // Film Compression V3. Apply before LUT2 and downstream optical stages.
   color.rgb = applyFilmCompression(color.rgb, uCompressionAmount, uCompressionRange);
+
+  // Shadow Latitude / toe separation. Apply before LUT2.
+  color.rgb = applyShadowLatitude(color.rgb, uShadowLatitude);
 
   // === Creative LUT (LUT2) === after color grading
   if (uLUT2Enabled > 0.5) {

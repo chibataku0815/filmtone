@@ -6,7 +6,7 @@ import FilmLabSwiftCore
 /// or accidental hand-edits of the generated Swift artifact.
 final class GeneratedLandmarkTests: XCTestCase {
     func testParamKeysCountAndOrder() {
-        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 36)
+        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 37)
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.first, "exposure")
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.last, "grainIntensity")
 
@@ -16,6 +16,7 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("rgbShift"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("bloomStrength"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("halationIntensity"))
+        XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("shadowLatitude"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("vignette"))
 
         // detailSoftness lands immediately after lensSoftness in the canonical
@@ -27,6 +28,14 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertNotNil(detailIndex)
         if let lensIndex, let detailIndex {
             XCTAssertEqual(detailIndex, lensIndex + 1)
+        }
+
+        let shadowToneIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "shadowTone")
+        let shadowLatitudeIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "shadowLatitude")
+        XCTAssertNotNil(shadowToneIndex)
+        XCTAssertNotNil(shadowLatitudeIndex)
+        if let shadowToneIndex, let shadowLatitudeIndex {
+            XCTAssertEqual(shadowLatitudeIndex, shadowToneIndex + 1)
         }
     }
 

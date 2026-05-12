@@ -46,7 +46,7 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
           ? z.number().min(0).max(64).default(12)
         : key === "lensSoftness"
           ? z.number().min(0).max(1).default(0)
-          : key === "detailSoftness"
+          : key === "detailSoftness" || key === "shadowLatitude"
           ? z.number().min(0).max(1).default(0)
           : key === "opticalDirectTransmission"
             ? z.number().min(0).max(1).default(1)

@@ -988,6 +988,7 @@ enum FilmtoneConnectCubeWriter {
 
         current = applyBaseGrade(current, params: params)
         current = applyFilmCompression(current, params: params)
+        current = applyShadowLatitude(current, params: params)
         return current
     }
 
@@ -1057,6 +1058,18 @@ enum FilmtoneConnectCubeWriter {
             out.g,
             out.b
         )
+    }
+
+    private static func applyShadowLatitude(_ rgb: RGB, params: Phase0ParamsDTO) -> RGB {
+        guard params.shadowLatitude > 0.0001 else {
+            return rgb
+        }
+        let out = FilmtoneShadowLatitude.apply(
+            rgb: FilmtoneShadowLatitudeRgb(r: rgb.r, g: rgb.g, b: rgb.b),
+            amount: params.shadowLatitude,
+            clampOutput: true
+        )
+        return RGB(out.r, out.g, out.b)
     }
 
     private static func applyPrintStage(_ rgb: RGB, params: Phase0ParamsDTO) -> RGB {

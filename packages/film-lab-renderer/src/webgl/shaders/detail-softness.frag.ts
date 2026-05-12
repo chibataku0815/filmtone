@@ -67,8 +67,8 @@ void main() {
     + wE + wW + wN + wS
     + wNE + wNW + wSE + wSW;
 
-  vec3 ref = sumRGB / sumW;
-  vec3 detail = srcRGB - ref;
+  vec3 referenceRgb = sumRGB / sumW;
+  vec3 detail = srcRGB - referenceRgb;
 
   float detailLuma = dot(detail, lumaWeights);
   vec3 detailLumaVec = detailLuma * lumaWeights;

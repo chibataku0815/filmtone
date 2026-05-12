@@ -135,6 +135,9 @@ test("iOS preset map exposes the four mobile looks without mutating shared prese
   expect(presetMap.iphone).toMatchObject(EXPECTED_IPHONE_IOS_ENVELOPE);
   expect(presetMap.softBlue).toMatchObject(EXPECTED_SOFT_BLUE_IOS_ENVELOPE);
   expect(presetMap.amberGlow).toMatchObject(EXPECTED_AMBER_GLOW_IOS_ENVELOPE);
+  for (const name of FILMTONE_IOS_PRESET_NAMES) {
+    expect(presetMap[name].shadowLatitude).toBe(0);
+  }
   expect(presetMap.reset.halationIntensity).toBe(0);
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let schemaVersion = 2');
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let rgbShiftMax = 0.005');

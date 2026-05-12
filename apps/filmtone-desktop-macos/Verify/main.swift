@@ -2955,4 +2955,103 @@ runner.test("sidecar emits capture provenance and package creative LUT") {
     try assertEqual(creative["source"] as? String, "capture-package", "creative source")
 }
 
+// ---------------------------------------------------------------------------
+// Test group — Twilight bundled built-in Look (preset-only, no cube).
+// Ports `vision3500t` from `packages/film-lab-core/src/presets.ts:632-689`.
+// Confirms: catalog wiring, preset-only materialize emits creativeLut: nil,
+// representative Phase0 values match presets.ts, store helpers treat
+// Twilight as immutable + materializable, and the sidecar payload routes
+// through the preset path (gradeParams reflect twilightPatch on top of
+// reset baseline). Mirrors `FilmtoneBuiltInCatalog.twilightPatch` on iOS.
+// ---------------------------------------------------------------------------
+
+runner.test("Twilight is registered in FilmtoneCreativePackCatalog.presetOnlyLooks") {
+    let twilight = FilmtoneCreativePackCatalog.presetOnlyLooks.first { $0.englishName == "Twilight" }
+    guard let entry = twilight else {
+        throw AssertionError(description: "Twilight entry missing from presetOnlyLooks")
+    }
+    try assertEqual(entry.slug, "filmtone-built-in-twilight")
+    try assertEqual(
+        entry.canonicalUUID,
+        UUID(uuidString: "FB1A0001-0000-4000-8000-000000000011")!,
+        "Twilight canonicalUUID must match iOS BuiltInLookUUID.twilight"
+    )
+}
+
+runner.test("Twilight materializes with creativeLut: nil and bundled flags") {
+    guard let preset = FilmtoneCreativePackCatalog.findPresetOnly(slug: "filmtone-built-in-twilight") else {
+        throw AssertionError(description: "findPresetOnly(slug:) returned nil")
+    }
+    let entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(preset)
+    try assertEqual(entry.name, "Twilight")
+    try assertEqual(entry.presetName, FilmtonePresetCatalog.defaultName)
+    try assertEqual(entry.strength, 1.0)
+    try assertEqual(entry.bundled, true)
+    try assertEqual(entry.immutable, true)
+    try assertEqual(entry.bundledSlug, Optional("filmtone-built-in-twilight"))
+    if entry.creativeLut != nil {
+        throw AssertionError(description: "Twilight must have creativeLut: nil — selecting it must stay on the preset path")
+    }
+}
+
+runner.test("Twilight patch carries the representative vision3500t values") {
+    guard let preset = FilmtoneCreativePackCatalog.findPresetOnly(slug: "filmtone-built-in-twilight") else {
+        throw AssertionError(description: "Twilight preset missing")
+    }
+    let v = preset.paramOverridesPatch.values
+    try assertClose(v["temperature"] ?? .nan, -0.40, eps: 1e-9, "temperature")
+    try assertClose(v["contrast"] ?? .nan, 1.22, eps: 1e-9, "contrast")
+    try assertClose(v["saturation"] ?? .nan, 1.02, eps: 1e-9, "saturation")
+    try assertClose(v["shadowHue"] ?? .nan, 225, eps: 1e-9, "shadowHue")
+    try assertClose(v["highlightHue"] ?? .nan, 214, eps: 1e-9, "highlightHue")
+    try assertClose(v["grainIntensity"] ?? .nan, 0.10, eps: 1e-9, "grainIntensity")
+    try assertClose(v["grainSize"] ?? .nan, 0.52, eps: 1e-9, "grainSize")
+    try assertClose(v["vignette"] ?? .nan, 0.36, eps: 1e-9, "vignette")
+    try assertClose(v["rgbShift"] ?? .nan, 0.0015, eps: 1e-9, "rgbShift")
+    try assertClose(v["fade"] ?? .nan, 0.012, eps: 1e-9, "fade")
+}
+
+runner.test("Twilight UUID resolves through the unified built-in helpers") {
+    let id = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000011")!
+    try assertEqual(
+        FilmtoneCreativePackCatalog.builtInSlug(canonicalUUID: id),
+        Optional("filmtone-built-in-twilight"),
+        "builtInSlug must recognize Twilight as a built-in"
+    )
+    guard let materialized = FilmtoneCreativePackCatalog.materializeAnyBuiltIn(canonicalUUID: id) else {
+        throw AssertionError(description: "materializeAnyBuiltIn returned nil for Twilight")
+    }
+    try assertEqual(materialized.name, "Twilight")
+    if materialized.creativeLut != nil {
+        throw AssertionError(description: "materializeAnyBuiltIn must emit creativeLut: nil for Twilight")
+    }
+}
+
+runner.test("Twilight sidecar payload resolves through preset path (no Creative LUT)") {
+    guard let preset = FilmtoneCreativePackCatalog.findPresetOnly(slug: "filmtone-built-in-twilight") else {
+        throw AssertionError(description: "Twilight preset missing")
+    }
+    let req = StubSidecarRequest(
+        sourceURL: URL(fileURLWithPath: "/tmp/in.png"),
+        outputURL: URL(fileURLWithPath: "/tmp/out.png"),
+        presetName: FilmtonePresetCatalog.defaultName,
+        presetStrength: 1.0,
+        lookSlug: nil,
+        sourceKind: .still,
+        quickState: .zero,
+        paramOverrides: preset.paramOverridesPatch
+    )
+    let payload = FilmtoneSidecarWriter.sidecarPayload(for: req)
+    guard let grade = payload["gradeParams"] as? [String: Double] else {
+        throw AssertionError(description: "gradeParams missing")
+    }
+    try assertClose(grade["temperature"] ?? .nan, -0.40, eps: 1e-6, "gradeParams.temperature")
+    try assertClose(grade["shadowHue"] ?? .nan, 225, eps: 1e-6, "gradeParams.shadowHue")
+    try assertClose(grade["highlightHue"] ?? .nan, 214, eps: 1e-6, "gradeParams.highlightHue")
+    try assertClose(grade["vignette"] ?? .nan, 0.36, eps: 1e-6, "gradeParams.vignette")
+    if payload["creativeLut"] != nil {
+        throw AssertionError(description: "Twilight must not emit a creativeLut sidecar block — preset path only")
+    }
+}
+
 exit(runner.summary())

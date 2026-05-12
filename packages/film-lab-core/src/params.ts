@@ -76,6 +76,8 @@ export const PARAM_KEYS = [
   "highlights",
   "shadows",
   "shadowTone",
+  /** Toe separation amount（0=off、1=max）。Deep black anchor is preserved. */
+  "shadowLatitude",
   "highlightTone",
   "shadowHue",
   "highlightHue",
@@ -238,6 +240,8 @@ export interface Params {
   highlights: number;
   shadows: number;
   shadowTone: number;
+  /** 黒の芯を固定したまま暗部中間の分離を戻す toe separation（0〜1）。 */
+  shadowLatitude: number;
   highlightTone: number;
   /** シャドウスプリットトーンの色相（度 0〜360） */
   shadowHue: number;

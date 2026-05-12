@@ -22,12 +22,12 @@ import Foundation
 //   lerp).
 //
 // Phase 2-B Detail Softness: local-reference high-pass attenuation
-//   inserted between filmCompressionV3 and edgeOptics, per
+//   inserted after shadowLatitude and before edgeOptics, per
 //   docs/filmtone/detail-softness/archive/2026-05-12-phase-2a-research-charter.md
 //   §Stage insertion points → macOS native. Identity at
 //   `effectiveDetailSoftness == 0` (caller short-circuit + kernel guard).
 //
-//   baseGradeV2 → filmCompressionV3 → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
+//   baseGradeV2 → filmCompressionV3 → shadowLatitude → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
 
 enum FilmtoneGradePipeline {
 
@@ -71,6 +71,9 @@ enum FilmtoneGradePipeline {
         }
         if params.compressionAmount > 0.0001 {
             current = applyFilmCompressionV3(to: current, params: params)
+        }
+        if params.shadowLatitude > 0.0001 {
+            current = applyShadowLatitude(to: current, params: params)
         }
         current = applyDetailSoftnessStage(
             to: current,
@@ -198,6 +201,14 @@ enum FilmtoneGradePipeline {
             image,
             params.compressionAmount,
             params.compressionRange,
+        ]) ?? image
+    }
+
+    private static func applyShadowLatitude(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
+        guard let kernel = FilmtoneGradeKernels.toeSeparation else { return image }
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            params.shadowLatitude,
         ]) ?? image
     }
 
