@@ -61,7 +61,8 @@ enum FilmtoneGradePipeline {
         creativeLut: PreparedCreativeLut? = nil,
         lutIntensity: Double = 1.0,
         opticalFilterProfileId: String? = nil,
-        opticalFilterIntensity: Double = 1.0
+        opticalFilterIntensity: Double = 1.0,
+        sourceDetailBias: Double = 0
     ) -> CIImage {
         var current = image
 
@@ -71,7 +72,11 @@ enum FilmtoneGradePipeline {
         if params.compressionAmount > 0.0001 {
             current = applyFilmCompressionV2(to: current, params: params)
         }
-        current = applyDetailSoftnessStage(to: current, params: params)
+        current = applyDetailSoftnessStage(
+            to: current,
+            params: params,
+            sourceDetailBias: sourceDetailBias
+        )
         current = applyEdgeOpticsStage(to: current, params: params)
         // M5-M (CC-B): Backlight Veil profiles route through a CIKernel
         // composite that uses the six iOS-canonical optical scatter
@@ -275,9 +280,13 @@ enum FilmtoneGradePipeline {
     // `edgeOptics` per Phase 2-A insertion-point survey.
     private static func applyDetailSoftnessStage(
         to image: CIImage,
-        params: FilmtonePhase0Params
+        params: FilmtonePhase0Params,
+        sourceDetailBias: Double = 0
     ) -> CIImage {
-        let uniforms = FilmtoneDetailSoftness.deriveUniforms(detailSoftness: params.detailSoftness)
+        let uniforms = FilmtoneDetailSoftness.deriveUniforms(
+            detailSoftness: params.detailSoftness,
+            sourceDetailBias: sourceDetailBias
+        )
         if uniforms.effectiveDetailSoftness < 0.0001 {
             return image
         }

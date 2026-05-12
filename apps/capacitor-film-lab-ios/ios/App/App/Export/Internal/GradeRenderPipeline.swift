@@ -121,8 +121,15 @@ final class GradeRenderPipeline {
         ]) ?? image
     }
 
-    func applyDetailSoftnessStage(to image: CIImage, params: Phase0ParamsDTO) -> CIImage {
-        let uniforms = FilmtoneDetailSoftness.deriveUniforms(detailSoftness: params.detailSoftness)
+    func applyDetailSoftnessStage(
+        to image: CIImage,
+        params: Phase0ParamsDTO,
+        sourceDetailBias: Double = 0
+    ) -> CIImage {
+        let uniforms = FilmtoneDetailSoftness.deriveUniforms(
+            detailSoftness: params.detailSoftness,
+            sourceDetailBias: sourceDetailBias
+        )
         if uniforms.effectiveDetailSoftness < 0.0001 {
             return image
         }

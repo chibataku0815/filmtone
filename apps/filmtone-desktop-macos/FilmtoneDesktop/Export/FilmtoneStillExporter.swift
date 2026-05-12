@@ -157,7 +157,15 @@ enum FilmtoneStillExporter {
             creativeLut: creativeLut,
             lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
-            opticalFilterIntensity: request.opticalFilterIntensity
+            opticalFilterIntensity: request.opticalFilterIntensity,
+            sourceDetailBias: FilmtoneSourceDetailCompensation.resolve(
+                FilmtoneSourceDetailCompensationInput(
+                    cameraMake: probe.cameraOptics?.cameraMake,
+                    cameraModel: probe.cameraOptics?.cameraModel,
+                    colorClass: probe.colorClass?.rawValue,
+                    sourceProfileId: resolvedProfile?.id
+                )
+            ).recommendedBias
         )
 
         try render(graded, request: request, contract: contract)
