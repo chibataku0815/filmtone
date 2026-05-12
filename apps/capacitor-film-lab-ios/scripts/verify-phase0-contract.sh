@@ -224,3 +224,28 @@ if [ -f "$SIDECAR_SCRIPT" ] && [ -f "$SIDECAR_SRC" ]; then
     "$SIDECAR_SCRIPT"
   "$SIDECAR_BIN" "$HLG_FIXTURE"
 fi
+
+# --- iOS capture package persistence payload round-trip ---
+CAPTURE_PACKAGE_SCRIPT="$SCRIPT_DIR/swift/test-capture-package-persistence.swift"
+CAPTURE_PACKAGE_SRC="$APP_DIR/ios/App/App/Capture/FilmtoneCapturePackage.swift"
+CAPTURE_PACKAGE_PERSISTENCE_SRC="$APP_DIR/ios/App/App/Capture/FilmtoneCapturePackagePersistence.swift"
+if [ -f "$CAPTURE_PACKAGE_SCRIPT" ] &&
+   [ -f "$CAPTURE_PACKAGE_SRC" ] &&
+   [ -f "$CAPTURE_PACKAGE_PERSISTENCE_SRC" ]; then
+  echo "==> capture package persistence payload round-trip test"
+  CAPTURE_PACKAGE_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-capture-package-check.XXXXXX")
+  CAPTURE_PACKAGE_TMP=$(mktemp "${TMPDIR:-/tmp}/FilmtoneCapturePackage.XXXXXX.swift")
+  CAPTURE_PACKAGE_PERSISTENCE_TMP=$(mktemp "${TMPDIR:-/tmp}/FilmtoneCapturePackagePersistence.XXXXXX.swift")
+  CLEANUP_FILES="$CLEANUP_FILES $CAPTURE_PACKAGE_BIN $CAPTURE_PACKAGE_TMP $CAPTURE_PACKAGE_PERSISTENCE_TMP"
+
+  sed '/^#if os(iOS)$/d;/^#endif$/d' "$CAPTURE_PACKAGE_SRC" > "$CAPTURE_PACKAGE_TMP"
+  sed '/^#if os(iOS)$/d;/^#endif$/d' "$CAPTURE_PACKAGE_PERSISTENCE_SRC" > "$CAPTURE_PACKAGE_PERSISTENCE_TMP"
+
+  xcrun swiftc \
+    -o "$CAPTURE_PACKAGE_BIN" \
+    "$LUT_BLOB_CODEC_SRC" \
+    "$CAPTURE_PACKAGE_TMP" \
+    "$CAPTURE_PACKAGE_PERSISTENCE_TMP" \
+    "$CAPTURE_PACKAGE_SCRIPT"
+  "$CAPTURE_PACKAGE_BIN"
+fi

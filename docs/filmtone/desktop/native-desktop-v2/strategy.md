@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-10 JST
+Last updated: 2026-05-12 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -441,6 +441,11 @@ right-rail fixes.
 The shared CIKL grain now uses temporally blended phases, tone-aware
 luma/chroma gating, softer coarse structure, and retuned UI-only recipes
 without schema or sidecar churn.
+
+2026-05-12: M4/M5 iOS capture package import parity vertical slice closed.
+Native Desktop opens iOS `capture-package.json`/package dirs, preserves
+master/proxy provenance, restores Stone/Urban/Noir, and imports package-local
+custom LUT payloads with explicit metadata-only failure state.
 
 ## Constraints
 

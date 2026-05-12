@@ -22,6 +22,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let sourceProfileSelection: CameraProfileSelection
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let packageCreativeLut: PreparedCreativeLut?
+    let capturePackageProvenance: FilmtoneCapturePackageProvenance?
     let highlightMarkers: FilmtoneHighlightMarkers?
     let opticalFilterProfileId: String?
     /// M5-M (CC-B): intensity scalar for the optical filter profile (0…1).
@@ -38,6 +40,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         sourceProfileSelection: CameraProfileSelection = .auto,
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
+        packageCreativeLut: PreparedCreativeLut? = nil,
+        capturePackageProvenance: FilmtoneCapturePackageProvenance? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
         opticalFilterProfileId: String? = nil,
         opticalFilterIntensity: Double = 1.0
@@ -51,6 +55,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.sourceProfileSelection = sourceProfileSelection
         self.quickState = quickState
         self.paramOverrides = paramOverrides
+        self.packageCreativeLut = packageCreativeLut
+        self.capturePackageProvenance = capturePackageProvenance
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
         self.opticalFilterIntensity = max(0, min(1, opticalFilterIntensity))
@@ -280,14 +286,10 @@ enum FilmtoneVideoExporter {
         // M5-A.2: resolve the cube ONCE outside the frame loop. The NSCache
         // hit guarantees a parsed cube survives this entire export. nil
         // when no Look is selected or strength gate is closed (D4-ii).
-        let creativeLut: PreparedCreativeLut?
-        if let lookSlug = request.lookSlug,
-           request.presetStrength > 0,
-           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
-            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
-        } else {
-            creativeLut = nil
-        }
+        let creativeLut: PreparedCreativeLut? = request.packageCreativeLut
+            ?? bundledCreativeLut(lookSlug: request.lookSlug, strength: request.presetStrength)
+        let lutIntensity = request.packageCreativeLut.map { clampLutIntensity($0.intensity) }
+            ?? FilmtonePresetCatalog.clampStrength(request.presetStrength)
         let context = FilmtoneCIContext.shared
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
@@ -299,7 +301,7 @@ enum FilmtoneVideoExporter {
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
-            lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
+            lutIntensity: lutIntensity,
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: context,
@@ -430,14 +432,10 @@ enum FilmtoneVideoExporter {
                 userOverrides: request.paramOverrides
             )
         )
-        let creativeLut: PreparedCreativeLut?
-        if let lookSlug = request.lookSlug,
-           request.presetStrength > 0,
-           let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) {
-            creativeLut = FilmtoneCreativeLutLoader.load(look: look)
-        } else {
-            creativeLut = nil
-        }
+        let creativeLut: PreparedCreativeLut? = request.packageCreativeLut
+            ?? bundledCreativeLut(lookSlug: request.lookSlug, strength: request.presetStrength)
+        let lutIntensity = request.packageCreativeLut.map { clampLutIntensity($0.intensity) }
+            ?? FilmtonePresetCatalog.clampStrength(request.presetStrength)
         return VideoFrameRenderContext(
             contract: contract,
             resolvedProfile: resolvedProfile,
@@ -447,7 +445,7 @@ enum FilmtoneVideoExporter {
             ),
             cameraOptics: probe.cameraOptics,
             creativeLut: creativeLut,
-            lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
+            lutIntensity: lutIntensity,
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
             ciContext: FilmtoneCIContext.shared,
@@ -456,6 +454,22 @@ enum FilmtoneVideoExporter {
             preferredTransform: reader.preferredTransform,
             outputSize: outputSize
         )
+    }
+
+    private static func bundledCreativeLut(
+        lookSlug: String?,
+        strength: Double
+    ) -> PreparedCreativeLut? {
+        guard let lookSlug,
+              strength > 0,
+              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
+            return nil
+        }
+        return FilmtoneCreativeLutLoader.load(look: look)
+    }
+
+    private static func clampLutIntensity(_ intensity: Double) -> Double {
+        max(0, min(1, intensity.isFinite ? intensity : 1))
     }
 
     private static func renderPixelBuffer(

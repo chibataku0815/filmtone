@@ -25,6 +25,7 @@ struct FilmtoneDesktopVideoRenderInputs: Sendable {
     let probedColorClass: SourceColorClassDTO?
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let packageCreativeLut: PreparedCreativeLut?
     /// M5-J.2: when true the composition handler emits a split
     /// (left = pre-transform source, right = graded) instead of the
     /// graded frame alone. Preview-only — never reaches the export path.
@@ -135,14 +136,8 @@ enum FilmtoneDesktopVideoComposition {
             selection: inputs.sourceProfileSelection,
             probedColorClass: inputs.probedColorClass
         )
-        let preparedCreativeLut: PreparedCreativeLut?
-        if let slug = inputs.lookSlug,
-           inputs.presetStrength > 0,
-           let look = FilmtoneCreativePackCatalog.find(slug: slug) {
-            preparedCreativeLut = FilmtoneCreativeLutLoader.load(look: look)
-        } else {
-            preparedCreativeLut = nil
-        }
+        let preparedCreativeLut: PreparedCreativeLut? = inputs.packageCreativeLut
+            ?? bundledCreativeLut(lookSlug: inputs.lookSlug, strength: inputs.presetStrength)
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: inputs.sourceURL.absoluteString
         )
@@ -159,7 +154,8 @@ enum FilmtoneDesktopVideoComposition {
         let opticalFilterProfileId = inputs.opticalFilterProfileId
         let opticalFilterIntensity = inputs.opticalFilterIntensity
         let cameraOptics = inputs.cameraOptics
-        let lutIntensity = FilmtonePresetCatalog.clampStrength(inputs.presetStrength)
+        let lutIntensity = inputs.packageCreativeLut.map { clampLutIntensity($0.intensity) }
+            ?? FilmtonePresetCatalog.clampStrength(inputs.presetStrength)
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -226,6 +222,22 @@ enum FilmtoneDesktopVideoComposition {
         )
 
         return composition
+    }
+
+    private static func bundledCreativeLut(
+        lookSlug: String?,
+        strength: Double
+    ) -> PreparedCreativeLut? {
+        guard let slug = lookSlug,
+              strength > 0,
+              let look = FilmtoneCreativePackCatalog.find(slug: slug) else {
+            return nil
+        }
+        return FilmtoneCreativeLutLoader.load(look: look)
+    }
+
+    private static func clampLutIntensity(_ intensity: Double) -> Double {
+        max(0, min(1, intensity.isFinite ? intensity : 1))
     }
 
     /// Apply the track's preferredTransform to the natural size, then

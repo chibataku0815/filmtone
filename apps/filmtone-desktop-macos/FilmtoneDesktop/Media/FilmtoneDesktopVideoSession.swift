@@ -339,6 +339,7 @@ final class FilmtoneDesktopVideoSession {
             probedColorClass: inputs.probedColorClass,
             quickState: inputs.quickState,
             paramOverrides: inputs.paramOverrides,
+            packageCreativeLut: inputs.packageCreativeLut,
             compareEnabled: inputs.compareEnabled,
             compareSplitFraction: inputs.compareSplitFraction,
             sourceURL: inputs.sourceURL,

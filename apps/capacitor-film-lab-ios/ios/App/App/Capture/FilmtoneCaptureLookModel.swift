@@ -87,6 +87,22 @@ struct FilmtoneCaptureLook: Identifiable, Equatable {
         customLutRecord
     }
 
+    func toCustomLutPayload() -> FilmtoneCaptureCustomLutPayload? {
+        guard customLutRecord != nil,
+              let parsedCreativeLut,
+              let blob = try? FilmtoneLutBlobCodec.encode(
+                data: parsedCreativeLut.data,
+                size: parsedCreativeLut.size
+              ) else {
+            return nil
+        }
+        return FilmtoneCaptureCustomLutPayload(
+            dataRef: FilmtoneCaptureCustomLutPayload.defaultDataRef,
+            dataFormat: FilmtoneCaptureCustomLutPayload.dataFormat,
+            blob: blob
+        )
+    }
+
     var needsTransformWarningAcceptance: Bool {
         customLutRecord?.transformWarningReason != nil
             && customLutRecord?.transformWarningAccepted == false

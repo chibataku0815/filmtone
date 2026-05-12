@@ -68,6 +68,9 @@
 		FT0000000000000000000A3F /* FilmtoneVideoScrubThumbnailProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3E /* FilmtoneVideoScrubThumbnailProvider.swift */; };
 		FT0000000000000000000A40 /* FilmtoneScrubThumbnailMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B3F /* FilmtoneScrubThumbnailMath.swift */; };
 		FT0000000000000000000A41 /* FilmtoneOpticalScatterMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */; };
+		FT0000000000000000000A42 /* FilmtoneLutBlobCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B41 /* FilmtoneLutBlobCodec.swift */; };
+		FT0000000000000000000A43 /* FilmtoneCapturePackageImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */; };
+		FT0000000000000000000A44 /* filmtone-creative-pack-01-noir.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B43 /* filmtone-creative-pack-01-noir.cube */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -131,6 +134,9 @@
 		FT0000000000000000000B3E /* FilmtoneVideoScrubThumbnailProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneVideoScrubThumbnailProvider.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B3F /* FilmtoneScrubThumbnailMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneScrubThumbnailMath.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneOpticalScatterMath.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B41 /* FilmtoneLutBlobCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneLutBlobCodec.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePackageImport.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B43 /* filmtone-creative-pack-01-noir.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-noir.cube"; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -183,6 +189,7 @@
 			children = (
 				FT0000000000000000000B23 /* filmtone-creative-pack-01-stone.cube */,
 				FT0000000000000000000B24 /* filmtone-creative-pack-01-urban.cube */,
+				FT0000000000000000000B43 /* filmtone-creative-pack-01-noir.cube */,
 			);
 			path = CreativeLuts;
 			sourceTree = "<group>";
@@ -241,6 +248,7 @@
 				FT0000000000000000000B19 /* SourceColorClassifier.swift */,
 				FT0000000000000000000B1E /* FilmtoneRayAngleOptics.swift */,
 				FT0000000000000000000B20 /* FilmtoneCubeParser.swift */,
+				FT0000000000000000000B41 /* FilmtoneLutBlobCodec.swift */,
 				FT0000000000000000000B21 /* FilmtoneCreativePackCatalog.swift */,
 				FT0000000000000000000B22 /* FilmtoneCreativeLutLoader.swift */,
 				FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */,
@@ -258,6 +266,7 @@
 			children = (
 				FT0000000000000000000B0D /* EditorState.swift */,
 				FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */,
+				FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */,
 				FT0000000000000000000B34 /* ExportCoordinator.swift */,
 				FT0000000000000000000B2B /* LibraryViewModel.swift */,
 				FT0000000000000000000B35 /* SaveLookPayload.swift */,
@@ -368,6 +377,7 @@
 				FT0000000000000000000A05 /* Assets.xcassets in Resources */,
 				FT0000000000000000000A23 /* filmtone-creative-pack-01-stone.cube in Resources */,
 				FT0000000000000000000A24 /* filmtone-creative-pack-01-urban.cube in Resources */,
+				FT0000000000000000000A44 /* filmtone-creative-pack-01-noir.cube in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -405,6 +415,7 @@
 				FT0000000000000000000A1D /* CameraOpticsDTO.swift in Sources */,
 				FT0000000000000000000A1E /* FilmtoneRayAngleOptics.swift in Sources */,
 				FT0000000000000000000A20 /* FilmtoneCubeParser.swift in Sources */,
+				FT0000000000000000000A42 /* FilmtoneLutBlobCodec.swift in Sources */,
 				FT0000000000000000000A21 /* FilmtoneCreativePackCatalog.swift in Sources */,
 				FT0000000000000000000A22 /* FilmtoneCreativeLutLoader.swift in Sources */,
 				FT0000000000000000000A25 /* FilmtoneSourceProfileMath.swift in Sources */,
@@ -423,6 +434,7 @@
 				FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */,
 				FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */,
 				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
+				FT0000000000000000000A43 /* FilmtoneCapturePackageImport.swift in Sources */,
 				FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */,
 				FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */,
 				FT0000000000000000000A38 /* FilmtoneDesktopVideoSession.swift in Sources */,

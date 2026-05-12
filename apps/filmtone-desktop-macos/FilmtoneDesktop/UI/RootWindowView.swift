@@ -257,6 +257,7 @@ struct RootWindowView: View {
                 sourceProfileSelection: state.sourceProfileSelection,
                 quickState: state.quickState,
                 paramOverrides: state.renderParamOverrides,
+                packageCreativeLut: state.packageCreativeLut,
                 opticalFilterProfileId: state.opticalFilterProfileId,
                 opticalFilterIntensity: state.opticalFilterIntensity,
                 compareEnabled: state.isCompareEnabled
@@ -379,11 +380,7 @@ struct RootWindowView: View {
     }
 
     private var sourceCapBlocked: Bool {
-        guard state.sourceURL != nil else { return false }
-        return FilmtoneSourceInputTransform.sourceExceedsCapacity(
-            selection: state.sourceProfileSelection,
-            probedColorClass: state.probedSourceColorClass
-        )
+        !state.sourceCapViolations.isEmpty
     }
 
     private var exportDisabled: Bool {
@@ -392,9 +389,7 @@ struct RootWindowView: View {
 
     private var exportHelpText: String {
         if sourceCapBlocked,
-           let reason = FilmtoneSourceInputTransform.sourceCapReason(
-            probedColorClass: state.probedSourceColorClass
-           ) {
+           let reason = state.sourceCapViolations.first {
             return reason
         }
         return state.sourceKind == .video ? "Export the current video" : "Export the current still"
@@ -403,12 +398,12 @@ struct RootWindowView: View {
     private func presentOpenPanel() {
         guard !openPanelPresented else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image, .movie, .quickTimeMovie, .mpeg4Movie]
+        panel.allowedContentTypes = [.image, .movie, .quickTimeMovie, .mpeg4Movie, .json]
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.prompt = "Open"
-        panel.message = "Choose a still image or short video to preview"
+        panel.message = "Choose a still, video, or iOS capture package"
 
         openPanelPresented = true
         let targetWindow = hostingWindow ?? NSApp.keyWindow ?? NSApp.mainWindow
@@ -429,9 +424,35 @@ struct RootWindowView: View {
     private func completeOpenPanel(response: NSApplication.ModalResponse, url: URL?) {
         openPanelPresented = false
         guard response == .OK, let url else { return }
+        if FilmtoneCapturePackageImporter.isCapturePackageCandidate(url) {
+            do {
+                let imported = try FilmtoneCapturePackageImporter.importPackage(from: url)
+                state.setSource(
+                    imported.sourceURL,
+                    kind: .video,
+                    importedCapturePackage: imported
+                )
+                resizeWindowToSourceAspect(url: imported.sourceURL, kind: .video)
+            } catch {
+                state.lastExportError = error.localizedDescription
+            }
+            return
+        }
+        if isDirectory(url) {
+            state.lastExportError = "Choose a folder that contains capture-package.json."
+            return
+        }
+        if url.pathExtension.lowercased() == "json" {
+            state.lastExportError = "Choose capture-package.json, a still, or a video."
+            return
+        }
         let kind = detectSourceKind(of: url)
         state.setSource(url, kind: kind)
         resizeWindowToSourceAspect(url: url, kind: kind)
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
     private func resizeWindowToSourceAspect(url: URL, kind: FilmtoneSourceKind) {
@@ -1286,6 +1307,7 @@ private struct VideoCompositionRefreshKey: Equatable {
     let probedSourceColorClass: SourceColorClassDTO?
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
+    let packageCreativeLutKey: String?
     let compareEnabled: Bool
     /// M5-K3: drag-induced fraction changes must rebuild the AVPlayer
     /// composition so the next composed frame reflects the new split.
@@ -1302,6 +1324,7 @@ private struct VideoCompositionRefreshKey: Equatable {
         self.probedSourceColorClass = state.probedSourceColorClass
         self.quickState = state.quickState
         self.paramOverrides = state.renderParamOverrides
+        self.packageCreativeLutKey = state.packageCreativeLut?.identityKey
         self.compareEnabled = state.isCompareEnabled
         self.compareSplitFraction = state.compareSplitFraction
     }

@@ -160,6 +160,7 @@ final class CapturePackageAssembler {
         lensRecord: FilmtoneCaptureLensRecord?,
         selectedLook: FilmtoneSelectedLookRecord?,
         customLut: FilmtoneCaptureCustomLutRecord?,
+        customLutPayload: FilmtoneCaptureCustomLutPayload?,
         exposure: ExposureSnapshot,
         whiteBalance: WhiteBalanceSnapshot,
         onCleanup: () -> Void
@@ -337,6 +338,7 @@ final class CapturePackageAssembler {
                         lens: lensRecord,
                         selectedLook: selectedLook,
                         customLut: customLut,
+                        customLutPayload: customLutPayload,
                         exposureControl: exposureControl,
                         whiteBalance: whiteBalanceRecord,
                         masterBookmark: masterBookmark,

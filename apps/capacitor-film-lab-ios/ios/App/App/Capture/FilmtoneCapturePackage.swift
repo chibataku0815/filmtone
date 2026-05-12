@@ -209,6 +209,21 @@ struct FilmtoneCaptureCustomLutRecord: Equatable, Codable {
     }
 }
 
+/// Package-local custom LUT payload for cross-device capture handoff.
+///
+/// The identity and warning state stay on `FilmtoneCaptureCustomLutRecord`;
+/// this carries the actual cube payload as the iOS library's canonical
+/// `.lutbin` byte stream so Desktop can render the same custom creative LUT
+/// without owning the iOS LUT library.
+struct FilmtoneCaptureCustomLutPayload: Equatable {
+    static let defaultDataRef = "custom-lut.lutbin"
+    static let dataFormat = "f32le-rgb-v1"
+
+    let dataRef: String
+    let dataFormat: String
+    let blob: Data?
+}
+
 /// S1 - Capture Stabilization Toggle: owner-visible request.  `.on`
 /// drives `cinematicExtendedEnhanced` exact, `.off` drives `.off`
 /// exact.  No fallback / silent degrade: post-record gate fails loudly
@@ -420,6 +435,10 @@ struct FilmtoneCapturePackage: Equatable {
     /// S7: user-imported capture creative LUT. Nil for built-in Looks,
     /// Filmtone default, and pre-S7 captures.
     let customLut: FilmtoneCaptureCustomLutRecord?
+    /// Package-local `.lutbin` payload for `customLut`. Nil on built-in
+    /// Looks, Filmtone default, pre-payload packages, or metadata-only
+    /// rehydration where the payload file is missing.
+    let customLutPayload: FilmtoneCaptureCustomLutPayload?
     /// M12 / S12-C: exposure / focus / metering state at record-stop
     /// time.  `nil` for pre-M12 captures decoded from disk; new runs
     /// always populate this with at least the M12 baseline (`mode:

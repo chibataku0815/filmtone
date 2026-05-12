@@ -4,12 +4,16 @@ import Foundation
 /// Bundle-resolved cube ready for `CIColorCubeWithColorSpace` consumption.
 /// `cubeData` is interleaved Float32 RGBA in iOS canonical b-major order;
 /// `intensity` is pinned at 1.0 for v1.4 Pack 01 entries.
-struct PreparedCreativeLut {
+struct PreparedCreativeLut: Sendable, Equatable {
     let slug: String
     let size: Int
     let intensity: Double
     let cubeData: Data
     let sourceHash: String
+
+    var identityKey: String {
+        "\(slug)|\(sourceHash)|\(size)|\(String(format: "%.6f", intensity))"
+    }
 }
 
 /// Resolves a `BuiltInLook` to a `PreparedCreativeLut` by reading the
@@ -97,6 +101,33 @@ enum FilmtoneCreativeLutLoader {
         )
         cache.setObject(CachedEntry(prepared), forKey: look.slug as NSString)
         return prepared
+    }
+
+    static func preparePackageLocal(
+        slug: String,
+        title: String,
+        size: Int,
+        intensity: Double,
+        blob: Data,
+        sourceHash: String?
+    ) -> PreparedCreativeLut? {
+        let data: [Double]
+        do {
+            data = try FilmtoneLutBlobCodec.decode(blob: blob, size: size)
+        } catch {
+            print("[FilmtoneCreativeLutLoader] package LUT decode failed title=\(title): \(error)")
+            return nil
+        }
+
+        let rgba = packRGBToRGBA(data, size: size)
+        let cubeData = rgba.withUnsafeBufferPointer { Data(buffer: $0) }
+        return PreparedCreativeLut(
+            slug: slug,
+            size: size,
+            intensity: intensity,
+            cubeData: cubeData,
+            sourceHash: sourceHash ?? FilmtoneLutBlobCodec.sourceHash(blob: blob)
+        )
     }
 
     /// Verbatim port of iOS `rgbaCubeData(from:size:)` — promotes the

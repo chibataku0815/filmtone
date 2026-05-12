@@ -68,6 +68,8 @@ final class ExportCoordinator {
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
+            packageCreativeLut: state.packageCreativeLut,
+            capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: nil,
             opticalFilterProfileId: state.opticalFilterProfileId,
             opticalFilterIntensity: state.opticalFilterIntensity
@@ -136,6 +138,8 @@ final class ExportCoordinator {
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
+            packageCreativeLut: state.packageCreativeLut,
+            capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId,
             opticalFilterIntensity: state.opticalFilterIntensity
@@ -215,6 +219,8 @@ final class ExportCoordinator {
             sourceProfileSelection: state.sourceProfileSelection,
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
+            packageCreativeLut: state.packageCreativeLut,
+            capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId
         )

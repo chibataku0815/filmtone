@@ -13,7 +13,7 @@ protocol FilmtoneSidecarRequest: Sendable {
     var presetStrength: Double { get }
     /// M5-A.2: nil for the legacy preset-only path; a
     /// `FilmtoneCreativePackCatalog` slug when a Creative LUT Pack 01 Look
-    /// is selected (Stone / Urban). The sidecar writer uses this to switch
+    /// is selected (Stone / Urban / Noir). The sidecar writer uses this to switch
     /// `lookId` namespace and emit the additive `creativeLut` block.
     var lookSlug: String? { get }
     var sourceKind: FilmtoneSourceKind { get }
@@ -28,6 +28,10 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// M5-C.3a: per-key parameter override patch applied between the
     /// preset/look resolve and the quick-state pass. Default = `.empty`.
     var paramOverrides: FilmtonePhase0ParamsPatch { get }
+    /// Source-bound custom LUT from an imported iOS capture package.
+    var packageCreativeLut: PreparedCreativeLut? { get }
+    /// iOS capture-package provenance to carry into Desktop sidecars.
+    var capturePackageProvenance: FilmtoneCapturePackageProvenance? { get }
     /// Source-relative highlight markers shared with iOS and DaVinci.
     var highlightMarkers: FilmtoneHighlightMarkers? { get }
     /// M5-L3: optional named optical filter profile. Stored separately
@@ -44,6 +48,8 @@ extension FilmtoneSidecarRequest {
     var sourceProfileSelection: CameraProfileSelection { .auto }
     var quickState: FilmtoneQuickState { .zero }
     var paramOverrides: FilmtonePhase0ParamsPatch { .empty }
+    var packageCreativeLut: PreparedCreativeLut? { nil }
+    var capturePackageProvenance: FilmtoneCapturePackageProvenance? { nil }
     var highlightMarkers: FilmtoneHighlightMarkers? { nil }
     var opticalFilterProfileId: String? { nil }
     var opticalFilterIntensity: Double { 1.0 }
