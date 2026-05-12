@@ -134,9 +134,10 @@ enum AdvancedAdjustCatalog {
                 id: "optics",
                 title: strings.groupOptics,
                 controls: [
-                    .init(key: "rgbShift",     label: strings.paramLabel(for: "rgbShift"),     range: 0...FilmtonePhase0Generated.rgbShiftMax, digits: 3),
-                    .init(key: "lensSoftness", label: strings.paramLabel(for: "lensSoftness"), range: 0...1, digits: 2),
-                    .init(key: "vignette",     label: strings.paramLabel(for: "vignette"),     range: 0...1, digits: 2),
+                    .init(key: "rgbShift",       label: strings.paramLabel(for: "rgbShift"),       range: 0...FilmtonePhase0Generated.rgbShiftMax, digits: 3),
+                    .init(key: "lensSoftness",   label: strings.paramLabel(for: "lensSoftness"),   range: 0...1, digits: 2),
+                    .init(key: "detailSoftness", label: strings.paramLabel(for: "detailSoftness"), range: 0...1, digits: 2),
+                    .init(key: "vignette",       label: strings.paramLabel(for: "vignette"),       range: 0...1, digits: 2),
                 ],
                 videoOnly: false,
                 recipes: standardAdvancedRecipes(

@@ -49,8 +49,8 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
 | ID | Phase | Status | Done Condition |
 |---|---|---|---|
 | Phase 1 | Contract & Neutral Plumbing | Complete (2026-05-12 JST) | `detailSoftness` plumbed in every contract layer with default `0`; in-scope verify commands green; 2 pre-existing `ios-swift-payload.test.ts` failures explicitly waived as baseline drift unrelated to `detailSoftness`; no render code changes. |
-| Phase 2 | Real Render Pass | In progress (2-A archived; 2-B/2-C native passes committed; 2-D WebGPU + WebGL parity active in `active.md`) | Local-reference / high-frequency detail reduction with edge guard and luma-vs-chroma weighting, placed before glow and grain. Renderer parity across WebGL, WebGPU, macOS native, iOS. |
-| Phase 3 | UI Exposure & Recipe Decision | Not started | Advanced control + harness-approved copy; decision recorded on whether optical recipes auto-apply `detailSoftness`. |
+| Phase 2 | Real Render Pass | Complete (2026-05-12 JST) | Local-reference / high-frequency detail reduction with edge guard and luma-vs-chroma weighting, committed across macOS native (`e277e9f3`), iOS export (`eac47d53`), WebGPU + WebGL (`444db1e0`). Final visual A/B deferred to final QA. |
+| Phase 3 | UI Exposure & Recipe Decision | In progress | Advanced control + harness-approved copy; decision recorded on whether optical recipes auto-apply `detailSoftness`. |
 | Phase 4 | Source Detail Compensation | Not started | Conservative metadata-driven bias resolver; `sourceDetailBias` stays out of saved Look identity; visible only in debug / sidecar. |
 | Phase 5 | Visual Tuning Matrix | Not started | iPhone SDR HEVC, iPhone Apple Log / ProRes, DJI / action camera Rec.709, Sony / Canon / Panasonic Log, low-light noisy clips, hair / foliage / brick / text, strong practical lights all judged. |
 
@@ -152,6 +152,12 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   iOS active while Web parity is in flight. Future iOS-only Detail Softness
   work splits by product surface (export, editor/preview UI,
   capture/source metadata, release/copy), not by file mechanics.
+- 2026-05-12 JST: Phase 2 closed. WebGPU + WebGL parity committed at
+  `444db1e0` after macOS pilot (`e277e9f3`) and iOS export port
+  (`eac47d53`). Renderer-parity active archived to
+  `archive/2026-05-12-phase-2-renderer-parity.md`. Final visual A/B
+  remains owner-run and is rolled into final QA — Phase 3 (UI exposure)
+  starts now per owner direction.
 
 ## Constraints
 
