@@ -113,15 +113,23 @@ kernel vec4 filmCompression(__sample image, float amount, float range) {
 }
 """)
 
-    // v2 (presetVersion="v2"): luma-only film latitude compression.
-    //   - Same v1 sigmoid knee at 0.82 (the wider 0.65 knee in the original
-    //     v2 attempt under-compressed mid-range; reverted to 0.82).
-    //   - Highlight squeeze above luma=0.7 is luma-only (single scalar applied
-    //     uniformly to RGB) — preserves hue. The original v2 used per-channel
-    //     `compressed * compressed` quadratic which destroyed hue at strong
-    //     contrast. Squeeze magnitude reduced to 0.10 to avoid micro-banding.
-    static let filmCompressionV2 = CIColorKernel(source: """
-kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
+    // v3 (presetVersion="v2"): luma shoulder plus hue-preserving chroma
+    // density compression. Public params stay compressionAmount /
+    // compressionRange; the internal colorfulness rolloff prepares cleaner
+    // source color for detailSoftness and downstream optics.
+    static let filmCompressionV3 = CIColorKernel(source: """
+float filmCompressionWarmProtect(vec3 chroma, float mag) {
+    if (mag <= 0.000001) {
+        return 0.0;
+    }
+    vec3 dir = chroma / mag;
+    float redWarm = smoothstep(0.32, 0.72, dir.r);
+    float blueOpposed = 1.0 - smoothstep(-0.58, -0.20, dir.b);
+    float greenModerate = 1.0 - smoothstep(0.18, 0.58, abs(dir.g));
+    return clamp(redWarm * blueOpposed * greenModerate, 0.0, 1.0);
+}
+
+kernel vec4 filmCompressionV3(__sample image, float amount, float range) {
     vec4 color = image;
     if (amount < 0.001) {
         return color;
@@ -133,11 +141,51 @@ kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
     float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     float x = clamp(k * (luma - 0.5), -5.5, 5.5);
     float sigm = 1.0 / (1.0 + exp(-x));
-    float scale = luma > 0.001 ? mix(luma, sigm, amt) / luma : 1.0;
-    vec3 compressed = color.rgb * scale;
-    float hiMask = smoothstep(0.7, 1.0, luma);
-    float squeezeFactor = 1.0 - hiMask * amt * 0.10;
-    color.rgb = clamp(compressed * squeezeFactor, 0.0, 1.0);
+    // One-sided shoulder: only roll highlights, never lift shadows. Without
+    // the min(), the symmetric sigmoid lifts deep blacks and boosts shadow
+    // chroma — the opposite of the filmic density target.
+    float shoulderY = min(luma, mix(luma, sigm, amt));
+    float scale = luma > 0.001 ? shoulderY / luma : 1.0;
+    vec3 lumaCompressed = color.rgb * scale;
+    vec3 chroma = lumaCompressed - vec3(shoulderY);
+    float chromaMag = length(chroma);
+
+    float shadowRelease = smoothstep(0.14, 0.30, shoulderY);
+    float kneeStart = mix(0.62, 0.42, r);
+    float kneeEnd = mix(0.96, 0.78, r);
+    float highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
+    float chromaStress = smoothstep(0.16, 0.70, chromaMag);
+    float maxChannel = max(max(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+    float minChannel = min(min(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+    float highEdgeStress = smoothstep(0.82, 1.08, maxChannel);
+    float lowEdgeStress = smoothstep(0.82, 1.08, -minChannel);
+    float gamutStress = max(highEdgeStress, lowEdgeStress)
+        * chromaStress
+        * smoothstep(0.08, 0.24, shoulderY);
+    float warmProtect = filmCompressionWarmProtect(chroma, chromaMag);
+
+    float highlightCompression = 0.42 * highlightMask * shadowRelease * mix(0.55, 1.0, chromaStress);
+    float guardCompression = 0.22 * gamutStress * shadowRelease;
+    float protectedCompression = (highlightCompression + guardCompression) * (1.0 - 0.35 * warmProtect);
+    float chromaScale = clamp(1.0 - amt * protectedCompression, 0.0, 1.0);
+    vec3 landedChroma = chroma * chromaScale;
+    vec3 outColor = vec3(shoulderY) + landedChroma;
+    float outMax = max(max(outColor.r, outColor.g), outColor.b);
+    float landingChroma = smoothstep(0.18, 0.62, chromaMag);
+    float landingMask = smoothstep(0.78, 0.98, outMax)
+        * landingChroma
+        * shadowRelease
+        * (1.0 - 0.35 * warmProtect);
+    if (outMax > 0.78 && outMax > shoulderY + 0.000001) {
+        float over = outMax - 0.78;
+        float headroom = 0.22;
+        float softMax = 0.78 + (headroom * over) / (over + headroom);
+        float landingScale = clamp((softMax - shoulderY) / (outMax - shoulderY), 0.0, 1.0);
+        float landingBlend = clamp(amt * 0.88 * landingMask, 0.0, 1.0);
+        float finalScale = mix(1.0, landingScale, landingBlend);
+        outColor = vec3(shoulderY) + landedChroma * finalScale;
+    }
+    color.rgb = clamp(outColor, 0.0, 1.0);
     return color;
 }
 """)

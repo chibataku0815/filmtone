@@ -1046,18 +1046,16 @@ enum FilmtoneConnectCubeWriter {
         guard params.compressionAmount > 0.0001 else {
             return rgb
         }
-        let range = clamp(params.compressionRange)
-        let k = mix(5.15, 2.85, range)
-        let rangeSoft = smoothstep(edge0: 0.82, edge1: 1.0, x: range)
-        let amount = params.compressionAmount * (1.0 - 0.18 * rangeSoft)
-        let luma = rgb.luma
-        let x = clamp(k * (luma - 0.5), min: -5.5, max: 5.5)
-        let s = 1.0 / (1.0 + exp(-x))
-        let scale = luma > 0.001 ? mix(luma, s, amount) / luma : 1.0
+        let out = FilmtoneFilmCompressionV3.apply(
+            rgb: FilmtoneFilmCompressionRgb(r: rgb.r, g: rgb.g, b: rgb.b),
+            amount: params.compressionAmount,
+            range: params.compressionRange,
+            clampOutput: true
+        )
         return RGB(
-            clamp(rgb.r * scale),
-            clamp(rgb.g * scale),
-            clamp(rgb.b * scale)
+            out.r,
+            out.g,
+            out.b
         )
     }
 

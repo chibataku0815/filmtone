@@ -1786,9 +1786,20 @@ fn applyPrintContrast(rgb: vec3f, amount: f32) -> vec3f {
   return mix(rgb, s, amount);
 }
 
-// Luma-preserving sigmoid compression \u2014 DIRECTION \xA73 step 11/12. The
-// WebGL original clamps the output to [0,1]; we drop that here because a
-// wider range survives through T2-2 soft-shaper before LUT2.
+fn filmCompressionWarmProtect(chroma: vec3f, mag: f32) -> f32 {
+  if (mag <= 0.000001) {
+    return 0.0;
+  }
+  let dir = chroma / mag;
+  let redWarm = smoothstep(0.32, 0.72, dir.r);
+  let blueOpposed = 1.0 - smoothstep(-0.58, -0.20, dir.b);
+  let greenModerate = 1.0 - smoothstep(0.18, 0.58, abs(dir.g));
+  return clamp(redWarm * blueOpposed * greenModerate, 0.0, 1.0);
+}
+
+// Film Compression V3: existing luma shoulder plus hue-preserving chroma
+// density rolloff around the post-shoulder neutral axis. Output remains
+// unclamped so wider values survive into the HDR-boundary soft shaper.
 fn applyFilmCompression(rgb: vec3f, amount: f32, range: f32) -> vec3f {
   if (amount < 0.001) {
     return rgb;
@@ -1802,9 +1813,52 @@ fn applyFilmCompression(rgb: vec3f, amount: f32, range: f32) -> vec3f {
   // pixels still pass through with gentle roll-off.
   let x = clamp(k * (luma - 0.5), -5.5, 5.5);
   let s = 1.0 / (1.0 + exp(-x));
+  // One-sided shoulder: only roll highlights down, never lift shadows.
+  // Without the min(), the symmetric sigmoid lifts deep blacks and boosts
+  // their chroma \u2014 the opposite of the filmic density target.
+  let shoulderY = min(luma, mix(luma, s, amt));
   let lumaSafe = max(luma, 0.001);
-  let lumaScale = select(1.0, mix(luma, s, amt) / lumaSafe, luma > 0.001);
-  return rgb * lumaScale;
+  let lumaScale = select(1.0, shoulderY / lumaSafe, luma > 0.001);
+  let lumaCompressed = rgb * lumaScale;
+  let chroma = lumaCompressed - vec3f(shoulderY);
+  let chromaMag = length(chroma);
+
+  let shadowRelease = smoothstep(0.14, 0.30, shoulderY);
+  let kneeStart = mix(0.62, 0.42, r);
+  let kneeEnd = mix(0.96, 0.78, r);
+  let highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
+  let chromaStress = smoothstep(0.16, 0.70, chromaMag);
+  let maxChannel = max(max(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  let minChannel = min(min(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  let highEdgeStress = smoothstep(0.82, 1.08, maxChannel);
+  let lowEdgeStress = smoothstep(0.82, 1.08, -minChannel);
+  let gamutStress = max(highEdgeStress, lowEdgeStress)
+    * chromaStress
+    * smoothstep(0.08, 0.24, shoulderY);
+  let warmProtect = filmCompressionWarmProtect(chroma, chromaMag);
+
+  let highlightCompression = 0.42 * highlightMask * shadowRelease * mix(0.55, 1.0, chromaStress);
+  let guardCompression = 0.22 * gamutStress * shadowRelease;
+  let protectedCompression = (highlightCompression + guardCompression) * (1.0 - 0.35 * warmProtect);
+  let chromaScale = clamp(1.0 - amt * protectedCompression, 0.0, 1.0);
+  let landedChroma = chroma * chromaScale;
+  var out = vec3f(shoulderY) + landedChroma;
+  let outMax = max(max(out.r, out.g), out.b);
+  let landingChroma = smoothstep(0.18, 0.62, chromaMag);
+  let landingMask = smoothstep(0.78, 0.98, outMax)
+    * landingChroma
+    * shadowRelease
+    * (1.0 - 0.35 * warmProtect);
+  if (outMax > 0.78 && outMax > shoulderY + 0.000001) {
+    let over = outMax - 0.78;
+    let headroom = 0.22;
+    let softMax = 0.78 + (headroom * over) / (over + headroom);
+    let landingScale = clamp((softMax - shoulderY) / (outMax - shoulderY), 0.0, 1.0);
+    let landingBlend = clamp(amt * 0.88 * landingMask, 0.0, 1.0);
+    let finalScale = mix(1.0, landingScale, landingBlend);
+    out = vec3f(shoulderY) + landedChroma * finalScale;
+  }
+  return out;
 }
 
 @fragment
@@ -1886,7 +1940,7 @@ fn fs_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     color.a,
   );
 
-  // 12. Film compression \u2014 lumaScale only, no output clamp.
+  // 12. Film compression V3 \u2014 luma shoulder + chroma density, no output clamp.
   let compAmount = uGrade.highlightsShadowsComp.z;
   let compRange = uGrade.highlightsShadowsComp.w;
   color = vec4f(applyFilmCompression(color.rgb, compAmount, compRange), color.a);

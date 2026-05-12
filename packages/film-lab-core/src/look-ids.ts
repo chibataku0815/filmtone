@@ -9,7 +9,7 @@ export const PRESET_VERSION = "v1" as const;
 /**
  * iOS-only preset / kernel version, decoupled from shared `PRESET_VERSION` so
  * iOS can bump kernel math (`OpticalKernels.baseGradeV2` /
- * `filmCompressionV2`) without invalidating desktop / web / Remotion Look IDs.
+ * `filmCompressionV3`) without invalidating desktop / web / Remotion Look IDs.
  *
  * Stamped onto `SavedLookEntry.presetVersion` at save time and consulted by
  * `FilmtoneExportSession.applyBaseGradeStage` /

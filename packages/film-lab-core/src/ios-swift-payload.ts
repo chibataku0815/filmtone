@@ -136,6 +136,20 @@ const CONTRACT_DEFAULT_KEY_ORDER: readonly ContractDefaultKey[] = [
   "crossFilterAngleInnerThreshold",
   "crossFilterEdgeLengthGain",
   "crossFilterEdgeStrengthGain",
+  "haloPrismStrength",
+  "haloPrismRadius",
+  "haloPrismWidth",
+  "haloPrismChromatic",
+  "haloPrismThreshold",
+  "haloPrismSplit",
+  "haloPrismAngle",
+  "haloPrismSourceReactivity",
+  "opticalDirectTransmission",
+  "opticalBlackRetention",
+  "opticalScatterStrength",
+  "opticalHighlightReactivity",
+  "opticalWarmScatter",
+  "opticalSpectralTail",
 ];
 
 export { CONTRACT_DEFAULT_KEY_ORDER };

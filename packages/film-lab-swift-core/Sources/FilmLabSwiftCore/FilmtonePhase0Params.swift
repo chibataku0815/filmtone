@@ -203,6 +203,20 @@ public struct FilmtonePhase0HiddenDefaults: Equatable, Hashable, Sendable {
     public let crossFilterAngleInnerThreshold: Double
     public let crossFilterEdgeLengthGain: Double
     public let crossFilterEdgeStrengthGain: Double
+    public let haloPrismStrength: Double
+    public let haloPrismRadius: Double
+    public let haloPrismWidth: Double
+    public let haloPrismChromatic: Double
+    public let haloPrismThreshold: Double
+    public let haloPrismSplit: Double
+    public let haloPrismAngle: Double
+    public let haloPrismSourceReactivity: Double
+    public let opticalDirectTransmission: Double
+    public let opticalBlackRetention: Double
+    public let opticalScatterStrength: Double
+    public let opticalHighlightReactivity: Double
+    public let opticalWarmScatter: Double
+    public let opticalSpectralTail: Double
 
     public init(
         depthMistGain: Double,
@@ -223,7 +237,21 @@ public struct FilmtonePhase0HiddenDefaults: Equatable, Hashable, Sendable {
         crossFilterAngleGamma: Double,
         crossFilterAngleInnerThreshold: Double,
         crossFilterEdgeLengthGain: Double,
-        crossFilterEdgeStrengthGain: Double
+        crossFilterEdgeStrengthGain: Double,
+        haloPrismStrength: Double,
+        haloPrismRadius: Double,
+        haloPrismWidth: Double,
+        haloPrismChromatic: Double,
+        haloPrismThreshold: Double,
+        haloPrismSplit: Double,
+        haloPrismAngle: Double,
+        haloPrismSourceReactivity: Double,
+        opticalDirectTransmission: Double,
+        opticalBlackRetention: Double,
+        opticalScatterStrength: Double,
+        opticalHighlightReactivity: Double,
+        opticalWarmScatter: Double,
+        opticalSpectralTail: Double
     ) {
         self.depthMistGain = depthMistGain
         self.depthGlowGain = depthGlowGain
@@ -244,5 +272,19 @@ public struct FilmtonePhase0HiddenDefaults: Equatable, Hashable, Sendable {
         self.crossFilterAngleInnerThreshold = crossFilterAngleInnerThreshold
         self.crossFilterEdgeLengthGain = crossFilterEdgeLengthGain
         self.crossFilterEdgeStrengthGain = crossFilterEdgeStrengthGain
+        self.haloPrismStrength = haloPrismStrength
+        self.haloPrismRadius = haloPrismRadius
+        self.haloPrismWidth = haloPrismWidth
+        self.haloPrismChromatic = haloPrismChromatic
+        self.haloPrismThreshold = haloPrismThreshold
+        self.haloPrismSplit = haloPrismSplit
+        self.haloPrismAngle = haloPrismAngle
+        self.haloPrismSourceReactivity = haloPrismSourceReactivity
+        self.opticalDirectTransmission = opticalDirectTransmission
+        self.opticalBlackRetention = opticalBlackRetention
+        self.opticalScatterStrength = opticalScatterStrength
+        self.opticalHighlightReactivity = opticalHighlightReactivity
+        self.opticalWarmScatter = opticalWarmScatter
+        self.opticalSpectralTail = opticalSpectralTail
     }
 }

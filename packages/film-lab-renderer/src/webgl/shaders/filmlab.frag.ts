@@ -118,9 +118,17 @@ float grain(vec2 uv, float time) {
   return fract(sin(dot(uv * time, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 }
 
-// ルミナンスを保ったまま S カーブで圧縮する（0.4.0）。
-// amount=0 なら何もしない。range は肩／足の広さ。高 range＋高 amount で輪郭に段差が出やすいため
-// k の振れ幅をやや抑え、sigmoid 入力を clamp し、range が極端に高いときだけ amount を軽く減衰する。
+float filmCompressionWarmProtect(vec3 chroma, float mag) {
+  if (mag <= 0.000001) return 0.0;
+  vec3 dir = chroma / mag;
+  float redWarm = smoothstep(0.32, 0.72, dir.r);
+  float blueOpposed = 1.0 - smoothstep(-0.58, -0.20, dir.b);
+  float greenModerate = 1.0 - smoothstep(0.18, 0.58, abs(dir.g));
+  return clamp(redWarm * blueOpposed * greenModerate, 0.0, 1.0);
+}
+
+// Film Compression V3: existing luma shoulder plus hue-preserving chroma
+// density rolloff around the post-shoulder neutral axis.
 vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   if (amount < 0.001) return rgb;
   float r = clamp(range, 0.0, 1.0);
@@ -130,8 +138,51 @@ vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
   float x = clamp(k * (luma - 0.5), -5.5, 5.5);
   float s = 1.0 / (1.0 + exp(-x));
-  float lumaScale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
-  return clamp(rgb * lumaScale, 0.0, 1.0);
+  // One-sided shoulder: only roll highlights down, never lift shadows.
+  // A symmetric sigmoid centered at 0.5 would push deep blacks upward
+  // and boost shadow chroma — the opposite of the filmic density target.
+  float shoulderY = min(luma, mix(luma, s, amt));
+  float lumaScale = luma > 0.001 ? shoulderY / luma : 1.0;
+  vec3 lumaCompressed = rgb * lumaScale;
+  vec3 chroma = lumaCompressed - vec3(shoulderY);
+  float chromaMag = length(chroma);
+
+  float shadowRelease = smoothstep(0.14, 0.30, shoulderY);
+  float kneeStart = mix(0.62, 0.42, r);
+  float kneeEnd = mix(0.96, 0.78, r);
+  float highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
+  float chromaStress = smoothstep(0.16, 0.70, chromaMag);
+  float maxChannel = max(max(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  float minChannel = min(min(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  float highEdgeStress = smoothstep(0.82, 1.08, maxChannel);
+  float lowEdgeStress = smoothstep(0.82, 1.08, -minChannel);
+  float gamutStress = max(highEdgeStress, lowEdgeStress)
+    * chromaStress
+    * smoothstep(0.08, 0.24, shoulderY);
+  float warmProtect = filmCompressionWarmProtect(chroma, chromaMag);
+
+  float highlightCompression = 0.42 * highlightMask * shadowRelease * mix(0.55, 1.0, chromaStress);
+  float guardCompression = 0.22 * gamutStress * shadowRelease;
+  float protectedCompression = (highlightCompression + guardCompression) * (1.0 - 0.35 * warmProtect);
+  float chromaScale = clamp(1.0 - amt * protectedCompression, 0.0, 1.0);
+  vec3 landedChroma = chroma * chromaScale;
+  vec3 outColor = vec3(shoulderY) + landedChroma;
+  float outMax = max(max(outColor.r, outColor.g), outColor.b);
+  float landingChroma = smoothstep(0.18, 0.62, chromaMag);
+  float landingMask = smoothstep(0.78, 0.98, outMax)
+    * landingChroma
+    * shadowRelease
+    * (1.0 - 0.35 * warmProtect);
+  if (outMax > 0.78 && outMax > shoulderY + 0.000001) {
+    float over = outMax - 0.78;
+    float headroom = 0.22;
+    float softMax = 0.78 + (headroom * over) / (over + headroom);
+    float landingScale = clamp((softMax - shoulderY) / (outMax - shoulderY), 0.0, 1.0);
+    float landingBlend = clamp(amt * 0.88 * landingMask, 0.0, 1.0);
+    float finalScale = mix(1.0, landingScale, landingBlend);
+    outColor = vec3(shoulderY) + landedChroma * finalScale;
+  }
+  return clamp(outColor, 0.0, 1.0);
 }
 
 // プリント段の最終コントラストを S カーブで持ち上げる。
@@ -189,7 +240,7 @@ void main() {
   color.rgb += uShadows * (1.0 - lumHS) * 0.5;
   color.rgb += uHighlights * lumHS * 0.5;
 
-  // 0.4.0 のネガ圧縮。LUT2 の前で効かせる。
+  // Film Compression V3. Apply before LUT2 and downstream optical stages.
   color.rgb = applyFilmCompression(color.rgb, uCompressionAmount, uCompressionRange);
 
   // === Creative LUT (LUT2) === after color grading

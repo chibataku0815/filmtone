@@ -173,12 +173,17 @@ test("iOS swift payload exposes hiddenDefaults that deep-equal CONTRACT_DEFAULTS
   const payload = buildFilmtoneIosSwiftPayload();
 
   expect(payload.hiddenDefaults).toEqual(CONTRACT_DEFAULTS);
-  expect(Object.keys(payload.hiddenDefaults)).toHaveLength(19);
+  expect(Object.keys(payload.hiddenDefaults)).toHaveLength(33);
   // Spot-check a few canonical values (T3 Stream 2 consumes depthRayAngle*)
   expect(payload.hiddenDefaults.depthRayAngleGamma).toBe(1.4);
   expect(payload.hiddenDefaults.depthRayAngleInnerThreshold).toBe(0.1);
   expect(payload.hiddenDefaults.crossFilterEdgeLengthGain).toBe(0.45);
   expect(payload.hiddenDefaults.depthMistFieldPsfRadiusPx).toBe(18);
+  // The haloPrism / optical groups were added after the original 19-key
+  // contract; pin one value from each so a future regression to the 19-key
+  // shape fails here first instead of silently in the generator.
+  expect(payload.hiddenDefaults.haloPrismRadius).toBe(0.62);
+  expect(payload.hiddenDefaults.opticalDirectTransmission).toBe(1);
 });
 
 test("iOS swift payload rendering emits static let hiddenDefaults block", () => {
@@ -188,9 +193,11 @@ test("iOS swift payload rendering emits static let hiddenDefaults block", () => 
     "static let hiddenDefaults = FilmtonePhase0HiddenDefaults(",
   );
   // Distant key sanity check — catches a half-emitted block that would
-  // compile-fail against FilmtonePhase0HiddenDefaults(19 fields).
-  expect(rendered).toContain("crossFilterEdgeStrengthGain: 0.25");
+  // compile-fail against FilmtonePhase0HiddenDefaults(33 fields).
   expect(rendered).toContain("depthRayAngleGamma: 1.4");
+  expect(rendered).toContain("crossFilterEdgeStrengthGain: 0.25");
+  expect(rendered).toContain("haloPrismRadius: 0.62");
+  expect(rendered).toContain("opticalSpectralTail: 0.0");
 });
 
 test("CONTRACT_DEFAULT_KEY_ORDER matches CONTRACT_DEFAULTS declaration order", () => {

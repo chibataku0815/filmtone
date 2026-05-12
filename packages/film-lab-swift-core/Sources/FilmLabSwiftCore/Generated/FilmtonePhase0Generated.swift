@@ -239,7 +239,21 @@ public enum FilmtonePhase0Generated {
         crossFilterAngleGamma: 1.4,
         crossFilterAngleInnerThreshold: 0.1,
         crossFilterEdgeLengthGain: 0.45,
-        crossFilterEdgeStrengthGain: 0.25
+        crossFilterEdgeStrengthGain: 0.25,
+        haloPrismStrength: 0.0,
+        haloPrismRadius: 0.62,
+        haloPrismWidth: 0.22,
+        haloPrismChromatic: 0.65,
+        haloPrismThreshold: 0.9,
+        haloPrismSplit: 0.7,
+        haloPrismAngle: 0.0,
+        haloPrismSourceReactivity: 0.85,
+        opticalDirectTransmission: 1.0,
+        opticalBlackRetention: 1.0,
+        opticalScatterStrength: 0.0,
+        opticalHighlightReactivity: 0.0,
+        opticalWarmScatter: 0.0,
+        opticalSpectralTail: 0.0
     )
     public static let quickWeights: [String: [String: Double]] = [
         "filmCharacter": [

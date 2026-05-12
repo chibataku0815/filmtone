@@ -2,13 +2,13 @@ import CoreImage
 import FilmLabSwiftCore
 import Foundation
 
-// Phase 1b primary grade chain: baseGradeV2 → filmCompressionV2 → printStage.
+// Phase 1b primary grade chain: baseGradeV2 → filmCompressionV3 → printStage.
 // Phase 2 C5a: vignette + grain inserted in iOS canonical order.
 // Phase 2 C5c: RayAngleOptics integrated — vignette computes opticsPack + applyMask.
 // Phase 2 C5b A.1: glowFamily inserted before vignette (iOS canonical order).
 // Phase 2 C5b A.2: halation + diffusion plates activated (bloom + halation + diffusion all live).
 // Phase 2 C5b A.3: edgeOptics (radialRGBSplit + edgeSoftnessBlend) inserted between
-//   filmCompressionV2 and glowFamily (iOS canonical order, FilmtoneExportSession L1565).
+//   filmCompressionV3 and glowFamily (iOS canonical order, FilmtoneExportSession L1565).
 // M5-A.2: creativeLut inserted between grain and printStage (iOS canonical
 //   FilmtoneExportSession L1561). Caller passes nil for the legacy
 //   "no Look" path; the stage is a no-op then.
@@ -22,12 +22,12 @@ import Foundation
 //   lerp).
 //
 // Phase 2-B Detail Softness: local-reference high-pass attenuation
-//   inserted between filmCompressionV2 and edgeOptics, per
+//   inserted between filmCompressionV3 and edgeOptics, per
 //   docs/filmtone/detail-softness/archive/2026-05-12-phase-2a-research-charter.md
 //   §Stage insertion points → macOS native. Identity at
 //   `effectiveDetailSoftness == 0` (caller short-circuit + kernel guard).
 //
-//   baseGradeV2 → filmCompressionV2 → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
+//   baseGradeV2 → filmCompressionV3 → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
 
 enum FilmtoneGradePipeline {
 
@@ -70,7 +70,7 @@ enum FilmtoneGradePipeline {
             current = applyBaseGradeV2(to: current, params: params)
         }
         if params.compressionAmount > 0.0001 {
-            current = applyFilmCompressionV2(to: current, params: params)
+            current = applyFilmCompressionV3(to: current, params: params)
         }
         current = applyDetailSoftnessStage(
             to: current,
@@ -192,8 +192,8 @@ enum FilmtoneGradePipeline {
         ]) ?? image
     }
 
-    private static func applyFilmCompressionV2(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
-        guard let kernel = FilmtoneGradeKernels.filmCompressionV2 else { return image }
+    private static func applyFilmCompressionV3(to image: CIImage, params: FilmtonePhase0Params) -> CIImage {
+        guard let kernel = FilmtoneGradeKernels.filmCompressionV3 else { return image }
         return kernel.apply(extent: image.extent, arguments: [
             image,
             params.compressionAmount,
@@ -276,7 +276,7 @@ enum FilmtoneGradePipeline {
     // Local-reference high-pass attenuation. Identity at
     // `effectiveDetailSoftness == 0` — short-circuits before any CIImage
     // construction, so non-`detailSoftness` renders stay bit-identical to
-    // the pre-Phase-2 pipeline. Inserted between `filmCompressionV2` and
+    // the pre-Phase-2 pipeline. Inserted between `filmCompressionV3` and
     // `edgeOptics` per Phase 2-A insertion-point survey.
     private static func applyDetailSoftnessStage(
         to image: CIImage,

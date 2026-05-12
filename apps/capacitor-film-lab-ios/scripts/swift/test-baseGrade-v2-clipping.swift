@@ -1,7 +1,7 @@
 import Foundation
 
 // v1.4 Look V2 — numeric clipping & monotonicity gate for baseGradeV2 and
-// filmCompressionV2 MSL kernels. We transcribe the kernel math into pure
+// filmCompressionV3 MSL kernels. We transcribe the kernel math into pure
 // Swift Foundation (no Core Image) and probe with stress inputs:
 //
 //   1. Grayscale ramp under preset-range contrast=1.20 stays bounded and
@@ -12,9 +12,9 @@ import Foundation
 //      (highlight unchanged) — handoff §3.5 reversal of muddy white-lift
 //   4. Contrast curve monotonic across 4096 points at preset-range
 //      contrast=1.20
-//   5. filmCompressionV2 doesn't blow channels at amount=1.0, range in {0,1}
+//   5. filmCompressionV3 doesn't blow channels at amount=1.0, range in {0,1}
 //   6. baseGradeV2 identity (all neutral) returns input
-//   7. filmCompressionV2 amount=0 = pass-through identity
+//   7. filmCompressionV3 amount=0 = pass-through identity
 //   8. NEW: crosstalk shifts shadow toward shadowHue direction (cyan-blue at
 //      shadowHue=200°) without breaking highlight neutrality
 //   9. NEW: highlightTone shifts highlight toward highlightHue direction
@@ -130,9 +130,22 @@ private func bakeBaseGradeV2(
     return (rr, gg, bb)
 }
 
-// MARK: - filmCompressionV2 transcription (luma-only scale + luma-only highlight squeeze)
+// MARK: - filmCompressionV3 transcription (luma shoulder + chroma density)
 
-private func bakeFilmCompressionV2(
+private func filmCompressionWarmProtect(cr: Double, cg: Double, cb: Double, magnitude: Double) -> Double {
+    if magnitude <= 0.000001 {
+        return 0.0
+    }
+    let dr = cr / magnitude
+    let dg = cg / magnitude
+    let db = cb / magnitude
+    let redWarm = smoothstep(0.32, 0.72, dr)
+    let blueOpposed = 1.0 - smoothstep(-0.58, -0.20, db)
+    let greenModerate = 1.0 - smoothstep(0.18, 0.58, abs(dg))
+    return max(0.0, min(1.0, redWarm * blueOpposed * greenModerate))
+}
+
+private func bakeFilmCompressionV3(
     r: Double, g: Double, b: Double,
     amount: Double, range: Double
 ) -> (r: Double, g: Double, b: Double) {
@@ -146,16 +159,59 @@ private func bakeFilmCompressionV2(
     let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
     let x = max(-5.5, min(5.5, k * (luma - 0.5)))
     let sigm = 1.0 / (1.0 + exp(-x))
-    let scale = luma > 0.001 ? (luma + (sigm - luma) * amt) / luma : 1.0
-    let cR = r * scale
-    let cG = g * scale
-    let cB = b * scale
-    let hiMask = smoothstep(0.7, 1.0, luma)
-    let squeezeFactor = 1.0 - hiMask * amt * 0.10
+    let shoulderY = min(luma, luma + (sigm - luma) * amt)
+    let scale = luma > 0.001 ? shoulderY / luma : 1.0
+    let lR = r * scale
+    let lG = g * scale
+    let lB = b * scale
+    let cR = lR - shoulderY
+    let cG = lG - shoulderY
+    let cB = lB - shoulderY
+    let chromaMag = sqrt(cR * cR + cG * cG + cB * cB)
+    let shadowRelease = smoothstep(0.14, 0.30, shoulderY)
+    let kneeStart = 0.62 + (0.42 - 0.62) * rr
+    let kneeEnd = 0.96 + (0.78 - 0.96) * rr
+    let highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY)
+    let chromaStress = smoothstep(0.16, 0.70, chromaMag)
+    let maxChannel = max(lR, max(lG, lB))
+    let minChannel = min(lR, min(lG, lB))
+    let highEdgeStress = smoothstep(0.82, 1.08, maxChannel)
+    let lowEdgeStress = smoothstep(0.82, 1.08, -minChannel)
+    let gamutStress = max(highEdgeStress, lowEdgeStress)
+        * chromaStress
+        * smoothstep(0.08, 0.24, shoulderY)
+    let warmProtect = filmCompressionWarmProtect(cr: cR, cg: cG, cb: cB, magnitude: chromaMag)
+    let highlightCompression = 0.42 * highlightMask * shadowRelease * (0.55 + (1.0 - 0.55) * chromaStress)
+    let guardCompression = 0.22 * gamutStress * shadowRelease
+    let protectedCompression = (highlightCompression + guardCompression) * (1.0 - 0.35 * warmProtect)
+    let chromaScale = max(0.0, min(1.0, 1.0 - amt * protectedCompression))
+    let landedCR = cR * chromaScale
+    let landedCG = cG * chromaScale
+    let landedCB = cB * chromaScale
+    var outR = shoulderY + landedCR
+    var outG = shoulderY + landedCG
+    var outB = shoulderY + landedCB
+    let outMax = max(outR, max(outG, outB))
+    let landingChroma = smoothstep(0.18, 0.62, chromaMag)
+    let landingMask = smoothstep(0.78, 0.98, outMax)
+        * landingChroma
+        * shadowRelease
+        * (1.0 - 0.35 * warmProtect)
+    if outMax > 0.78 && outMax > shoulderY + 0.000001 {
+        let over = outMax - 0.78
+        let headroom = 0.22
+        let softMax = 0.78 + (headroom * over) / (over + headroom)
+        let landingScale = max(0.0, min(1.0, (softMax - shoulderY) / (outMax - shoulderY)))
+        let landingBlend = max(0.0, min(1.0, amt * 0.88 * landingMask))
+        let finalScale = 1.0 + (landingScale - 1.0) * landingBlend
+        outR = shoulderY + landedCR * finalScale
+        outG = shoulderY + landedCG * finalScale
+        outB = shoulderY + landedCB * finalScale
+    }
     return (
-        max(0.0, min(1.0, cR * squeezeFactor)),
-        max(0.0, min(1.0, cG * squeezeFactor)),
-        max(0.0, min(1.0, cB * squeezeFactor))
+        max(0.0, min(1.0, outR)),
+        max(0.0, min(1.0, outG)),
+        max(0.0, min(1.0, outB))
     )
 }
 
@@ -228,12 +284,12 @@ func runProbes() throws {
         prevR = out.r
     }
 
-    // Probe 5: filmCompressionV2 doesn't blow channels at amount=1.0
+    // Probe 5: filmCompressionV3 doesn't blow channels at amount=1.0
     for amount in [0.5, 0.75, 1.0] {
         for range in [0.0, 0.5, 1.0] {
             for i in 0...255 {
                 let v = Double(i) / 255.0
-                let out = bakeFilmCompressionV2(
+                let out = bakeFilmCompressionV3(
                     r: v, g: v * 0.7, b: v * 1.1,
                     amount: amount, range: range
                 )
@@ -261,10 +317,10 @@ func runProbes() throws {
                    "v2 identity violated at v=\(v): out.r=\(out.r)")
     }
 
-    // Probe 7: filmCompressionV2 amount<0.001 = pass-through identity
-    let pass = bakeFilmCompressionV2(r: 0.4, g: 0.6, b: 0.8, amount: 0.0, range: 0.5)
+    // Probe 7: filmCompressionV3 amount<0.001 = pass-through identity
+    let pass = bakeFilmCompressionV3(r: 0.4, g: 0.6, b: 0.8, amount: 0.0, range: 0.5)
     try expect(pass.r == 0.4 && pass.g == 0.6 && pass.b == 0.8,
-               "filmCompV2 amount=0 should be identity, got \(pass)")
+               "filmCompV3 amount=0 should be identity, got \(pass)")
 
     // Probe 8 (NEW): Crosstalk shifts shadow toward shadowHue direction (cyan-blue
     // at shadowHue=200°) — gray shadow gets a cool tint, not white lift.

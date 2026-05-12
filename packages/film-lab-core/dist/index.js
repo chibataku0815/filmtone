@@ -2768,10 +2768,32 @@ function getIosPhase0SourceCapViolations(source) {
   return violations;
 }
 
-// src/bake-color-only.ts
-function mix(a, b, t) {
-  return a + (b - a) * t;
-}
+// src/film-compression-v3.ts
+var FILM_COMPRESSION_V3_CONSTANTS = {
+  lumaKMin: 2.85,
+  lumaKMax: 5.15,
+  rangeSoftStart: 0.82,
+  rangeSoftEnd: 1,
+  rangeAmountTrim: 0.18,
+  chromaCompressionMax: 0.42,
+  problemColorGuardMax: 0.22,
+  shadowReleaseStart: 0.14,
+  shadowReleaseEnd: 0.3,
+  highlightKneeStartLowRange: 0.62,
+  highlightKneeStartHighRange: 0.42,
+  highlightKneeEndLowRange: 0.96,
+  highlightKneeEndHighRange: 0.78,
+  chromaStressStart: 0.16,
+  chromaStressEnd: 0.7,
+  gamutStressStart: 0.82,
+  gamutStressEnd: 1.08,
+  warmProtectStrength: 0.35,
+  highlightDensityLandingStart: 0.78,
+  highlightDensityLandingStrength: 0.88,
+  highlightDensityLandingChromaStart: 0.18,
+  highlightDensityLandingChromaEnd: 0.62,
+  highlightDensityLandingWarmProtect: 0.35
+};
 function clamp012(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
@@ -2782,15 +2804,150 @@ function clampRange(x, lo, hi) {
   if (x > hi) return hi;
   return x;
 }
+function mix(a, b, t) {
+  return a + (b - a) * t;
+}
 function smoothstep(edge0, edge1, x) {
   const t = clamp012((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
-function luma(rgb) {
+function filmCompressionLuma(rgb) {
   return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
 }
+function filmCompressionChromaMagnitude(rgb) {
+  const y = filmCompressionLuma(rgb);
+  const cr = rgb.r - y;
+  const cg = rgb.g - y;
+  const cb = rgb.b - y;
+  return Math.sqrt(cr * cr + cg * cg + cb * cb);
+}
+function max3(a, b, c) {
+  return Math.max(a, Math.max(b, c));
+}
+function min3(a, b, c) {
+  return Math.min(a, Math.min(b, c));
+}
+function warmHueProtect(cr, cg, cb, mag) {
+  if (mag <= 1e-6) {
+    return 0;
+  }
+  const dr = cr / mag;
+  const dg = cg / mag;
+  const db = cb / mag;
+  const redWarm = smoothstep(0.32, 0.72, dr);
+  const blueOpposed = 1 - smoothstep(-0.58, -0.2, db);
+  const greenModerate = 1 - smoothstep(0.18, 0.58, Math.abs(dg));
+  return clamp012(redWarm * blueOpposed * greenModerate);
+}
+function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
+  if (amount < 1e-3) {
+    return rgb;
+  }
+  const c = FILM_COMPRESSION_V3_CONSTANTS;
+  const r = clamp012(range);
+  const k = mix(c.lumaKMax, c.lumaKMin, r);
+  const rangeSoft = smoothstep(c.rangeSoftStart, c.rangeSoftEnd, r);
+  const amt = amount * (1 - c.rangeAmountTrim * rangeSoft);
+  const y = filmCompressionLuma(rgb);
+  const x = clampRange(k * (y - 0.5), -5.5, 5.5);
+  const sigmoid = 1 / (1 + Math.exp(-x));
+  const shoulderY = Math.min(y, mix(y, sigmoid, amt));
+  const lumaScale = y > 1e-3 ? shoulderY / y : 1;
+  const lr = rgb.r * lumaScale;
+  const lg = rgb.g * lumaScale;
+  const lb = rgb.b * lumaScale;
+  const cr = lr - shoulderY;
+  const cg = lg - shoulderY;
+  const cb = lb - shoulderY;
+  const chromaMag = Math.sqrt(cr * cr + cg * cg + cb * cb);
+  const shadowRelease = smoothstep(
+    c.shadowReleaseStart,
+    c.shadowReleaseEnd,
+    shoulderY
+  );
+  const kneeStart = mix(
+    c.highlightKneeStartLowRange,
+    c.highlightKneeStartHighRange,
+    r
+  );
+  const kneeEnd = mix(
+    c.highlightKneeEndLowRange,
+    c.highlightKneeEndHighRange,
+    r
+  );
+  const highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
+  const chromaStress = smoothstep(
+    c.chromaStressStart,
+    c.chromaStressEnd,
+    chromaMag
+  );
+  const maxChannel = max3(lr, lg, lb);
+  const minChannel = min3(lr, lg, lb);
+  const highEdgeStress = smoothstep(
+    c.gamutStressStart,
+    c.gamutStressEnd,
+    maxChannel
+  );
+  const lowEdgeStress = smoothstep(
+    c.gamutStressStart,
+    c.gamutStressEnd,
+    -minChannel
+  );
+  const gamutStress = Math.max(highEdgeStress, lowEdgeStress) * chromaStress * smoothstep(0.08, 0.24, shoulderY);
+  const warmProtect = warmHueProtect(cr, cg, cb, chromaMag);
+  const highlightCompression = c.chromaCompressionMax * highlightMask * shadowRelease * mix(0.55, 1, chromaStress);
+  const guardCompression = c.problemColorGuardMax * gamutStress * shadowRelease;
+  const protectedCompression = (highlightCompression + guardCompression) * (1 - c.warmProtectStrength * warmProtect);
+  const chromaScale = clamp012(1 - amt * protectedCompression);
+  const landedCr = cr * chromaScale;
+  const landedCg = cg * chromaScale;
+  const landedCb = cb * chromaScale;
+  const out = {
+    r: shoulderY + landedCr,
+    g: shoulderY + landedCg,
+    b: shoulderY + landedCb
+  };
+  const outMax = max3(out.r, out.g, out.b);
+  const landingChroma = smoothstep(
+    c.highlightDensityLandingChromaStart,
+    c.highlightDensityLandingChromaEnd,
+    chromaMag
+  );
+  const landingMask = smoothstep(c.highlightDensityLandingStart, 0.98, outMax) * landingChroma * shadowRelease * (1 - c.highlightDensityLandingWarmProtect * warmProtect);
+  if (outMax > c.highlightDensityLandingStart && outMax > shoulderY + 1e-6) {
+    const over = outMax - c.highlightDensityLandingStart;
+    const headroom = 1 - c.highlightDensityLandingStart;
+    const softMax = c.highlightDensityLandingStart + headroom * over / (over + headroom);
+    const landingScale = clamp012((softMax - shoulderY) / (outMax - shoulderY));
+    const landingBlend = clamp012(
+      amt * c.highlightDensityLandingStrength * landingMask
+    );
+    const finalScale = mix(1, landingScale, landingBlend);
+    out.r = shoulderY + landedCr * finalScale;
+    out.g = shoulderY + landedCg * finalScale;
+    out.b = shoulderY + landedCb * finalScale;
+  }
+  if (options.clampOutput) {
+    return {
+      r: clamp012(out.r),
+      g: clamp012(out.g),
+      b: clamp012(out.b)
+    };
+  }
+  return out;
+}
+
+// src/bake-color-only.ts
+function mix2(a, b, t) {
+  return a + (b - a) * t;
+}
+function clamp013(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
 function clampedRGB(rgb) {
-  return { r: clamp012(rgb.r), g: clamp012(rgb.g), b: clamp012(rgb.b) };
+  return { r: clamp013(rgb.r), g: clamp013(rgb.g), b: clamp013(rgb.b) };
 }
 var BAKE_COLOR_PARAM_KEYS = [
   "exposure",
@@ -2848,9 +3005,9 @@ function applyBaseGrade(rgb, params) {
   g = (g - 0.5) * params.contrast + 0.5;
   b = (b - 0.5) * params.contrast + 0.5;
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  r = mix(lum, r, params.saturation);
-  g = mix(lum, g, params.saturation);
-  b = mix(lum, b, params.saturation);
+  r = mix2(lum, r, params.saturation);
+  g = mix2(lum, g, params.saturation);
+  b = mix2(lum, b, params.saturation);
   r += params.temperature * 0.1;
   b -= params.temperature * 0.1;
   r += params.tint * 0.05;
@@ -2862,22 +3019,12 @@ function applyBaseGrade(rgb, params) {
   return { r, g, b };
 }
 function applyFilmCompression(rgb, params) {
-  if (params.compressionAmount <= 1e-4) {
-    return rgb;
-  }
-  const range = clamp012(params.compressionRange);
-  const k = mix(5.15, 2.85, range);
-  const rangeSoft = smoothstep(0.82, 1, range);
-  const amount = params.compressionAmount * (1 - 0.18 * rangeSoft);
-  const lum = luma(rgb);
-  const x = clampRange(k * (lum - 0.5), -5.5, 5.5);
-  const s = 1 / (1 + Math.exp(-x));
-  const scale = lum > 1e-3 ? mix(lum, s, amount) / lum : 1;
-  return {
-    r: clamp012(rgb.r * scale),
-    g: clamp012(rgb.g * scale),
-    b: clamp012(rgb.b * scale)
-  };
+  return applyFilmCompressionV3Sample(
+    rgb,
+    params.compressionAmount,
+    params.compressionRange,
+    { clampOutput: true }
+  );
 }
 function applyPrintStage(rgb, params) {
   let r = rgb.r;
@@ -2888,13 +3035,13 @@ function applyPrintStage(rgb, params) {
   g -= params.magenta * cmyScale;
   b -= params.yellow * cmyScale;
   if (params.printContrast >= 1e-3) {
-    const k = mix(1, 5, params.printContrast);
+    const k = mix2(1, 5, params.printContrast);
     const sR = 1 / (1 + Math.exp(-k * (r - 0.5)));
     const sG = 1 / (1 + Math.exp(-k * (g - 0.5)));
     const sB = 1 / (1 + Math.exp(-k * (b - 0.5)));
-    r = mix(r, sR, params.printContrast);
-    g = mix(g, sG, params.printContrast);
-    b = mix(b, sB, params.printContrast);
+    r = mix2(r, sR, params.printContrast);
+    g = mix2(g, sG, params.printContrast);
+    b = mix2(b, sB, params.printContrast);
   }
   return clampedRGB({ r, g, b });
 }
@@ -2985,13 +3132,13 @@ function serializeCreativeCubeToText(cube, options) {
 // src/creative-pack-01-generator.ts
 var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-palermo-reference-v1";
 var CREATIVE_PACK_01_URBAN_TRANSFORM = "filmtone-urban-palermo-green-density-v1";
-function clamp013(x) {
+function clamp014(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
 }
 function smoothstep2(edge0, edge1, x) {
-  const t = clamp013((x - edge0) / (edge1 - edge0));
+  const t = clamp014((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
 function applyStoneFingerprintTransform(sourceCube) {
@@ -3015,9 +3162,9 @@ function applyStoneFingerprintTransform(sourceCube) {
         const midWeight = smoothstep2(0.18, 0.62, inputLuma) * (1 - smoothstep2(0.72, 0.95, inputLuma));
         const highlightProtect = 1 - smoothstep2(0.76, 0.98, inputLuma);
         const cool = neutralWeight * highlightProtect;
-        data[idx + 0] = clamp013(sourceR * (1 - 0.012 * cool) - 2e-3 * shadowWeight);
-        data[idx + 1] = clamp013(sourceG * (1 + 3e-3 * cool * midWeight));
-        data[idx + 2] = clamp013(sourceB * (1 + 0.014 * cool * midWeight));
+        data[idx + 0] = clamp014(sourceR * (1 - 0.012 * cool) - 2e-3 * shadowWeight);
+        data[idx + 1] = clamp014(sourceG * (1 + 3e-3 * cool * midWeight));
+        data[idx + 2] = clamp014(sourceB * (1 + 0.014 * cool * midWeight));
       }
     }
   }
@@ -3050,9 +3197,9 @@ function applyUrbanCoolDensityTransform(sourceCube) {
         const newR = sourceR * (1 - coolStrength * 1.05 - highlightCool) + shadowLift * 0.7;
         const newG = sourceG * (1 + greenCastStrength) + shadowLift;
         const newB = sourceB * (1 + coolStrength * 1.3 + highlightCool * 0.5) + shadowLift * 1.1;
-        data[idx + 0] = clamp013(newR);
-        data[idx + 1] = clamp013(newG);
-        data[idx + 2] = clamp013(newB);
+        data[idx + 0] = clamp014(newR);
+        data[idx + 1] = clamp014(newG);
+        data[idx + 2] = clamp014(newB);
       }
     }
   }
@@ -3325,16 +3472,16 @@ function generateCubeForEntry(entry, size) {
     }
   }
 }
-function clamp014(v) {
+function clamp015(v) {
   return Math.min(Math.max(v, 0), 1);
 }
 function filmtoneSdrShoulder(linear) {
   const exposed = Math.max(0, linear * 1.18);
   const shoulder = exposed / (1 + Math.max(exposed - 0.18, 0) * 0.42);
-  return clamp014(shoulder);
+  return clamp015(shoulder);
 }
 function rec709Encode(linear) {
-  const value = clamp014(linear);
+  const value = clamp015(linear);
   if (value < 0.018) {
     return value * 4.5;
   }
@@ -3789,6 +3936,7 @@ export {
   DETAIL_SOFTNESS_EFFECTIVE_MAX,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
+  FILM_COMPRESSION_V3_CONSTANTS,
   FILM_GRAIN_INTENSITY_MAX,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
@@ -3827,6 +3975,7 @@ export {
   QUICK_AXIS_IDS,
   SOURCE_PROFILE_CATALOG,
   applyCreativePack01SourceTransform,
+  applyFilmCompressionV3Sample,
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
   applyStoneFingerprintTransform,
@@ -3854,6 +4003,8 @@ export {
   deriveDetailSoftnessUniforms,
   deserializeCubeLutData,
   diagonalMaxDelta,
+  filmCompressionChromaMagnitude,
+  filmCompressionLuma,
   filmLabDepthTrackSchema,
   filmLabParamsSchema,
   filmLookGradeDefaultProps,

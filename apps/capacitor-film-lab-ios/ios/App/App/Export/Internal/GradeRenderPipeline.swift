@@ -104,12 +104,12 @@ final class GradeRenderPipeline {
         let kernel: CIColorKernel?
         switch presetVersion {
         case "v2":
-            kernel = OpticalKernels.filmCompressionV2
+            kernel = OpticalKernels.filmCompressionV3
         case "v1":
             kernel = OpticalKernels.filmCompression
         default:
             assertionFailure("Unknown presetVersion: \(presetVersion)")
-            kernel = OpticalKernels.filmCompressionV2
+            kernel = OpticalKernels.filmCompressionV3
         }
         guard let kernel else {
             return image

@@ -253,6 +253,14 @@ export {
   type DetailSoftnessUniforms,
 } from "./detail-softness";
 export {
+  FILM_COMPRESSION_V3_CONSTANTS,
+  applyFilmCompressionV3Sample,
+  filmCompressionChromaMagnitude,
+  filmCompressionLuma,
+  type FilmCompressionRgb,
+  type FilmCompressionV3Options,
+} from "./film-compression-v3";
+export {
   resolveSourceDetailCompensation,
   type SourceDetailCompensationInput,
   type SourceDetailConfidence,

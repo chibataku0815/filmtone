@@ -3465,9 +3465,17 @@ float grain(vec2 uv, float time) {
   return fract(sin(dot(uv * time, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 }
 
-// \u30EB\u30DF\u30CA\u30F3\u30B9\u3092\u4FDD\u3063\u305F\u307E\u307E S \u30AB\u30FC\u30D6\u3067\u5727\u7E2E\u3059\u308B\uFF080.4.0\uFF09\u3002
-// amount=0 \u306A\u3089\u4F55\u3082\u3057\u306A\u3044\u3002range \u306F\u80A9\uFF0F\u8DB3\u306E\u5E83\u3055\u3002\u9AD8 range\uFF0B\u9AD8 amount \u3067\u8F2A\u90ED\u306B\u6BB5\u5DEE\u304C\u51FA\u3084\u3059\u3044\u305F\u3081
-// k \u306E\u632F\u308C\u5E45\u3092\u3084\u3084\u6291\u3048\u3001sigmoid \u5165\u529B\u3092 clamp \u3057\u3001range \u304C\u6975\u7AEF\u306B\u9AD8\u3044\u3068\u304D\u3060\u3051 amount \u3092\u8EFD\u304F\u6E1B\u8870\u3059\u308B\u3002
+float filmCompressionWarmProtect(vec3 chroma, float mag) {
+  if (mag <= 0.000001) return 0.0;
+  vec3 dir = chroma / mag;
+  float redWarm = smoothstep(0.32, 0.72, dir.r);
+  float blueOpposed = 1.0 - smoothstep(-0.58, -0.20, dir.b);
+  float greenModerate = 1.0 - smoothstep(0.18, 0.58, abs(dir.g));
+  return clamp(redWarm * blueOpposed * greenModerate, 0.0, 1.0);
+}
+
+// Film Compression V3: existing luma shoulder plus hue-preserving chroma
+// density rolloff around the post-shoulder neutral axis.
 vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   if (amount < 0.001) return rgb;
   float r = clamp(range, 0.0, 1.0);
@@ -3477,8 +3485,51 @@ vec3 applyFilmCompression(vec3 rgb, float amount, float range) {
   float luma = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
   float x = clamp(k * (luma - 0.5), -5.5, 5.5);
   float s = 1.0 / (1.0 + exp(-x));
-  float lumaScale = luma > 0.001 ? mix(luma, s, amt) / luma : 1.0;
-  return clamp(rgb * lumaScale, 0.0, 1.0);
+  // One-sided shoulder: only roll highlights down, never lift shadows.
+  // A symmetric sigmoid centered at 0.5 would push deep blacks upward
+  // and boost shadow chroma \u2014 the opposite of the filmic density target.
+  float shoulderY = min(luma, mix(luma, s, amt));
+  float lumaScale = luma > 0.001 ? shoulderY / luma : 1.0;
+  vec3 lumaCompressed = rgb * lumaScale;
+  vec3 chroma = lumaCompressed - vec3(shoulderY);
+  float chromaMag = length(chroma);
+
+  float shadowRelease = smoothstep(0.14, 0.30, shoulderY);
+  float kneeStart = mix(0.62, 0.42, r);
+  float kneeEnd = mix(0.96, 0.78, r);
+  float highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
+  float chromaStress = smoothstep(0.16, 0.70, chromaMag);
+  float maxChannel = max(max(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  float minChannel = min(min(lumaCompressed.r, lumaCompressed.g), lumaCompressed.b);
+  float highEdgeStress = smoothstep(0.82, 1.08, maxChannel);
+  float lowEdgeStress = smoothstep(0.82, 1.08, -minChannel);
+  float gamutStress = max(highEdgeStress, lowEdgeStress)
+    * chromaStress
+    * smoothstep(0.08, 0.24, shoulderY);
+  float warmProtect = filmCompressionWarmProtect(chroma, chromaMag);
+
+  float highlightCompression = 0.42 * highlightMask * shadowRelease * mix(0.55, 1.0, chromaStress);
+  float guardCompression = 0.22 * gamutStress * shadowRelease;
+  float protectedCompression = (highlightCompression + guardCompression) * (1.0 - 0.35 * warmProtect);
+  float chromaScale = clamp(1.0 - amt * protectedCompression, 0.0, 1.0);
+  vec3 landedChroma = chroma * chromaScale;
+  vec3 outColor = vec3(shoulderY) + landedChroma;
+  float outMax = max(max(outColor.r, outColor.g), outColor.b);
+  float landingChroma = smoothstep(0.18, 0.62, chromaMag);
+  float landingMask = smoothstep(0.78, 0.98, outMax)
+    * landingChroma
+    * shadowRelease
+    * (1.0 - 0.35 * warmProtect);
+  if (outMax > 0.78 && outMax > shoulderY + 0.000001) {
+    float over = outMax - 0.78;
+    float headroom = 0.22;
+    float softMax = 0.78 + (headroom * over) / (over + headroom);
+    float landingScale = clamp((softMax - shoulderY) / (outMax - shoulderY), 0.0, 1.0);
+    float landingBlend = clamp(amt * 0.88 * landingMask, 0.0, 1.0);
+    float finalScale = mix(1.0, landingScale, landingBlend);
+    outColor = vec3(shoulderY) + landedChroma * finalScale;
+  }
+  return clamp(outColor, 0.0, 1.0);
 }
 
 // \u30D7\u30EA\u30F3\u30C8\u6BB5\u306E\u6700\u7D42\u30B3\u30F3\u30C8\u30E9\u30B9\u30C8\u3092 S \u30AB\u30FC\u30D6\u3067\u6301\u3061\u4E0A\u3052\u308B\u3002
@@ -3536,7 +3587,7 @@ void main() {
   color.rgb += uShadows * (1.0 - lumHS) * 0.5;
   color.rgb += uHighlights * lumHS * 0.5;
 
-  // 0.4.0 \u306E\u30CD\u30AC\u5727\u7E2E\u3002LUT2 \u306E\u524D\u3067\u52B9\u304B\u305B\u308B\u3002
+  // Film Compression V3. Apply before LUT2 and downstream optical stages.
   color.rgb = applyFilmCompression(color.rgb, uCompressionAmount, uCompressionRange);
 
   // === Creative LUT (LUT2) === after color grading
@@ -3664,7 +3715,7 @@ var Viewport = class _Viewport {
           "[Viewport] WebGPU is required but not supported in this environment"
         );
       }
-      const { WebGPUBackend } = await import("./WebGPUBackend-IIM6UPUN.js");
+      const { WebGPUBackend } = await import("./WebGPUBackend-54U7QS6A.js");
       const backend = await WebGPUBackend.create(canvas);
       backend.setResolution(width, height);
       return new _Viewport(null, backend);

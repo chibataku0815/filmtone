@@ -1,7 +1,7 @@
 # Filmtone Detail Softness Strategy
 
 Date opened: 2026-05-12 JST
-Last updated: 2026-05-12 JST (Phase 5 closed at `3d23a5df` — amplitude-gated bilateral detail-layer replaces local-mean blur, iOS real-device QA passed)
+Last updated: 2026-05-12 JST (Film Compression V3 follow-up implemented — chroma-density rolloff now precedes Detail Softness and optics)
 
 This file is the compact source of truth for the Detail Softness lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -204,6 +204,23 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   `archive/2026-05-12-phase-3-ui-exposure.md`. Final visual A/B is rolled
   into Phase 5 / final QA and is **not** a Phase 4 blocker per owner
   direction. Phase 4 (Source Detail Compensation) starts now.
+- 2026-05-12 JST: Film Compression V3 follow-up implemented. The luma-only
+  shoulder is now extended with hue-preserving chroma-density rolloff across
+  color-only, WebGL, WebGPU, macOS native, iOS export, and iOS sidecar paths.
+  Active archived to `archive/2026-05-12-film-compression-v3.md`.
+- 2026-05-12 JST: Film Compression V3 product calibration. Scalar probe at
+  Stone / Urban / Noir operating points exposed a structural shadow lift in
+  the centered-sigmoid shoulder (hair / cool / warm shadows lifted +25 to
+  +134% luma and +25 to +236% chroma). Tuned the shoulder to one-sided
+  (`shoulderY = min(luma, mix(luma, sigmoid, amt))`) across TS scalar, Swift
+  mirror, WGSL, WebGL, iOS CIKernel, macOS CIKernel. Shadows now
+  identity-preserve; highlight behavior unchanged. Active archived to
+  `archive/2026-05-12-film-compression-v3-calibration.md`.
+- 2026-05-12 JST: Film Compression V3 highlight density strong probe closed.
+  Added a hue-preserving soft landing after chroma compression so saturated
+  practical red / blue / cyan / magenta cores round below the 1.0 wall while
+  preserving luma and hue direction. Active archived to
+  `archive/2026-05-12-film-compression-v3-highlight-density-strong-probe.md`.
 
 ## Constraints
 
@@ -240,3 +257,9 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   merged in via `main` once that lane lands).
 - Phase 1 archive: created on Phase 1 close.
 - Phase 5 archive: `archive/2026-05-12-phase-5-detail-softness-visual-tuning.md`.
+- Film Compression V3 archive:
+  `archive/2026-05-12-film-compression-v3.md`.
+- Film Compression V3 calibration archive:
+  `archive/2026-05-12-film-compression-v3-calibration.md`.
+- Film Compression V3 highlight density strong probe archive:
+  `archive/2026-05-12-film-compression-v3-highlight-density-strong-probe.md`.
