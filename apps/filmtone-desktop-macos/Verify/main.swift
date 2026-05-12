@@ -1044,7 +1044,7 @@ private let iosCanonicalParamLabels: [String: String] = [
     "fade": "Fade",
     "rgbShift": "Color fringing",
     "lensSoftness": "Lens softness",
-    "detailSoftness": "Detail softness",
+    "detailSoftness": "Texture softness",
     "vignette": "Vignette",
     "bloomThreshold": "Bloom Threshold",
     "bloomStrength": "Bloom Strength",

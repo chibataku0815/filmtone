@@ -1,7 +1,7 @@
 # Filmtone Detail Softness Strategy
 
 Date opened: 2026-05-12 JST
-Last updated: 2026-05-12 JST (Phase 4-B native wiring landed at `52d38328`; Phase 5 visual tuning matrix opened)
+Last updated: 2026-05-12 JST (Phase 5 closed at `3d23a5df` — amplitude-gated bilateral detail-layer replaces local-mean blur, iOS real-device QA passed)
 
 This file is the compact source of truth for the Detail Softness lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -53,7 +53,7 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
 | Phase 3 | UI Exposure & Recipe Decision | Complete (2026-05-12 JST) | iOS + macOS Advanced sliders shipped at commit `27a856fa`; existing recipes left untouched; final visual A/B rolled into Phase 5 / final QA. |
 | Phase 4-A | Source Detail Compensation Resolver | Complete (2026-05-12 JST) | TS resolver `resolveSourceDetailCompensation` + 21 unit tests landed at commit `3036e5b9`. Bias never patched into saved Looks; surface stays diagnostic. |
 | Phase 4-B | Source Detail Compensation Native Wiring | Complete (2026-05-12 JST) | Swift resolver mirror + 21 parity tests; macOS `FilmtoneGradePipeline.apply` + iOS `GradeRenderPipeline.applyDetailSoftnessStage` forward a session-derived `sourceDetailBias` into `FilmtoneDetailSoftness.deriveUniforms`. Landed at commit `52d38328`. Web renderer wiring deferred until metadata channel exists. |
-| Phase 5 | Visual Tuning Matrix | In progress | iPhone SDR HEVC, iPhone Apple Log / ProRes, DJI / action camera Rec.709, Sony / Canon / Panasonic Log, low-light noisy clips, hair / foliage / brick / text, strong practical lights all judged across macOS native, iOS export, WebGPU, WebGL at `detailSoftness` `0.00` / `0.18` / `0.30`. |
+| Phase 5 | Visual Tuning Matrix | Complete (2026-05-12 JST) | Phase 5-B replaced the blur-like local-mean pass with an amplitude-gated bilateral detail-layer (`3d23a5df`); iOS real-device QA passed. Remaining broad cross-renderer visual QA stays as final pre-merge smoke, not a blocker for core algorithm progress. |
 
 ## Current Strategic State
 
@@ -184,11 +184,19 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   archived to
   `archive/2026-05-12-phase-4b-source-compensation-native-wiring.md`.
   Phase 5 (visual tuning matrix across all four renderers) opens now.
+- 2026-05-12 JST: Phase 5 closed at commit `3d23a5df`. Replaced the
+  blur-like 4-tap local-mean attenuation with an amplitude-gated bilateral
+  detail-layer (8-tap ring + Gaussian range weights + smoothstep amplitude
+  gate) across iOS CIKernel, macOS CIKernel, WebGL, and WebGPU; iOS
+  real-device QA passed. Remaining broad cross-renderer visual QA stays as
+  final pre-merge smoke, not a blocker for core algorithm progress. Active
+  archived to `archive/2026-05-12-phase-5-detail-softness-visual-tuning.md`.
 - 2026-05-12 JST: Phase 3 closed at commit `27a856fa`. `detailSoftness`
   is now a user-facing Advanced control in the Optics group on both iOS
   SwiftUI (`FilmtoneStrengthSheetData` + `FilmtoneStrings`) and macOS
   native (`AdvancedAdjustCatalog` + `FilmtoneDesktopStrings`), with the
-  drift detector treating `Detail softness` as canonical. Existing
+  drift detector now treating `Texture softness` as canonical after the
+  Phase 5 naming closeout. Existing
   optical recipes (Optics default/strong, Backlight Veil profiles, Stone
   / Urban Looks) deliberately do not auto-apply `detailSoftness` —
   recorded as the Phase 3 recipe decision so future authoring decisions
@@ -231,3 +239,4 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   chat routing for this lane (lives on the export-audio worktree, will be
   merged in via `main` once that lane lands).
 - Phase 1 archive: created on Phase 1 close.
+- Phase 5 archive: `archive/2026-05-12-phase-5-detail-softness-visual-tuning.md`.

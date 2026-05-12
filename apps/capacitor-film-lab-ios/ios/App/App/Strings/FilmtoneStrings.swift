@@ -582,7 +582,7 @@ extension FilmtoneStrings {
         case "lensSoftness":
             return paramHelpCopy(id: key, title: label, jaBody: "解像の硬さを少し落として、レンズ越しの柔らかさを作ります。", enBody: "Reduces hard digital sharpness and adds a softer lens feel.", jaEffect: "上げると細部がやわらぎ、肌や光がなめらかに見えます。", enEffect: "Higher values soften fine detail, skin, and light transitions.")
         case "detailSoftness":
-            return paramHelpCopy(id: key, title: label, jaBody: "センサー由来の硬い細部や肌・布の表面感をわずかにやわらげ、輪郭は残したままフィルム寄りの質感に近づけます。", enBody: "Eases sensor-sharp fine detail and surface acutance on skin and fabric while keeping outlines intact, nudging the texture toward a film-like feel.", jaEffect: "上げるとざらつきや細かなディテールが穏やかになり、文字や輪郭は読めるまま柔らかく見えます。", enEffect: "Higher values calm fine texture and noise while text and outlines stay readable.")
+            return paramHelpCopy(id: key, title: label, jaBody: "肌・紙・布・髪などの細かな質感の硬さを抑え、文字や輪郭は残したまま見え方をやわらげます。", enBody: "Softens hard fine texture from sensor sharpening while keeping text and outlines intact.", jaEffect: "上げるとざらつきや細かな質感が穏やかになり、文字や輪郭は読めるまま柔らかく見えます。", enEffect: "Higher values calm fine texture and noise while text and outlines stay readable.")
         case "vignette":
             return paramHelpCopy(id: key, title: label, jaBody: "画面の周辺を少し落として、視線を中央へ集めます。", enBody: "Darkens frame edges slightly to pull attention toward the center.", jaEffect: "上げると四隅が暗くなり、中心が立ちます。", enEffect: "Higher values darken corners and emphasize the center.")
         case "bloomThreshold":
@@ -1077,7 +1077,7 @@ extension FilmtoneStrings {
             "fade": filmtoneLocalized("filmtone.param.fade", defaultValue: "Fade", comment: "Advanced parameter label."),
             "rgbShift": filmtoneLocalized("filmtone.param.rgb_shift", defaultValue: "Color fringing", comment: "Advanced parameter label."),
             "lensSoftness": filmtoneLocalized("filmtone.param.lens_softness", defaultValue: "Lens softness", comment: "Advanced parameter label."),
-            "detailSoftness": filmtoneLocalized("filmtone.param.detail_softness", defaultValue: "Detail softness", comment: "Advanced parameter label."),
+            "detailSoftness": filmtoneLocalized("filmtone.param.detail_softness", defaultValue: "Texture softness", comment: "Advanced parameter label."),
             "vignette": filmtoneLocalized("filmtone.param.vignette", defaultValue: "Vignette", comment: "Advanced parameter label."),
             "bloomThreshold": filmtoneLocalized("filmtone.param.bloom_threshold", defaultValue: "Bloom Threshold", comment: "Advanced parameter label."),
             "bloomStrength": filmtoneLocalized("filmtone.param.bloom_strength", defaultValue: "Bloom Strength", comment: "Advanced parameter label."),
