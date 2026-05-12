@@ -65,6 +65,7 @@ const allowedLegacyPresetPaths = [
   /^apps\/capacitor-film-lab-ios\/ios\/App\/App\/Smoke\/FilmtoneSnapshotSupport\.swift$/,
   /^apps\/capacitor-film-lab-ios\/ios\/App\/App\/Localizable\.xcstrings$/,
   /^apps\/capacitor-film-lab-ios\/scripts\/fixtures\/phase0-contract\//,
+  /^apps\/capacitor-film-lab-ios\/scripts\/swift\/test-sidecar-builder\.swift$/,
   /^apps\/filmtone-desktop-macos\/FilmtoneDesktop\/Color\/FilmtonePresetCatalog\.swift$/,
   /^docs\/filmtone\/.*\/archive\//,
   /^docs\/filmtone\/archive\//,
