@@ -591,7 +591,7 @@ struct TestSidecarBuilder {
                 quickState: Phase0QuickStateDTO(filmCharacter: 0, era: 0, dynamics: 0),
                 params: Phase0ParamsDTO(
                     exposure: 0, contrast: 1, saturation: 1, temperature: 0, tint: 0,
-                    rgbShift: 0.002, lensSoftness: 0, grainRadialMix: 0.4, grainSize: 0.3,
+                    rgbShift: 0.002, lensSoftness: 0, detailSoftness: 0, grainRadialMix: 0.4, grainSize: 0.3,
                     bloomThreshold: 0, bloomStrength: 0, bloomRadius: 0,
                     diffusion: 0.09, halationIntensity: 0, halationSpread: 0,
                     halationHue: 0, halationThreshold: 0, halationRadius: 0,
@@ -1251,7 +1251,7 @@ struct TestSidecarBuilder {
     static func zeroParams() -> Phase0ParamsDTO {
         Phase0ParamsDTO(
             exposure: 0, contrast: 1, saturation: 1, temperature: 0, tint: 0,
-            rgbShift: 0, lensSoftness: 0, grainRadialMix: 0, grainSize: 0,
+            rgbShift: 0, lensSoftness: 0, detailSoftness: 0, grainRadialMix: 0, grainSize: 0,
             bloomThreshold: 0, bloomStrength: 0, bloomRadius: 0,
             diffusion: 0, halationIntensity: 0, halationSpread: 0,
             halationHue: 0, halationThreshold: 0, halationRadius: 0,

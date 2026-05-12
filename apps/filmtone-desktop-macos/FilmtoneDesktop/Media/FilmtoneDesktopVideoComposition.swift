@@ -160,6 +160,14 @@ enum FilmtoneDesktopVideoComposition {
         let opticalFilterIntensity = inputs.opticalFilterIntensity
         let cameraOptics = inputs.cameraOptics
         let lutIntensity = FilmtonePresetCatalog.clampStrength(inputs.presetStrength)
+        let sourceDetailBias = FilmtoneSourceDetailCompensation.resolve(
+            FilmtoneSourceDetailCompensationInput(
+                cameraMake: cameraOptics?.cameraMake,
+                cameraModel: cameraOptics?.cameraModel,
+                colorClass: inputs.probedColorClass?.rawValue,
+                sourceProfileId: resolvedProfileEntry?.id
+            )
+        ).recommendedBias
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { request in
@@ -187,7 +195,8 @@ enum FilmtoneDesktopVideoComposition {
                     creativeLut: preparedCreativeLut,
                     lutIntensity: lutIntensity,
                     opticalFilterProfileId: opticalFilterProfileId,
-                    opticalFilterIntensity: opticalFilterIntensity
+                    opticalFilterIntensity: opticalFilterIntensity,
+                    sourceDetailBias: sourceDetailBias
                 )
                 // Halation / bloom mip pyramids can grow extent beyond the
                 // composition canvas. Crop back to renderBounds so

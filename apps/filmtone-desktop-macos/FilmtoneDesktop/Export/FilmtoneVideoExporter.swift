@@ -302,6 +302,11 @@ enum FilmtoneVideoExporter {
             lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
+            sourceDetailBias: resolveSourceDetailBias(
+                cameraOptics: probe.cameraOptics,
+                colorClass: probe.colorClass,
+                resolvedProfile: resolvedProfile
+            ),
             ciContext: context,
             outputColorSpace: outputColorSpace,
             renderBounds: renderBounds,
@@ -450,6 +455,11 @@ enum FilmtoneVideoExporter {
             lutIntensity: FilmtonePresetCatalog.clampStrength(request.presetStrength),
             opticalFilterProfileId: request.opticalFilterProfileId,
             opticalFilterIntensity: request.opticalFilterIntensity,
+            sourceDetailBias: resolveSourceDetailBias(
+                cameraOptics: probe.cameraOptics,
+                colorClass: probe.colorClass,
+                resolvedProfile: resolvedProfile
+            ),
             ciContext: FilmtoneCIContext.shared,
             outputColorSpace: contract.destinationColorSpace,
             renderBounds: CGRect(origin: .zero, size: outputSize),
@@ -503,7 +513,8 @@ enum FilmtoneVideoExporter {
                 creativeLut: renderContext.creativeLut,
                 lutIntensity: renderContext.lutIntensity,
                 opticalFilterProfileId: renderContext.opticalFilterProfileId,
-                opticalFilterIntensity: renderContext.opticalFilterIntensity
+                opticalFilterIntensity: renderContext.opticalFilterIntensity,
+                sourceDetailBias: renderContext.sourceDetailBias
             ).cropped(to: renderContext.renderBounds)
 
             renderContext.ciContext.render(
@@ -570,6 +581,7 @@ private struct VideoFrameRenderContext {
     let lutIntensity: Double
     let opticalFilterProfileId: String?
     let opticalFilterIntensity: Double
+    let sourceDetailBias: Double
     let ciContext: CIContext
     let outputColorSpace: CGColorSpace
     let renderBounds: CGRect
@@ -621,4 +633,26 @@ private struct FilmtoneHighlightReelFrameTimeline {
         let sourceStartSec: Double
         let sourceEndSec: Double
     }
+}
+
+// Phase 4-B Detail Softness: resolve a session-derived `sourceDetailBias`
+// from the metadata that is already in scope when the export render
+// context is built. Output is fed straight into
+// `FilmtoneDetailSoftness.deriveUniforms(detailSoftness:sourceDetailBias:)`
+// at the detail-softness stage. Never persisted; not in any saved Look.
+private func resolveSourceDetailBias(
+    cameraOptics: CameraOpticsDTO?,
+    colorClass: SourceColorClassDTO?,
+    resolvedProfile: CameraProfileCatalogEntry?
+) -> Double {
+    let input = FilmtoneSourceDetailCompensationInput(
+        cameraMake: cameraOptics?.cameraMake,
+        cameraModel: cameraOptics?.cameraModel,
+        logTransferFunction: nil,
+        inputTransformStrategy: nil,
+        codecFamily: nil,
+        colorClass: colorClass?.rawValue,
+        sourceProfileId: resolvedProfile?.id
+    )
+    return FilmtoneSourceDetailCompensation.resolve(input).recommendedBias
 }

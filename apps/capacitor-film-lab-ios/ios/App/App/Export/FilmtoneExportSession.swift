@@ -115,6 +115,11 @@ final class FilmtoneExportSession {
     /// the session and delegate only the wrapping / scaling primitives.
     private let sourceImageNormalizer: ExportSourceImageNormalizer
     private let sourceSeed: Double
+    /// Phase 4-B Detail Softness: session-derived additive bias resolved
+    /// once from `request.sourceProbe`. Fed into
+    /// `FilmtoneDetailSoftness.deriveUniforms(...)` at the detail-softness
+    /// stage. Never persisted; not in any saved Look or export JSON.
+    private let sourceDetailBias: Double
     /// Phase 2B-8B: Filmtone Connect package companion assembler. Owns source
     /// media copy, combined / pre-optical / post-optical cube + DCTL writes,
     /// reference-after JPEG path orchestration via a session-supplied closure,
@@ -313,6 +318,7 @@ final class FilmtoneExportSession {
             colorPipeline: colorPipeline
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
+        self.sourceDetailBias = Self.resolveSourceDetailBias(from: request.sourceProbe)
         self.connectPackageAssembler = ExportConnectPackageAssembler(
             request: request,
             sourceURL: sourceURL,
@@ -964,6 +970,12 @@ final class FilmtoneExportSession {
         profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
         current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
         profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
+        current = gradeRenderPipeline.applyDetailSoftnessStage(
+            to: current,
+            params: params,
+            sourceDetailBias: sourceDetailBias
+        )
+        profileRenderSubstage(.detailSoftness, image: current, outputSize: stageProfilingOutputSize)
         current = opticsCompositor.applyEdgeOpticsStage(to: current, params: params)
         profileRenderSubstage(.edgeOptics, image: current, outputSize: stageProfilingOutputSize)
         current = opticsCompositor.applyGlowFamilyStage(
@@ -1084,6 +1096,30 @@ final class FilmtoneExportSession {
             hash &*= 1_099_511_628_211
         }
         return Double(hash % 8_192)
+    }
+
+    // Phase 4-B Detail Softness: resolve `sourceDetailBias` once per
+    // export from the metadata already on `SourceProbeDTO`. Combined
+    // with `request.grade.params.detailSoftness` at the stage via
+    // `FilmtoneDetailSoftness.deriveUniforms(...)`. Not stored.
+    private static func resolveSourceDetailBias(
+        from probe: SourceProbeDTO?
+    ) -> Double {
+        guard let probe else { return 0 }
+        let video = probe.sourceVideoMetadata
+        let logTransfer = video?.logTransferFunction ?? probe.logTransferFunction
+        let transformStrategy = (video?.inputTransformPolicy ?? probe.inputTransformPolicy)?.strategy
+        let codec = video?.codecFamily ?? probe.codecFamily
+        let input = FilmtoneSourceDetailCompensationInput(
+            cameraMake: probe.cameraOptics?.cameraMake,
+            cameraModel: probe.cameraOptics?.cameraModel,
+            logTransferFunction: logTransfer?.rawValue,
+            inputTransformStrategy: transformStrategy?.rawValue,
+            codecFamily: codec?.rawValue,
+            colorClass: video?.colorClass.rawValue,
+            sourceProfileId: nil
+        )
+        return FilmtoneSourceDetailCompensation.resolve(input).recommendedBias
     }
 
     private func checkCancelled() throws {

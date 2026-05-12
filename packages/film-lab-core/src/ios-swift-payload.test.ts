@@ -101,11 +101,13 @@ test("generated Swift payload stays in sync with current iOS phase0 payload trut
   const repoRoot = resolve(import.meta.dir, "../../..");
   const generatedPath = resolve(
     repoRoot,
-    "apps/capacitor-film-lab-ios/ios/App/App/FilmtonePhase0Generated.swift",
+    "packages/film-lab-swift-core/Sources/FilmLabSwiftCore/Generated/FilmtonePhase0Generated.swift",
   );
 
   const actual = readFileSync(generatedPath, "utf8");
-  const expected = renderFilmtoneIosSwiftPayload();
+  const expected = renderFilmtoneIosSwiftPayload(undefined, {
+    accessLevel: "public",
+  });
 
   expect(actual).toBe(expected);
 });

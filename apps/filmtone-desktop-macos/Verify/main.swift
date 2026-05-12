@@ -930,9 +930,9 @@ runner.test("clampedJpegQuality enforces 0.5...1.0 range") {
 runner.test("AdvancedAdjustCatalog group + control counts match the spec") {
     let allKeys = AdvancedAdjustCatalog.allGroups.flatMap { $0.controls.map(\.key) }
     try assertEqual(AdvancedAdjustCatalog.allGroups.count, 6, "expected 6 groups")
-    try assertEqual(allKeys.count, 31, "expected 31 controls total")
+    try assertEqual(allKeys.count, 32, "expected 32 controls total")
     try assertEqual(
-        Set(allKeys).count, 31,
+        Set(allKeys).count, 32,
         "control key collision — every key must appear exactly once"
     )
 }
@@ -942,8 +942,8 @@ runner.test("AdvancedAdjustCatalog video-only filter hides motion in still mode"
         .flatMap { $0.controls.map(\.key) }
     let videoKeys = AdvancedAdjustCatalog.groups(forVideo: true)
         .flatMap { $0.controls.map(\.key) }
-    try assertEqual(stillKeys.count, 29, "still mode = 31 - 2 motion")
-    try assertEqual(videoKeys.count, 31, "video mode exposes all 31")
+    try assertEqual(stillKeys.count, 30, "still mode = 32 - 2 motion")
+    try assertEqual(videoKeys.count, 32, "video mode exposes all 32")
     if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") {
         throw AssertionError(description: "still mode must not surface motion params")
     }
@@ -1044,6 +1044,7 @@ private let iosCanonicalParamLabels: [String: String] = [
     "fade": "Fade",
     "rgbShift": "Color fringing",
     "lensSoftness": "Lens softness",
+    "detailSoftness": "Texture softness",
     "vignette": "Vignette",
     "bloomThreshold": "Bloom Threshold",
     "bloomStrength": "Bloom Strength",

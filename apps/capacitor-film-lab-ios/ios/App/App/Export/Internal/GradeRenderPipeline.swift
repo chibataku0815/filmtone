@@ -121,6 +121,39 @@ final class GradeRenderPipeline {
         ]) ?? image
     }
 
+    func applyDetailSoftnessStage(
+        to image: CIImage,
+        params: Phase0ParamsDTO,
+        sourceDetailBias: Double = 0
+    ) -> CIImage {
+        let uniforms = FilmtoneDetailSoftness.deriveUniforms(
+            detailSoftness: params.detailSoftness,
+            sourceDetailBias: sourceDetailBias
+        )
+        if uniforms.effectiveDetailSoftness < 0.0001 {
+            return image
+        }
+        guard let kernel = OpticalKernels.detailSoftness else {
+            return image
+        }
+
+        let padding = CGFloat(ceil(uniforms.kernelRadiusPx) + 1.0)
+        return kernel.apply(
+            extent: image.extent,
+            roiCallback: { _, rect in rect.insetBy(dx: -padding, dy: -padding) },
+            arguments: [
+                image.clampedToExtent(),
+                uniforms.effectiveDetailSoftness,
+                uniforms.kernelRadiusPx,
+                uniforms.rangeSigma,
+                uniforms.detailAmplitudeLo,
+                uniforms.detailAmplitudeHi,
+                uniforms.chromaAttenScale,
+                uniforms.highlightBias,
+            ]
+        )?.cropped(to: image.extent) ?? image
+    }
+
     func applyCreativeLutStage(to image: CIImage) -> CIImage {
         guard let preparedCreativeLut else {
             return image

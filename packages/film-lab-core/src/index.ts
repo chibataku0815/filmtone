@@ -246,3 +246,16 @@ export {
   type SourceProfileId,
   type SourceProfileImplKind,
 } from "./source-profile-conversion";
+export {
+  DETAIL_SOFTNESS_EFFECTIVE_MAX,
+  deriveDetailSoftnessUniforms,
+  type DetailSoftnessOptions,
+  type DetailSoftnessUniforms,
+} from "./detail-softness";
+export {
+  resolveSourceDetailCompensation,
+  type SourceDetailCompensationInput,
+  type SourceDetailConfidence,
+  type SourceDetailProfile,
+  type SourceDetailTransferClass,
+} from "./source-detail-compensation";

@@ -142,6 +142,93 @@ kernel vec4 filmCompressionV2(__sample image, float amount, float range) {
 }
 """)
 
+    // Phase 5-B Detail Softness — amplitude-gated bilateral detail-layer
+    // attenuation. See packages/film-lab-core/src/detail-softness.ts for
+    // the algorithm narrative and the canonical uniform set.
+    //
+    // Edge preservation is structural: large-amplitude detail (real step
+    // edges, text, contour lines) is excluded from `detail` by the
+    // bilateral weights *and* released by the amplitude gate. This is
+    // why text remains readable even at slider max — the kernel is not
+    // a defocus blur.
+    static let detailSoftness = CIKernel(source: """
+kernel vec4 detailSoftness(
+    sampler image,
+    float effectiveDetailSoftness,
+    float kernelRadiusPx,
+    float rangeSigma,
+    float detailAmplitudeLo,
+    float detailAmplitudeHi,
+    float chromaAttenScale,
+    float highlightBias
+) {
+    vec2 coord = destCoord();
+    vec4 center = sample(image, samplerTransform(image, coord));
+    if (effectiveDetailSoftness < 1e-4) {
+        return center;
+    }
+
+    float r = max(kernelRadiusPx, 0.0001);
+    float rd = r * 0.70710678;
+    vec3 lumaWeights = vec3(0.2126, 0.7152, 0.0722);
+
+    vec3 srcRGB = center.rgb;
+    vec3 nE  = sample(image, samplerTransform(image, coord + vec2( r,  0.0))).rgb;
+    vec3 nW  = sample(image, samplerTransform(image, coord + vec2(-r,  0.0))).rgb;
+    vec3 nN  = sample(image, samplerTransform(image, coord + vec2( 0.0,  r))).rgb;
+    vec3 nS  = sample(image, samplerTransform(image, coord + vec2( 0.0, -r))).rgb;
+    vec3 nNE = sample(image, samplerTransform(image, coord + vec2( rd,  rd))).rgb;
+    vec3 nNW = sample(image, samplerTransform(image, coord + vec2(-rd,  rd))).rgb;
+    vec3 nSE = sample(image, samplerTransform(image, coord + vec2( rd, -rd))).rgb;
+    vec3 nSW = sample(image, samplerTransform(image, coord + vec2(-rd, -rd))).rgb;
+
+    float lumaC  = dot(srcRGB, lumaWeights);
+    float sigma2 = max(rangeSigma * rangeSigma, 1e-6);
+
+    float dE  = dot(nE,  lumaWeights) - lumaC;
+    float dW  = dot(nW,  lumaWeights) - lumaC;
+    float dN  = dot(nN,  lumaWeights) - lumaC;
+    float dS  = dot(nS,  lumaWeights) - lumaC;
+    float dNE = dot(nNE, lumaWeights) - lumaC;
+    float dNW = dot(nNW, lumaWeights) - lumaC;
+    float dSE = dot(nSE, lumaWeights) - lumaC;
+    float dSW = dot(nSW, lumaWeights) - lumaC;
+
+    float wE  = exp(-(dE  * dE)  / sigma2);
+    float wW  = exp(-(dW  * dW)  / sigma2);
+    float wN  = exp(-(dN  * dN)  / sigma2);
+    float wS  = exp(-(dS  * dS)  / sigma2);
+    float wNE = exp(-(dNE * dNE) / sigma2);
+    float wNW = exp(-(dNW * dNW) / sigma2);
+    float wSE = exp(-(dSE * dSE) / sigma2);
+    float wSW = exp(-(dSW * dSW) / sigma2);
+
+    vec3 sumRGB = srcRGB
+        + nE  * wE  + nW  * wW  + nN  * wN  + nS  * wS
+        + nNE * wNE + nNW * wNW + nSE * wSE + nSW * wSW;
+    float sumW = 1.0
+        + wE + wW + wN + wS
+        + wNE + wNW + wSE + wSW;
+
+    vec3 ref = sumRGB / sumW;
+    vec3 detail = srcRGB - ref;
+
+    float detailLuma = dot(detail, lumaWeights);
+    vec3 detailLumaVec = detailLuma * lumaWeights;
+    vec3 detailChroma = detail - detailLumaVec;
+
+    float detailMag = abs(detailLuma);
+    float gate = 1.0 - smoothstep(detailAmplitudeLo, detailAmplitudeHi, detailMag);
+    float highlightWeight = mix(1.0, highlightBias, smoothstep(0.6, 0.9, lumaC));
+
+    float lumaAtten   = effectiveDetailSoftness * gate * highlightWeight;
+    float chromaAtten = lumaAtten * chromaAttenScale;
+
+    vec3 softened = srcRGB - (detailLumaVec * lumaAtten) - (detailChroma * chromaAtten);
+    return vec4(softened, center.a);
+}
+""")
+
     static let printStage = CIColorKernel(source: """
 vec3 applyPrintContrast(vec3 rgb, float amount) {
     if (amount < 0.001) {

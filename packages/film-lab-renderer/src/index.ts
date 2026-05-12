@@ -42,6 +42,7 @@ export { filmlabVertexShader } from "./webgl/shaders/filmlab.vert";
 export { filmlabFragmentShader } from "./webgl/shaders/filmlab.frag";
 export { bloomPrefilterFragmentShader } from "./webgl/shaders/bloom-prefilter.frag";
 export { halationPrefilterFragmentShader } from "./webgl/shaders/halation-prefilter.frag";
+export { detailSoftnessFragmentShader } from "./webgl/shaders/detail-softness.frag";
 export { downsampleFragmentShader } from "./webgl/shaders/downsample.frag";
 export { upsampleFragmentShader } from "./webgl/shaders/upsample.frag";
 export { compositeFragmentShader } from "./webgl/shaders/composite.frag";

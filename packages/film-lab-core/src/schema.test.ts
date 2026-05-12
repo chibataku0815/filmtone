@@ -60,6 +60,29 @@ describe("filmLabParamsSchema", () => {
     }
   });
 
+  test("detailSoftness 省略時は既定 0（後方互換）", () => {
+    const { detailSoftness: _omit, ...rest } = PRESETS.cinematic;
+    const r = filmLabParamsSchema.safeParse(rest);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.detailSoftness).toBe(0);
+    }
+  });
+
+  test("detailSoftness が 0–1 の境界値（0, 1）を受理する", () => {
+    for (const val of [0, 1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, detailSoftness: val });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  test("detailSoftness が範囲外（-0.1, 1.1）を拒否する", () => {
+    for (const val of [-0.1, 1.1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, detailSoftness: val });
+      expect(r.success).toBe(false);
+    }
+  });
+
   // === 0.4.0 新規キー: デフォルトフォールバック ===
 
   test("6 新キー全省略時でもパース成功 — デフォルト充填される", () => {

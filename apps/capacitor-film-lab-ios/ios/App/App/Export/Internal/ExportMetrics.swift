@@ -7,6 +7,7 @@ enum FilmtoneExportRenderSubstage: String, CaseIterable {
     case inputLut = "InputLut"
     case baseGrade = "BaseGrade"
     case toneCompression = "ToneCompression"
+    case detailSoftness = "DetailSoftness"
     case edgeOptics = "EdgeOptics"
     case glowFamily = "GlowFamily"
     case vignette = "Vignette"

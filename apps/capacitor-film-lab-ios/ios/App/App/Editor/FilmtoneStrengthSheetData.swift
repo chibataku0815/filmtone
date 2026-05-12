@@ -47,7 +47,7 @@ extension FilmtoneStrengthSheet {
             return .highlight
         case "rgbShift":
             return .colorFringe
-        case "lensSoftness":
+        case "lensSoftness", "detailSoftness":
             return .softness
         case "vignette":
             return .vignette
@@ -115,6 +115,7 @@ extension FilmtoneStrengthSheet {
                 controls: [
                     control("rgbShift", range: 0...FilmtonePhase0Math.rgbShiftMax, digits: 3),
                     control("lensSoftness", range: 0...1),
+                    control("detailSoftness", range: 0...1),
                     control("vignette", range: 0...1),
                 ]
             ),

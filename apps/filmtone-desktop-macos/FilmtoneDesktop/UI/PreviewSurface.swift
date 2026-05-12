@@ -307,7 +307,15 @@ struct PreviewSurface: View {
             creativeLut: creativeLut,
             lutIntensity: FilmtonePresetCatalog.clampStrength(presetStrength),
             opticalFilterProfileId: opticalFilterProfileId,
-            opticalFilterIntensity: opticalFilterIntensity
+            opticalFilterIntensity: opticalFilterIntensity,
+            sourceDetailBias: FilmtoneSourceDetailCompensation.resolve(
+                FilmtoneSourceDetailCompensationInput(
+                    cameraMake: cameraOptics?.cameraMake,
+                    cameraModel: cameraOptics?.cameraModel,
+                    colorClass: probedColorClass?.rawValue,
+                    sourceProfileId: resolvedProfile?.id
+                )
+            ).recommendedBias
         )
         guard let gradedNSImage = rasterize(
             ciImage: graded,

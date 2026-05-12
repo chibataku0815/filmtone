@@ -33,6 +33,37 @@ describe("phase0 schema", () => {
     expect(phase0.shutterAngle).toBe(PRESETS.cinematic.shutterAngle);
     expect(phase0.trailIntensity).toBe(PRESETS.cinematic.trailIntensity);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
+    expect(phase0.detailSoftness).toBe(PRESETS.cinematic.detailSoftness);
+  });
+
+  test("detailSoftness defaults to 0 when omitted from a phase0 patch", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { detailSoftness: _omit, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    expect(parsed.detailSoftness).toBe(0);
+  });
+
+  test("detailSoftness accepts 0/1 boundaries and rejects out-of-range values", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    for (const val of [0, 1]) {
+      expect(phase0ParamsSchema.parse({ ...reset, detailSoftness: val }).detailSoftness).toBe(val);
+    }
+    for (const val of [-0.01, 1.01]) {
+      expect(
+        phase0ParamsSchema.safeParse({ ...reset, detailSoftness: val }).success,
+      ).toBe(false);
+    }
+  });
+
+  test("mergePhase0Params preserves detailSoftness and still strips unknown keys", () => {
+    const merged = mergePhase0Params(pickPhase0Params(PRESETS.reset), {
+      detailSoftness: 0.42,
+      // unknown sibling — must be stripped, not retained
+      // @ts-expect-error: intentionally probing strip behavior
+      bogusUnknownKey: 1,
+    });
+    expect(merged.detailSoftness).toBe(0.42);
+    expect((merged as Record<string, unknown>).bogusUnknownKey).toBeUndefined();
   });
 
   test("defaults to reset identity with the shared soft finish", () => {

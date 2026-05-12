@@ -8,6 +8,8 @@ var PARAM_KEYS = [
   "rgbShift",
   /** 周辺ほど等方ブラーを足すレンズの柔らかさ（0〜1、Pro）。中心固定。 */
   "lensSoftness",
+  /** ハードな微細ディテール（デジタル acutance）を弱める柔らかさ（0〜1）。lensSoftness とは別 param で、画面中心も対象。Phase 1 では neutral plumbing のみで renderer は未参照。 */
+  "detailSoftness",
   "grainIntensity",
   // 0=一様、1=周辺強め（既定1で後方互換）
   "grainRadialMix",
@@ -283,6 +285,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0,
     grainRadialMix: 1,
     grainSize: 0.3,
@@ -343,6 +346,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 2e-3,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.05,
     grainRadialMix: 1,
     grainSize: 0.32,
@@ -399,6 +403,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.32,
@@ -455,6 +460,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 12e-4,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.07,
     grainRadialMix: 1,
     grainSize: 0.28,
@@ -511,6 +517,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.04,
     grainRadialMix: 1,
     grainSize: 0.25,
@@ -567,6 +574,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.1,
     grainRadialMix: 1,
     grainSize: 0.43,
@@ -623,6 +631,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.03,
     grainRadialMix: 1,
     grainSize: 0.12,
@@ -679,6 +688,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.065,
     grainRadialMix: 1,
     grainSize: 0.4,
@@ -735,6 +745,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 115e-5,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.08,
     grainRadialMix: 1,
     grainSize: 0.58,
@@ -796,6 +807,7 @@ var RAW_PRESETS = {
     tint: 0,
     rgbShift: 0,
     lensSoftness: 0,
+    detailSoftness: 0,
     grainIntensity: 0.01,
     grainRadialMix: 1,
     grainSize: 0.08,
@@ -905,7 +917,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1158,6 +1170,7 @@ function clampParamValue(key, value) {
     case "vignette":
     case "fade":
     case "lensSoftness":
+    case "detailSoftness":
     case "grainRadialMix":
     case "grainSize":
     case "halationIntensity":
@@ -1226,6 +1239,7 @@ var PHASE0_PARAM_KEYS = [
   "tint",
   "rgbShift",
   "lensSoftness",
+  "detailSoftness",
   "grainRadialMix",
   "grainSize",
   "bloomThreshold",
@@ -1280,6 +1294,7 @@ var phase0ParamsSchema = z3.object({
   tint: z3.number().min(-1).max(1).default(PRESETS.reset.tint),
   rgbShift: phase0RgbShiftSchema.default(PRESETS.reset.rgbShift),
   lensSoftness: z3.number().min(0).max(1).default(PRESETS.reset.lensSoftness),
+  detailSoftness: z3.number().min(0).max(1).default(PRESETS.reset.detailSoftness),
   grainRadialMix: z3.number().min(0).max(1).default(PRESETS.reset.grainRadialMix),
   grainSize: z3.number().min(0).max(1).default(PRESETS.reset.grainSize),
   bloomThreshold: z3.number().min(0).max(1).default(PRESETS.reset.bloomThreshold),
@@ -1317,6 +1332,7 @@ var phase0ParamsPatchSchema = z3.object({
   tint: z3.number().min(-1).max(1).optional(),
   rgbShift: phase0RgbShiftSchema.optional(),
   lensSoftness: z3.number().min(0).max(1).optional(),
+  detailSoftness: z3.number().min(0).max(1).optional(),
   grainRadialMix: z3.number().min(0).max(1).optional(),
   grainSize: z3.number().min(0).max(1).optional(),
   bloomThreshold: z3.number().min(0).max(1).optional(),
@@ -3575,6 +3591,190 @@ function makeVlogToRec709Cube(size = 33) {
 function makeSlog3ToRec709Cube(size = 33) {
   return buildCubeRgba(size, slog3PixelToRec709);
 }
+
+// src/detail-softness.ts
+var DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.65;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MIN = 1;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MAX = 2.5;
+var DETAIL_SOFTNESS_RANGE_SIGMA = 0.07;
+var DETAIL_SOFTNESS_DETAIL_AMPLITUDE_LO = 0;
+var DETAIL_SOFTNESS_DETAIL_AMPLITUDE_HI = 0.05;
+var DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE = 0.7;
+var DETAIL_SOFTNESS_HIGHLIGHT_BIAS = 1.18;
+function deriveDetailSoftnessUniforms(detailSoftness, opts = {}) {
+  const bias = opts.sourceDetailBias ?? 0;
+  const combined = detailSoftness + bias;
+  const effective = Math.max(
+    0,
+    Math.min(DETAIL_SOFTNESS_EFFECTIVE_MAX, combined)
+  );
+  const t = effective / DETAIL_SOFTNESS_EFFECTIVE_MAX;
+  const kernelRadiusPx = DETAIL_SOFTNESS_KERNEL_RADIUS_MIN + t * (DETAIL_SOFTNESS_KERNEL_RADIUS_MAX - DETAIL_SOFTNESS_KERNEL_RADIUS_MIN);
+  return {
+    effectiveDetailSoftness: effective,
+    kernelRadiusPx,
+    rangeSigma: DETAIL_SOFTNESS_RANGE_SIGMA,
+    detailAmplitudeLo: DETAIL_SOFTNESS_DETAIL_AMPLITUDE_LO,
+    detailAmplitudeHi: DETAIL_SOFTNESS_DETAIL_AMPLITUDE_HI,
+    chromaAttenScale: DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE,
+    highlightBias: DETAIL_SOFTNESS_HIGHLIGHT_BIAS
+  };
+}
+
+// src/source-detail-compensation.ts
+var APPLE_LOG_INPUT_STRATEGIES = /* @__PURE__ */ new Set([
+  "apple-log-to-rec709",
+  "apple-log2-to-rec709"
+]);
+var APPLE_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.apple-log",
+  "built-in:source-profile.apple-log-2"
+]);
+var DJI_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.dji-dlog",
+  "built-in:source-profile.dji-dlog-m"
+]);
+var CANON_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.canon-clog",
+  "built-in:source-profile.canon-log3-cinema-gamut"
+]);
+var PANASONIC_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.panasonic-vlog"
+]);
+var SONY_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.sony-slog3"
+]);
+var APPLE_COLOR_CLASSES = /* @__PURE__ */ new Set([
+  "apple-log",
+  "apple-log2"
+]);
+var REC709_COLOR_CLASSES = /* @__PURE__ */ new Set(["sdr-bt709"]);
+function clampBias(value) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(value, DETAIL_SOFTNESS_EFFECTIVE_MAX);
+}
+function normalizeMake(make) {
+  if (!make) return "";
+  return make.trim().toLowerCase();
+}
+function normalizeModel(model) {
+  if (!model) return "";
+  return model.trim().toLowerCase();
+}
+function makeProfile(id, confidence, transferClass, bias, reason) {
+  return {
+    id,
+    confidence,
+    transferClass,
+    recommendedBias: clampBias(bias),
+    effectiveMax: DETAIL_SOFTNESS_EFFECTIVE_MAX,
+    reason
+  };
+}
+function resolveSourceDetailCompensation(input = {}) {
+  const make = normalizeMake(input.cameraMake);
+  const model = normalizeModel(input.cameraModel);
+  const profileId = (input.sourceProfileId ?? "").toString();
+  const transferStrategy = input.inputTransformPolicy?.strategy ?? null;
+  const appleLogTransfer = input.logTransferFunction === "apple-log" || input.logTransferFunction === "apple-log2";
+  const appleLogColorClass = input.colorClass ? APPLE_COLOR_CLASSES.has(input.colorClass) : false;
+  const appleLogStrategy = transferStrategy ? APPLE_LOG_INPUT_STRATEGIES.has(transferStrategy) : false;
+  const appleLogProfile = APPLE_LOG_SOURCE_PROFILE_IDS.has(profileId);
+  if (appleLogTransfer || appleLogColorClass || appleLogStrategy || appleLogProfile) {
+    const matchedSignals = Number(appleLogTransfer) + Number(appleLogColorClass) + Number(appleLogStrategy) + Number(appleLogProfile);
+    const confidence = matchedSignals >= 2 ? "high" : "medium";
+    return makeProfile(
+      "apple-log",
+      confidence,
+      "log-consumer",
+      0.06,
+      "apple-log-smaller-positive"
+    );
+  }
+  if (SONY_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "sony") {
+    return makeProfile(
+      "sony-slog3",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "sony-log-near-zero"
+    );
+  }
+  if (CANON_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "canon") {
+    return makeProfile(
+      "canon-clog",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "canon-log-near-zero"
+    );
+  }
+  if (PANASONIC_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "panasonic") {
+    return makeProfile(
+      "panasonic-vlog",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "panasonic-log-near-zero"
+    );
+  }
+  if (DJI_SOURCE_PROFILE_IDS.has(profileId) || make === "dji") {
+    return makeProfile(
+      "dji-action",
+      profileId ? "high" : "medium",
+      "rec709-consumer",
+      0.08,
+      "dji-action-positive"
+    );
+  }
+  if (make === "gopro") {
+    return makeProfile(
+      "gopro-action",
+      "medium",
+      "rec709-consumer",
+      0.08,
+      "gopro-action-positive"
+    );
+  }
+  if (make === "apple" || model.startsWith("iphone")) {
+    const codec = input.codecFamily ?? null;
+    const isProRes = codec === "prores-422" || codec === "prores-4444";
+    const isHevc = codec === "hevc";
+    const reasonCodec = isProRes ? "iphone-prores" : isHevc ? "iphone-hevc" : "iphone-sdr";
+    return makeProfile(
+      "iphone-sdr-hevc",
+      "high",
+      "rec709-consumer",
+      0.1,
+      `${reasonCodec}-modest-positive`
+    );
+  }
+  if (input.logTransferFunction != null || transferStrategy != null && transferStrategy !== "none") {
+    return makeProfile(
+      "log-unknown",
+      "low",
+      "unknown",
+      0,
+      "unknown-log-zero"
+    );
+  }
+  if (profileId === "built-in:source-profile.rec709" || (input.colorClass ? REC709_COLOR_CLASSES.has(input.colorClass) : false) || input.codecFamily != null) {
+    return makeProfile(
+      "rec709-unknown",
+      "low",
+      "rec709-consumer",
+      0.02,
+      "unknown-rec709-tiny"
+    );
+  }
+  return makeProfile(
+    "metadata-missing",
+    "none",
+    "unknown",
+    0,
+    "metadata-missing-zero"
+  );
+}
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
@@ -3586,6 +3786,7 @@ export {
   CREATIVE_PACK_01_STONE_TRANSFORM,
   CREATIVE_PACK_01_URBAN_TRANSFORM,
   DEFAULT_QUICK_STATE,
+  DETAIL_SOFTNESS_EFFECTIVE_MAX,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
   FILM_GRAIN_INTENSITY_MAX,
@@ -3650,6 +3851,7 @@ export {
   createFilmtoneDefaultPhase0Params,
   createIosPhase0SerializableLut,
   createPhase0ProjectState,
+  deriveDetailSoftnessUniforms,
   deserializeCubeLutData,
   diagonalMaxDelta,
   filmLabDepthTrackSchema,
@@ -3700,6 +3902,7 @@ export {
   pickPhase0Params,
   quickStateSchema,
   recommendOpticalFinish,
+  resolveSourceDetailCompensation,
   serializeCreativeCubeToText,
   serializeCubeLut
 };

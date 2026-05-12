@@ -5,7 +5,7 @@ public enum FilmtonePhase0Generated {
     public static let presetVersion = "v2"
     public static let presetDefault = "reset"
     public static let presetStrengthDefault = 1.0
-    public static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
+    public static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
     public static let quickAxisIds: [String] = ["filmCharacter", "era", "dynamics"]
     public static let quickAxisMin = -1.0
     public static let quickAxisMax = 1.0
@@ -36,6 +36,7 @@ public enum FilmtonePhase0Generated {
             tint: 0.0,
             rgbShift: 0.0,
             lensSoftness: 0.0,
+            detailSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.3,
             bloomThreshold: 0.8,
@@ -74,6 +75,7 @@ public enum FilmtonePhase0Generated {
             tint: 0.0,
             rgbShift: 0.0,
             lensSoftness: 0.0,
+            detailSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.3,
             bloomThreshold: 0.72,
@@ -111,6 +113,7 @@ public enum FilmtonePhase0Generated {
             tint: 0.02,
             rgbShift: 0.0012,
             lensSoftness: 0.14,
+            detailSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.26,
             bloomThreshold: 0.72,
@@ -148,6 +151,7 @@ public enum FilmtonePhase0Generated {
             tint: -0.04,
             rgbShift: 0.0016,
             lensSoftness: 0.22,
+            detailSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.34,
             bloomThreshold: 0.6,
@@ -185,6 +189,7 @@ public enum FilmtonePhase0Generated {
             tint: 0.04,
             rgbShift: 0.0015,
             lensSoftness: 0.16,
+            detailSoftness: 0.0,
             grainRadialMix: 1.0,
             grainSize: 0.32,
             bloomThreshold: 0.62,
