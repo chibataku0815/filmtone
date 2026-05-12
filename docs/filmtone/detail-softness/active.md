@@ -1,247 +1,289 @@
-# Phase 3: Detail Softness UI Exposure & Recipe Decision
+# Phase 4: Detail Softness Source Compensation
 
 Date opened: 2026-05-12 JST
-Phase: 3 of 5 (see `strategy.md`; Phase 2 archived at
-`archive/2026-05-12-phase-2-renderer-parity.md`).
+Phase: 4 of 5 (see `strategy.md`; Phase 3 archived at
+`archive/2026-05-12-phase-3-ui-exposure.md`).
 
 ## Gating
 
-Phase 2 renderer parity is committed on `feature/detail-softness-contract`
-through HEAD `444db1e0`:
-
-- `e277e9f3` macOS native pilot.
-- `eac47d53` iOS export port.
-- `444db1e0` WebGPU + WebGL parity.
-
-Final visual A/B at `detailSoftness ∈ {0.00, 0.18, 0.30}` is deferred to
-final QA per owner direction and is **not** a precondition for Phase 3.
+Phase 3 UI exposure is committed on `feature/detail-softness-contract`
+at `27a856fa`. Final visual A/B across native + web is rolled into
+Phase 5 / final QA per owner direction and is **not** a Phase 4
+precondition.
 
 ## Goal
 
-Expose `detailSoftness` as a user-facing Advanced control on the live native
-surfaces, without overloading `lensSoftness` or disturbing existing Looks /
-recipes. Keep copy minimal but precise enough that a user reads `Lens
-softness` and `Detail softness` next to each other and understands they are
-different optical axes.
+Add a conservative metadata-driven source-detail compensation resolver
+that produces a recommended `sourceDetailBias`, without baking that
+automatic bias into saved Looks. Effective render softness remains:
 
-Live Advanced surfaces in scope:
+```
+clamp(user detailSoftness + sourceDetailBias, 0, DETAIL_SOFTNESS_EFFECTIVE_MAX)
+```
 
-- iOS native SwiftUI: `apps/capacitor-film-lab-ios/ios/App/App/Editor/FilmtoneStrengthSheetData.swift`
-  + `apps/capacitor-film-lab-ios/ios/App/App/Strings/FilmtoneStrings.swift`.
-- macOS native: `apps/filmtone-desktop-macos/FilmtoneDesktop/Domain/AdvancedAdjustCatalog.swift`
-  + `apps/filmtone-desktop-macos/FilmtoneDesktop/Domain/FilmtoneDesktopStrings.swift`.
+User-authored `detailSoftness` stays the saved creative intent
+(`FilmtonePhase0ParamsPatch.opticsGlowKeys`). The automatic
+`sourceDetailBias` is **session/source-derived**, not patched into
+saved Look identity, and not exposed as a user control.
 
-Out of scope: `messages/{en,ja}.json` (legacy React/Electron surface — see
-`project_native_v2_replaces_electron.md`), fastlane / App Store / LP copy,
-Phase 4 `sourceDetailBias` automation.
+## Scope decision
 
-## Owner-confirmed decisions (2026-05-12)
+This slice ships the **resolver + unit tests in
+`packages/film-lab-core/`** only. Render-site plumbing is a follow-up.
 
-- **Range / default / key**: `0…1`, default `0`, stored key `detailSoftness`
-  (already plumbed in Phase 1, render-active since Phase 2).
-- **Placement**: Add to the existing **Optics** group, immediately after
-  `lensSoftness`, on both Desktop and iOS canonical catalogs. The two
-  "softness" labels sit adjacent so the contrast in copy
-  (`Lens softness` vs `Detail softness`) is visible to the user.
-- **Copy distinction**:
-  - `Detail Softness` = reduces hard digital fine detail / local
-    acutance.
-  - `Lens Softness` = lens/periphery softness (unchanged meaning).
-- **Hidden internals**: do not expose `kernelRadiusPx`, `edgeGuardLo/Hi`,
-  `chromaAttenScale`, `highlightBias`, or `sourceDetailBias` to the user.
-  They stay as derived uniforms from `deriveDetailSoftnessUniforms(...)`.
-- **Recipe decision (recommended Phase 3 default)**: existing optical
-  recipes (`AdvancedAdjustCatalog` default / strong, Backlight Veil
-  profiles, Stone / Urban Looks) **do not** auto-apply `detailSoftness`.
-  The user slider is the first exposure. Rationale below.
+Rationale: callsite survey on `feature/detail-softness-contract`:
 
-## Recipe decision
+- macOS `FilmtoneGradePipeline.apply(...)` does not forward source
+  profile / log transfer to `applyDetailSoftnessStage(to:params:)`.
+  `FilmtoneVideoExporterRenderContext` holds `resolvedProfile:
+  CameraProfileCatalogEntry?` and `cameraOptics: CameraOpticsDTO?`,
+  but the stage signature only sees `params`.
+- iOS `GradeRenderPipeline.applyDetailSoftnessStage(to:params:)` does
+  not receive `Phase0ExportRequest.sourceProbe` either.
+- Web `WebGPUBackend` / `WebGLBackend` consume `params.detailSoftness`
+  directly from the uniform table with no source-metadata channel at
+  the backend boundary.
 
-Existing optical / look-affecting recipe surfaces inspected:
+Widening these signatures + building a Swift mirror of the resolver
+to keep platform parity is broad metadata plumbing per the owner stop
+condition. Phase 4 lands the resolver as the single source of truth
+and opens a Phase 4-B follow-up for platform wiring once the resolver
+is stable.
 
-- `AdvancedAdjustCatalog.swift` Optics group `default` / `strong` chips:
-  raise `rgbShift` / `lensSoftness` / `vignette`. **Lens-character axis**
-  (frame periphery falloff + RGB fringe). `detailSoftness` is a separate
-  sensor-detail-acutance axis — folding it in would couple two semantically
-  distinct intents.
-- `FilmtoneOpticalFilterCatalog.profiles` (Backlight Veil 1/8, 1/4, 1/2):
-  raise `bloomThreshold` / `bloomStrength` / `bloomRadius` /
-  `bloomSoftKnee` / `diffusion` / `halationIntensity` / `halationThreshold` /
-  `halationRadius` / `halationHue` / `halationSoftKnee` / `lensSoftness` /
-  `rgbShift`. **Diffusion-filter axis** (glow + haze around highlights).
-  Again, this is light-leak / scatter character, not sensor acutance —
-  Veil profiles deliberately exclude `detailSoftness` so a Veil look does
-  not pre-soften the underlying material the user is rendering.
-- iOS canonical `standardAdvancedRecipes` mirrors the Desktop Optics chips
-  with the same `rgbShift` / `lensSoftness` / `vignette` shape.
+## Owner-confirmed constraints
 
-**Decision: keep existing recipes byte-identical in Phase 3.** Folding
-`detailSoftness` into any of them would (a) silently change pixel output
-for existing saved Looks / recipes that were authored before the slider
-existed, (b) couple sensor-detail intent with lens-character intent, and
-(c) reduce the value of the new slider as a discoverable independent
-control. The user slider stays the first exposure; a later phase can
-revisit recipe stamping once the slider has product feedback.
+- Range / clamp: `recommendedBias` ≥ 0 and ≤
+  `DETAIL_SOFTNESS_EFFECTIVE_MAX` (`0.34`). `deriveDetailSoftnessUniforms`
+  already enforces the combined clamp; the resolver returns a
+  bias-only number so callers can log it independently.
+- Saved-Look isolation: `sourceDetailBias` **must not** become a
+  `FilmtonePhase0Params` field or join
+  `FilmtonePhase0ParamsPatch.opticsGlowKeys`. It is a session-derived
+  uniform input, not stored creative intent.
+- No new UI controls for `sourceDetailBias`.
+- No recipe changes from Phase 3 (existing optical recipes still do
+  not auto-apply `detailSoftness`).
+- Unknown metadata defaults to a small or zero bias (see Tuning).
 
-This decision is recorded here and consciously not encoded into the
-Phase 2 closure — recipe authors changing later does not invalidate
-Phase 3.
+## Tuning (initial conservative recommendations)
 
-## Edit Targets
+Resolver output `recommendedBias` per input class:
 
-### iOS canonical — `apps/capacitor-film-lab-ios/ios/App/App/`
+| Source class | Bias | Reason |
+|---|---|---|
+| iPhone SDR / HEVC (consumer) | `0.10` | modest positive; iPhone sensor-acutance + H.265 macroblock edges |
+| Apple Log / Apple Log 2 / ProRes (iPhone Pro) | `0.06` | smaller positive; log preserves more roll, less hard sharpness |
+| DJI / GoPro / action camera (Rec.709) | `0.08` | positive; high-MP small-sensor with strong in-camera sharpening |
+| Sony S-Log3 / Canon C-Log{,3} / Panasonic V-Log | `0.02` | near-zero; cinema-class log curves already gentle on acutance |
+| unknown Rec.709 | `0.02` | tiny; could be sensor-sharp consumer source but unsure |
+| unknown log transfer | `0.00` | zero; log usually softer, do not bias when uncertain |
+| missing metadata | `0.00` | fully conservative passthrough |
 
-- `Editor/FilmtoneStrengthSheetData.swift`:
-  - Add `control("detailSoftness", range: 0...1)` to the `optics` group
-    immediately after `lensSoftness` (currently L116-119).
-  - Add `case "detailSoftness": return .softness` to
-    `comparisonStyleForParam(_:)` (currently L50-51). Reusing the existing
-    `.softness` comparison family is the smallest-touch option: the
-    `FilmtoneAdjustmentComparisonStyle.softness` case already maps to the
-    `.optics` family (`HelpCompareOpticsAfter` asset). A dedicated demo
-    clip is out of scope for Phase 3.
-- `Strings/FilmtoneStrings.swift`:
-  - Add `"detailSoftness": filmtoneLocalized("filmtone.param.detail_softness", defaultValue: "Detail softness", ...)`
-    to `paramLabels` (currently L1077, after `lensSoftness`). Match the
-    iOS convention of EN default on JA hosts (only `shutterAngle` /
-    `trailIntensity` carry an explicit JA variant; the Desktop drift
-    detector enforces this).
-  - Add `case "detailSoftness":` to `paramHelpCopy(for:)` (currently
-    L582, after `lensSoftness`). Copy is detail-axis-specific, contrasted
-    with the adjacent `lensSoftness` help body without explicitly naming
-    the other slider.
+`confidence` reflects how directly metadata identified the class:
+`high` = make + model + transfer matched; `medium` = transfer or
+explicit source-profile-id matched; `low` = single weak signal;
+`none` = nothing matched.
 
-### Desktop canonical — `apps/filmtone-desktop-macos/FilmtoneDesktop/`
+## Edit Targets (this slice)
 
-- `Domain/AdvancedAdjustCatalog.swift`:
-  - Add `.init(key: "detailSoftness", label: strings.paramLabel(for: "detailSoftness"), range: 0...1, digits: 2)`
-    to the Optics group immediately after `lensSoftness` (currently
-    L138). The `clamp(_:for:)` switch already lists `"detailSoftness"`
-    in the `[0,1]` case (L342), inherited from Phase 1.
-  - **Do not** add `detailSoftness` to either Optics recipe (`default` /
-    `strong`) per the recipe decision above.
-- `Domain/FilmtoneDesktopStrings.swift`:
-  - Add `"detailSoftness": "Detail softness"` to both
-    `englishParamLabels` and `japaneseParamLabels`. JA mirrors EN per
-    the iOS-canonical convention enforced by the drift detector.
+### Core resolver — `packages/film-lab-core/src/`
 
-### Drift-detector — `apps/filmtone-desktop-macos/Verify/main.swift`
+- **New**: `source-detail-compensation.ts` — exports
+  `SourceDetailCompensationInput`,
+  `SourceDetailProfile`, and `resolveSourceDetailCompensation(input)`.
+  Re-uses existing core types: `SourceLogTransferFunction`,
+  `SourceCodecFamily`, `SourceColorClass`, and
+  `SourceProfileId` so callsites can plug in metadata that is
+  already on the wire.
+- **New**: `source-detail-compensation.test.ts` — coverage for every
+  row of the Tuning table plus:
+  - clamp at `DETAIL_SOFTNESS_EFFECTIVE_MAX` (no row produces
+    `recommendedBias > 0.34`);
+  - missing-metadata returns `{ recommendedBias: 0, confidence:
+    "none" }`;
+  - explicit `sourceProfileId === "built-in:source-profile.rec709"`
+    behaves like unknown Rec.709 not unknown Log;
+  - case-insensitive camera-make matching;
+  - `inputTransformPolicy.strategy ∈ { "apple-log-to-rec709",
+    "apple-log2-to-rec709" }` is honored even if `cameraMake` is
+    nil.
+- **Index re-export**: `packages/film-lab-core/src/index.ts` adds
+  `resolveSourceDetailCompensation`, `type
+  SourceDetailCompensationInput`, `type SourceDetailProfile`,
+  `type SourceDetailConfidence`, `type SourceDetailTransferClass`.
 
-- `iosCanonicalParamLabels` dictionary at L1038-1070 is the parity gate
-  between Desktop and iOS labels. Add `"detailSoftness": "Detail softness"`
-  to keep the drift detector authoritative.
+### Tracked core dist
+
+If the rebuilt `packages/film-lab-core/dist/index.{js,d.ts}` diff
+shows the new symbols, commit the diff alongside source per
+project `CLAUDE.md` §6. No `renderer` / `smart-look` dist rebuild
+expected — neither package consumes the resolver yet.
+
+### Not touched (this slice, follow-up Phase 4-B)
+
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneGradePipeline.swift`
+- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneDetailSoftness.swift`
+  (Swift mirror would land here)
+- `apps/capacitor-film-lab-ios/ios/App/App/Export/Internal/GradeRenderPipeline.swift`
+- `packages/film-lab-renderer/src/webgpu/WebGPUBackend.ts`
+- `packages/film-lab-renderer/src/webgl/WebGLBackend.ts`
+- `FilmtonePhase0Params` / `FilmtonePhase0ParamsPatch` (no schema
+  change — bias is not a stored param)
 
 ## Verification
 
+Smallest gates that prove the touched surfaces:
+
 ```bash
-bun run verify:ios
-bun run verify:macos
-bun run check:filmtone-copy
+bun run build:core
+bun run --cwd packages/film-lab-core test
 bun run check:filmtone-context
 git diff --check
 ```
 
-Skip gates:
+Skip gates (this slice):
 
-- `bun run --cwd packages/film-lab-core test` — no TS contract change.
-- `bun run build:renderer` — no renderer change.
+- `bun run verify:ios` — no iOS source change.
+- `bun run verify:macos` — no macOS source change.
+- `bun run build:renderer` — no renderer source change.
+- `bun run check:filmtone-copy` — no user-visible copy change in
+  this slice (resolver output is diagnostic; UI exposure is
+  Phase 3-shipped).
 
 ## Done Conditions
 
-- iOS Advanced sheet renders a `Detail softness` slider in the Optics
-  group immediately after `Lens softness`, with help copy distinct from
-  `Lens softness`. Slider writes `detailSoftness` into
-  `paramOverrides`; pre-existing Phase 2 render pipeline picks it up
-  automatically.
-- Desktop Advanced sheet renders the same control in the Optics group at
-  the matching position, with the same label.
-- Verify drift detector treats `detailSoftness: "Detail softness"` as
-  canonical; Desktop catalog matches.
-- `bun run verify:ios` + `bun run verify:macos` +
-  `bun run check:filmtone-copy` + `bun run check:filmtone-context` pass.
-  `git diff --check` clean.
-- Recipe decision recorded above; existing recipes untouched.
-- Identity check still holds: with the slider at `0` (default),
-  pixel output is bitwise identical to pre-Phase 3 (no render change;
-  Phase 2 short-circuits at `effectiveDetailSoftness < 0.0001`).
+- `packages/film-lab-core/src/source-detail-compensation.ts` exports
+  the resolver and types.
+- `source-detail-compensation.test.ts` covers every Tuning row plus
+  the four edge cases above; tests pass.
+- `bun run --cwd packages/film-lab-core test` passes (baseline-waived
+  `ios-swift-payload.test.ts` failures remain, see
+  `archive/2026-05-12-phase-1-contract-neutral-plumbing.md`).
+- `bun run build:core` emits the new symbols into
+  `packages/film-lab-core/dist/index.{js,d.ts}`.
+- `bun run check:filmtone-context` passes against the
+  `No copy/history impact: resolver shipped without user-visible
+  copy change` declaration below.
+- `git diff --check` clean.
+- Active archived to
+  `archive/2026-05-12-phase-4-source-compensation-resolver.md` and a
+  1–3 line completion note appended to `strategy.md`.
 
 ## Stop Conditions
 
-- Any change would require introducing `sourceDetailBias` or metadata
-  compensation. Halt — that is Phase 4.
-- A recipe auto-application would change existing output at
-  `detailSoftness == 0`. (Cannot happen if recipes don't write the key,
-  but flagged as a hard line.)
-- UI exposure requires broad redesign of the Advanced surface rather
-  than adding one control to the existing Optics group.
-- `bun run verify:ios` or `verify:macos` fails because Phase 1 Swift
-  positional inits are out of sync. Halt and fix Phase 1 first.
+- The resolver requires `FilmtonePhase0Params` to gain a
+  `sourceDetailBias` field. Halt — that would put automatic bias
+  into saved Looks (constraint violation).
+- A test or generator requires `PHASE0_SCHEMA_VERSION` bump. Halt —
+  resolver is non-contract.
+- Wiring the resolver into a render callsite requires changing the
+  public `Phase0ExportRequest` shape or any persisted JSON
+  fixture. Halt and re-evaluate the slice boundary.
+- A reasonable signal (camera-make match, transfer match) is missed
+  by the resolver — extend tests + tune, do not relax the
+  unknown-default-zero rule for log sources.
 
 ## Copy / History Impact
 
-UI exposure adds two short copy rows on each platform:
+No user-visible copy change in this slice. Resolver output is a
+diagnostic / future render-bias input; it does not surface in any UI
+string, App Store / LP page, release notes, fastlane lane, or
+`messages/{en,ja}.json` row. **No history claim moves.**
 
-- `Detail softness` label (EN / JA both fall back to EN per the iOS
-  paramLabels convention, like every non-motion param).
-- Help body / effect / guidance copy for the slider, scoped to
-  sensor-detail acutance reduction.
+Marker (required for `bun run check:filmtone-context`):
 
-No App Store metadata, LP, release notes, fastlane, or
-`messages/{en,ja}.json` change. No implementation-history claim moves —
-`apps/web` Electron 1.0.3 surface is not touched.
+> `No copy/history impact: resolver shipped without user-visible
+> copy change.`
 
-`bun run check:filmtone-copy` and `bun run check:filmtone-context` must pass
-on this declaration.
+## Article / Change-History Opportunity
+
+- **Article opportunity**: developer-note only (no user-visible
+  behaviour change in this slice). A release-note treatment is
+  reserved for Phase 4-B when the resolver is wired to a render
+  surface and changes pixels for users.
+- **Change-history opportunity**: yes. The resolver separates
+  user creative intent (`detailSoftness`) from automatic source
+  adaptation (`sourceDetailBias`). That separation is worth
+  recording in `docs/filmtone/` change history alongside the
+  Phase 4-B wiring once it lands.
 
 ## Checklist
 
-- [x] Phase 2 active archived; `strategy.md` Phase 2 status set to
-      Complete with the three commit pointers.
-- [x] iOS `FilmtoneStrengthSheetData.swift` Optics group + comparison
-      style.
-- [x] iOS `FilmtoneStrings.swift` `paramLabels` row + help copy case.
-- [x] Desktop `AdvancedAdjustCatalog.swift` Optics group.
-- [x] Desktop `FilmtoneDesktopStrings.swift` EN + JA label rows.
-- [x] Desktop `Verify/main.swift` `iosCanonicalParamLabels` row.
-- [x] `bun run verify:ios` PASS.
-- [x] `bun run verify:macos` PASS.
-- [x] `bash apps/filmtone-desktop-macos/Verify/run.sh` PASS.
-- [x] `bun run check:filmtone-copy` PASS.
-- [x] `bun run check:filmtone-context` PASS.
+- [x] Phase 3 active archived; `strategy.md` Phase 3 status set to
+      Complete with commit pointer `27a856fa`.
+- [x] `source-detail-compensation.ts` resolver + types.
+- [x] `source-detail-compensation.test.ts` covering Tuning table +
+      edge cases (21 tests).
+- [x] `packages/film-lab-core/src/index.ts` re-exports.
+- [x] `bun run --cwd packages/film-lab-core test` PASS — 228 pass /
+      2 fail; the two failures are the baseline-waived
+      `ios-swift-payload.test.ts` rows from Phase 1
+      (`hiddenDefaults` length and `CONTRACT_DEFAULT_KEY_ORDER`
+      drift). Unchanged by this slice.
+- [x] `bun run build:core` rebuilds `dist/` with new symbols
+      (`resolveSourceDetailCompensation` + type group present in
+      `dist/index.{js,d.ts}`).
+- [x] `bun run check:filmtone-context` PASS — impact marker present
+      in this active.md.
 - [x] `git diff --check` clean.
 - [ ] Archive `active.md` →
-      `archive/2026-05-12-phase-3-ui-exposure.md`; append 1–3 line
-      completion note to `strategy.md`.
+      `archive/2026-05-12-phase-4-source-compensation-resolver.md`;
+      append 1–3 line completion note to `strategy.md`. (Owner-run
+      after commit `feat(detail-softness): add source compensation
+      resolver` lands.)
 
 ## Implementation Log
 
-### 2026-05-12 JST — Advanced control exposed
+### 2026-05-12 JST — Resolver landed
 
-- iOS: added `detailSoftness` to the Optics group immediately after
-  `lensSoftness`, reused the existing `.softness` comparison style, and
-  added the canonical `Detail softness` label plus help copy.
-- macOS: added the matching Optics control and label rows; drift detector
-  now treats `detailSoftness: "Detail softness"` as canonical.
-- Recipe decision: existing recipes remain untouched. `detailSoftness` is a
-  separate sensor-acutance axis, not a lens-character or diffusion-filter
-  preset stamp.
+- Added `packages/film-lab-core/src/source-detail-compensation.ts`
+  with `resolveSourceDetailCompensation(input)` + the
+  `SourceDetailProfile` / `SourceDetailCompensationInput` /
+  `SourceDetailConfidence` / `SourceDetailTransferClass` types.
+  Bias values match the Phase 4 Tuning table; clamp is shared with
+  `DETAIL_SOFTNESS_EFFECTIVE_MAX`.
+- Added 21 unit tests in
+  `packages/film-lab-core/src/source-detail-compensation.test.ts`
+  covering each Tuning row plus invariants (clamp, case-insensitive
+  cameraMake, Apple-Log signal precedence over iPhone-Rec.709,
+  `inputTransformPolicy.strategy === "none"` not triggering
+  `log-unknown`, missing-metadata → zero).
+- Re-exported the resolver and types from
+  `packages/film-lab-core/src/index.ts`.
+- Rebuilt `packages/film-lab-core/dist/` (additive ESM + d.ts).
+- `packages/film-lab-smart-look/dist/` and
+  `packages/film-lab-renderer/dist/` were inspected and contain
+  no references to the new symbols, so they are not rebuilt
+  this slice.
 
 **Verification gates run**
 
 | Gate | Result |
 |---|---|
-| `bun run verify:macos` | BUILD SUCCEEDED. |
-| `bash apps/filmtone-desktop-macos/Verify/run.sh` | 124 / 124 passed. |
-| `bun run verify:ios` | EXIT 0. |
-| `bun run check:filmtone-copy` | PASS. |
-| `bun run check:filmtone-context` | PASS. |
+| `bun run --cwd packages/film-lab-core test` | 228 pass / 2 baseline-waived fail (Phase 1 known drift). |
+| `bun test packages/film-lab-core/src/source-detail-compensation.test.ts` | 21 / 21 pass. |
+| `bun run build:core` | ESM + DTS rebuilt; resolver + types present in `dist/index.{js,d.ts}`. |
+| `bun run check:filmtone-context` | PASS (impact marker in this active.md). |
 | `git diff --check` | Clean. |
+
+Skip gates (justified above): `bun run verify:ios`,
+`bun run verify:macos`, `bun run build:renderer`,
+`bun run check:filmtone-copy`.
 
 ## Read-only references
 
 - Phase 1 archive:
   `archive/2026-05-12-phase-1-contract-neutral-plumbing.md`.
-- Phase 2-A archive: `archive/2026-05-12-phase-2a-research-charter.md`.
 - Phase 2 archive: `archive/2026-05-12-phase-2-renderer-parity.md`.
-- Copy harness: `docs/filmtone/filmtone-copy-quality-harness.md`.
-- Source plan: `docs/filmtone/2026-05-11-detail-softness-source-compensation-plan.md`.
+- Phase 3 archive: `archive/2026-05-12-phase-3-ui-exposure.md`.
+- Source plan:
+  `docs/filmtone/2026-05-11-detail-softness-source-compensation-plan.md`.
+- Existing core types reused as resolver inputs:
+  - `SourceLogTransferFunction`, `SourceCodecFamily`,
+    `SourceColorClass`, `SourceInputTransformPolicy` —
+    `packages/film-lab-core/src/native-bridge.ts`.
+  - `SourceProfileId`, `SOURCE_PROFILE_CATALOG` —
+    `packages/film-lab-core/src/source-profile-conversion.ts`.
+- Render integration target (Phase 4-B, not this slice):
+  `packages/film-lab-core/src/detail-softness.ts`
+  `deriveDetailSoftnessUniforms(..., { sourceDetailBias })`.

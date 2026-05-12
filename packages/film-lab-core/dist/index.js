@@ -3618,6 +3618,161 @@ function deriveDetailSoftnessUniforms(detailSoftness, opts = {}) {
     highlightBias: DETAIL_SOFTNESS_HIGHLIGHT_BIAS
   };
 }
+
+// src/source-detail-compensation.ts
+var APPLE_LOG_INPUT_STRATEGIES = /* @__PURE__ */ new Set([
+  "apple-log-to-rec709",
+  "apple-log2-to-rec709"
+]);
+var APPLE_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.apple-log",
+  "built-in:source-profile.apple-log-2"
+]);
+var DJI_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.dji-dlog",
+  "built-in:source-profile.dji-dlog-m"
+]);
+var CANON_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.canon-clog",
+  "built-in:source-profile.canon-log3-cinema-gamut"
+]);
+var PANASONIC_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.panasonic-vlog"
+]);
+var SONY_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.sony-slog3"
+]);
+var APPLE_COLOR_CLASSES = /* @__PURE__ */ new Set([
+  "apple-log",
+  "apple-log2"
+]);
+var REC709_COLOR_CLASSES = /* @__PURE__ */ new Set(["sdr-bt709"]);
+function clampBias(value) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.min(value, DETAIL_SOFTNESS_EFFECTIVE_MAX);
+}
+function normalizeMake(make) {
+  if (!make) return "";
+  return make.trim().toLowerCase();
+}
+function normalizeModel(model) {
+  if (!model) return "";
+  return model.trim().toLowerCase();
+}
+function makeProfile(id, confidence, transferClass, bias, reason) {
+  return {
+    id,
+    confidence,
+    transferClass,
+    recommendedBias: clampBias(bias),
+    effectiveMax: DETAIL_SOFTNESS_EFFECTIVE_MAX,
+    reason
+  };
+}
+function resolveSourceDetailCompensation(input = {}) {
+  const make = normalizeMake(input.cameraMake);
+  const model = normalizeModel(input.cameraModel);
+  const profileId = (input.sourceProfileId ?? "").toString();
+  const transferStrategy = input.inputTransformPolicy?.strategy ?? null;
+  const appleLogTransfer = input.logTransferFunction === "apple-log" || input.logTransferFunction === "apple-log2";
+  const appleLogColorClass = input.colorClass ? APPLE_COLOR_CLASSES.has(input.colorClass) : false;
+  const appleLogStrategy = transferStrategy ? APPLE_LOG_INPUT_STRATEGIES.has(transferStrategy) : false;
+  const appleLogProfile = APPLE_LOG_SOURCE_PROFILE_IDS.has(profileId);
+  if (appleLogTransfer || appleLogColorClass || appleLogStrategy || appleLogProfile) {
+    const matchedSignals = Number(appleLogTransfer) + Number(appleLogColorClass) + Number(appleLogStrategy) + Number(appleLogProfile);
+    const confidence = matchedSignals >= 2 ? "high" : "medium";
+    return makeProfile(
+      "apple-log",
+      confidence,
+      "log-consumer",
+      0.06,
+      "apple-log-smaller-positive"
+    );
+  }
+  if (SONY_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "sony") {
+    return makeProfile(
+      "sony-slog3",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "sony-log-near-zero"
+    );
+  }
+  if (CANON_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "canon") {
+    return makeProfile(
+      "canon-clog",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "canon-log-near-zero"
+    );
+  }
+  if (PANASONIC_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "panasonic") {
+    return makeProfile(
+      "panasonic-vlog",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "panasonic-log-near-zero"
+    );
+  }
+  if (DJI_SOURCE_PROFILE_IDS.has(profileId) || make === "dji") {
+    return makeProfile(
+      "dji-action",
+      profileId ? "high" : "medium",
+      "rec709-consumer",
+      0.08,
+      "dji-action-positive"
+    );
+  }
+  if (make === "gopro") {
+    return makeProfile(
+      "gopro-action",
+      "medium",
+      "rec709-consumer",
+      0.08,
+      "gopro-action-positive"
+    );
+  }
+  if (make === "apple" || model.startsWith("iphone")) {
+    const codec = input.codecFamily ?? null;
+    const isProRes = codec === "prores-422" || codec === "prores-4444";
+    const isHevc = codec === "hevc";
+    const reasonCodec = isProRes ? "iphone-prores" : isHevc ? "iphone-hevc" : "iphone-sdr";
+    return makeProfile(
+      "iphone-sdr-hevc",
+      "high",
+      "rec709-consumer",
+      0.1,
+      `${reasonCodec}-modest-positive`
+    );
+  }
+  if (input.logTransferFunction != null || transferStrategy != null && transferStrategy !== "none") {
+    return makeProfile(
+      "log-unknown",
+      "low",
+      "unknown",
+      0,
+      "unknown-log-zero"
+    );
+  }
+  if (profileId === "built-in:source-profile.rec709" || (input.colorClass ? REC709_COLOR_CLASSES.has(input.colorClass) : false) || input.codecFamily != null) {
+    return makeProfile(
+      "rec709-unknown",
+      "low",
+      "rec709-consumer",
+      0.02,
+      "unknown-rec709-tiny"
+    );
+  }
+  return makeProfile(
+    "metadata-missing",
+    "none",
+    "unknown",
+    0,
+    "metadata-missing-zero"
+  );
+}
 export {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
@@ -3745,6 +3900,7 @@ export {
   pickPhase0Params,
   quickStateSchema,
   recommendOpticalFinish,
+  resolveSourceDetailCompensation,
   serializeCreativeCubeToText,
   serializeCubeLut
 };

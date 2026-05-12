@@ -252,3 +252,10 @@ export {
   type DetailSoftnessOptions,
   type DetailSoftnessUniforms,
 } from "./detail-softness";
+export {
+  resolveSourceDetailCompensation,
+  type SourceDetailCompensationInput,
+  type SourceDetailConfidence,
+  type SourceDetailProfile,
+  type SourceDetailTransferClass,
+} from "./source-detail-compensation";
