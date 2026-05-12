@@ -1,7 +1,7 @@
 # Filmtone Detail Softness Strategy
 
 Date opened: 2026-05-12 JST
-Last updated: 2026-05-12 JST (Phase 4-A resolver landed at `3036e5b9`; Phase 4-B native wiring opened)
+Last updated: 2026-05-12 JST (Phase 4-B native wiring landed at `52d38328`; Phase 5 visual tuning matrix opened)
 
 This file is the compact source of truth for the Detail Softness lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -52,8 +52,8 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
 | Phase 2 | Real Render Pass | Complete (2026-05-12 JST) | Local-reference / high-frequency detail reduction with edge guard and luma-vs-chroma weighting, committed across macOS native (`e277e9f3`), iOS export (`eac47d53`), WebGPU + WebGL (`444db1e0`). Final visual A/B deferred to final QA. |
 | Phase 3 | UI Exposure & Recipe Decision | Complete (2026-05-12 JST) | iOS + macOS Advanced sliders shipped at commit `27a856fa`; existing recipes left untouched; final visual A/B rolled into Phase 5 / final QA. |
 | Phase 4-A | Source Detail Compensation Resolver | Complete (2026-05-12 JST) | TS resolver `resolveSourceDetailCompensation` + 21 unit tests landed at commit `3036e5b9`. Bias never patched into saved Looks; surface stays diagnostic. |
-| Phase 4-B | Source Detail Compensation Native Wiring | In progress | Swift resolver mirror + parity tests; macOS `FilmtoneGradePipeline.apply` + iOS `GradeRenderPipeline.applyDetailSoftnessStage` forward a session-derived `sourceDetailBias` into `FilmtoneDetailSoftness.deriveUniforms`. Web renderer wiring deferred until metadata channel exists. |
-| Phase 5 | Visual Tuning Matrix | Not started | iPhone SDR HEVC, iPhone Apple Log / ProRes, DJI / action camera Rec.709, Sony / Canon / Panasonic Log, low-light noisy clips, hair / foliage / brick / text, strong practical lights all judged. |
+| Phase 4-B | Source Detail Compensation Native Wiring | Complete (2026-05-12 JST) | Swift resolver mirror + 21 parity tests; macOS `FilmtoneGradePipeline.apply` + iOS `GradeRenderPipeline.applyDetailSoftnessStage` forward a session-derived `sourceDetailBias` into `FilmtoneDetailSoftness.deriveUniforms`. Landed at commit `52d38328`. Web renderer wiring deferred until metadata channel exists. |
+| Phase 5 | Visual Tuning Matrix | In progress | iPhone SDR HEVC, iPhone Apple Log / ProRes, DJI / action camera Rec.709, Sony / Canon / Panasonic Log, low-light noisy clips, hair / foliage / brick / text, strong practical lights all judged across macOS native, iOS export, WebGPU, WebGL at `detailSoftness` `0.00` / `0.18` / `0.30`. |
 
 ## Current Strategic State
 
@@ -170,6 +170,20 @@ branched from `main @ 95f1be03` so it never collides with the in-flight
   already at the callsite) opens now. Web renderer wiring stays
   deferred — no source-metadata channel reaches the WebGPU / WebGL
   backends without broad API churn.
+- 2026-05-12 JST: Phase 4-B closed at commit `52d38328`. Native macOS
+  (`FilmtoneGradePipeline` + `FilmtoneVideoExporter` /
+  `FilmtoneStillExporter` / `PreviewSurface` /
+  `FilmtoneDesktopVideoComposition`) and iOS export
+  (`GradeRenderPipeline` + `FilmtoneExportSession`) now feed a
+  runtime-only `sourceDetailBias` resolved via a new
+  `FilmtoneSourceDetailCompensation` Swift mirror (21 parity tests).
+  `FilmtoneDetailSoftness.deriveUniforms(detailSoftness:sourceDetailBias:)`
+  is the single clamp site (`effectiveMax = 0.34`). Web (WebGPU /
+  WebGL) metadata wiring remains deferred until a metadata channel
+  reaches the backend boundary without broad API churn. Active
+  archived to
+  `archive/2026-05-12-phase-4b-source-compensation-native-wiring.md`.
+  Phase 5 (visual tuning matrix across all four renderers) opens now.
 - 2026-05-12 JST: Phase 3 closed at commit `27a856fa`. `detailSoftness`
   is now a user-facing Advanced control in the Optics group on both iOS
   SwiftUI (`FilmtoneStrengthSheetData` + `FilmtoneStrings`) and macOS
