@@ -2507,13 +2507,14 @@ interface BuiltSourceProfileLut {
  */
 declare function buildSourceProfileLut(id: string, size?: number): BuiltSourceProfileLut | null;
 
-declare const DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.45;
+declare const DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.65;
 interface DetailSoftnessUniforms {
     effectiveDetailSoftness: number;
     kernelRadiusPx: number;
+    rangeSigma: number;
+    detailAmplitudeLo: number;
+    detailAmplitudeHi: number;
     chromaAttenScale: number;
-    edgeGuardLo: number;
-    edgeGuardHi: number;
     highlightBias: number;
 }
 interface DetailSoftnessOptions {

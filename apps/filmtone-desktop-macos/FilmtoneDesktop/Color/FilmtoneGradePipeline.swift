@@ -300,9 +300,10 @@ enum FilmtoneGradePipeline {
                 image.clampedToExtent(),
                 uniforms.effectiveDetailSoftness,
                 uniforms.kernelRadiusPx,
+                uniforms.rangeSigma,
+                uniforms.detailAmplitudeLo,
+                uniforms.detailAmplitudeHi,
                 uniforms.chromaAttenScale,
-                uniforms.edgeGuardLo,
-                uniforms.edgeGuardHi,
                 uniforms.highlightBias,
             ]
         )?.cropped(to: image.extent) ?? image

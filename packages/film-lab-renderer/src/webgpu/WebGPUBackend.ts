@@ -143,7 +143,7 @@ const HALATION_LEVELS = 6;
 const DIFFUSION_LEVELS = 3;
 const BLOOM_PARAMS_BYTES = 16;
 const HALATION_PARAMS_BYTES = 32;
-const DETAIL_SOFTNESS_PARAMS_BYTES = 32;
+const DETAIL_SOFTNESS_PARAMS_BYTES = 48;
 const PYRAMID_LEVEL_UNIFORM_BYTES = 16;
 const MOTIONBLUR_FEEDBACK_UNIFORM_BYTES = 16;
 /** weights (2 vec4) + ring control (1 vec4) = 48 bytes. */
@@ -3750,14 +3750,22 @@ export class WebGPUBackend implements RenderBackend {
         height: this._height,
         format: "rgba16float",
       });
+      // Layout: 3 vec4f (see detail-softness.frag.wgsl.ts).
+      // p0: effective, radius, chromaAttenScale, highlightBias
+      // p1: rangeSigma, detailAmplitudeLo, detailAmplitudeHi, _pad
+      // p2: invWidth, invHeight, _pad, _pad
       this.detailSoftnessScratch[0] = detailSoftnessUniforms.effectiveDetailSoftness;
       this.detailSoftnessScratch[1] = detailSoftnessUniforms.kernelRadiusPx;
       this.detailSoftnessScratch[2] = detailSoftnessUniforms.chromaAttenScale;
-      this.detailSoftnessScratch[3] = detailSoftnessUniforms.edgeGuardLo;
-      this.detailSoftnessScratch[4] = detailSoftnessUniforms.edgeGuardHi;
-      this.detailSoftnessScratch[5] = detailSoftnessUniforms.highlightBias;
-      this.detailSoftnessScratch[6] = 1 / Math.max(1, this._width);
-      this.detailSoftnessScratch[7] = 1 / Math.max(1, this._height);
+      this.detailSoftnessScratch[3] = detailSoftnessUniforms.highlightBias;
+      this.detailSoftnessScratch[4] = detailSoftnessUniforms.rangeSigma;
+      this.detailSoftnessScratch[5] = detailSoftnessUniforms.detailAmplitudeLo;
+      this.detailSoftnessScratch[6] = detailSoftnessUniforms.detailAmplitudeHi;
+      this.detailSoftnessScratch[7] = 0;
+      this.detailSoftnessScratch[8] = 1 / Math.max(1, this._width);
+      this.detailSoftnessScratch[9] = 1 / Math.max(1, this._height);
+      this.detailSoftnessScratch[10] = 0;
+      this.detailSoftnessScratch[11] = 0;
       device.queue.writeBuffer(
         this.detailSoftnessBuffer,
         0,

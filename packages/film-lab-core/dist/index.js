@@ -3593,12 +3593,13 @@ function makeSlog3ToRec709Cube(size = 33) {
 }
 
 // src/detail-softness.ts
-var DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.45;
-var DETAIL_SOFTNESS_KERNEL_RADIUS_MIN = 0.62;
-var DETAIL_SOFTNESS_KERNEL_RADIUS_MAX = 2;
+var DETAIL_SOFTNESS_EFFECTIVE_MAX = 0.65;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MIN = 1;
+var DETAIL_SOFTNESS_KERNEL_RADIUS_MAX = 2.5;
+var DETAIL_SOFTNESS_RANGE_SIGMA = 0.07;
+var DETAIL_SOFTNESS_DETAIL_AMPLITUDE_LO = 0;
+var DETAIL_SOFTNESS_DETAIL_AMPLITUDE_HI = 0.05;
 var DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE = 0.7;
-var DETAIL_SOFTNESS_EDGE_GUARD_LO = 0.04;
-var DETAIL_SOFTNESS_EDGE_GUARD_HI = 0.2;
 var DETAIL_SOFTNESS_HIGHLIGHT_BIAS = 1.18;
 function deriveDetailSoftnessUniforms(detailSoftness, opts = {}) {
   const bias = opts.sourceDetailBias ?? 0;
@@ -3612,9 +3613,10 @@ function deriveDetailSoftnessUniforms(detailSoftness, opts = {}) {
   return {
     effectiveDetailSoftness: effective,
     kernelRadiusPx,
+    rangeSigma: DETAIL_SOFTNESS_RANGE_SIGMA,
+    detailAmplitudeLo: DETAIL_SOFTNESS_DETAIL_AMPLITUDE_LO,
+    detailAmplitudeHi: DETAIL_SOFTNESS_DETAIL_AMPLITUDE_HI,
     chromaAttenScale: DETAIL_SOFTNESS_CHROMA_ATTEN_SCALE,
-    edgeGuardLo: DETAIL_SOFTNESS_EDGE_GUARD_LO,
-    edgeGuardHi: DETAIL_SOFTNESS_EDGE_GUARD_HI,
     highlightBias: DETAIL_SOFTNESS_HIGHLIGHT_BIAS
   };
 }

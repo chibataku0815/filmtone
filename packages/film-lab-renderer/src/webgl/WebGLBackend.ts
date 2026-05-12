@@ -401,10 +401,11 @@ export class WebGLBackend implements RenderBackend {
         uSource: { value: null },
         uTexelSize: { value: new THREE.Vector2() },
         uEffectiveDetailSoftness: { value: 0.0 },
-        uKernelRadiusPx: { value: 0.62 },
+        uKernelRadiusPx: { value: 1.0 },
+        uRangeSigma: { value: 0.07 },
+        uDetailAmplitudeLo: { value: 0.0 },
+        uDetailAmplitudeHi: { value: 0.05 },
         uChromaAttenScale: { value: 0.7 },
-        uEdgeGuardLo: { value: 0.04 },
-        uEdgeGuardHi: { value: 0.2 },
         uHighlightBias: { value: 1.18 },
       },
     });
@@ -1012,9 +1013,10 @@ export class WebGLBackend implements RenderBackend {
     );
     du.uEffectiveDetailSoftness!.value = uniforms.effectiveDetailSoftness;
     du.uKernelRadiusPx!.value = uniforms.kernelRadiusPx;
+    du.uRangeSigma!.value = uniforms.rangeSigma;
+    du.uDetailAmplitudeLo!.value = uniforms.detailAmplitudeLo;
+    du.uDetailAmplitudeHi!.value = uniforms.detailAmplitudeHi;
     du.uChromaAttenScale!.value = uniforms.chromaAttenScale;
-    du.uEdgeGuardLo!.value = uniforms.edgeGuardLo;
-    du.uEdgeGuardHi!.value = uniforms.edgeGuardHi;
     du.uHighlightBias!.value = uniforms.highlightBias;
     this.postMesh.material = this.detailSoftnessMaterial;
     renderer.setRenderTarget(this.rtDetailSoftened);

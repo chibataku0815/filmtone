@@ -1,48 +1,50 @@
 import Foundation
 
 // Swift mirror of packages/film-lab-core/src/detail-softness.ts.
-// Constants and derivation must match the TS helper byte-for-byte so the
-// macOS native pilot (Phase 2-B) and the iOS export port (Phase 2-C) share
-// the same effective values as the WebGL / WebGPU renderers (Phase 2-D).
+// Constants and derivation must match the TS helper byte-for-byte so
+// macOS native (FilmtoneGradePipeline), iOS export (GradeRenderPipeline),
+// and the WebGL / WebGPU shader paths share the same effective values.
 //
-// Algorithm shape: local-reference high-pass attenuation with edge guard
-// and luma-vs-chroma separation. See
-// `docs/filmtone/detail-softness/archive/2026-05-12-phase-2a-research-charter.md`
-// §Algorithm decision.
+// Algorithm shape: amplitude-gated bilateral detail-layer attenuation.
+// See detail-softness.ts for the algorithm narrative.
 
 public struct FilmtoneDetailSoftnessUniforms: Equatable, Sendable {
     public var effectiveDetailSoftness: Double
     public var kernelRadiusPx: Double
+    public var rangeSigma: Double
+    public var detailAmplitudeLo: Double
+    public var detailAmplitudeHi: Double
     public var chromaAttenScale: Double
-    public var edgeGuardLo: Double
-    public var edgeGuardHi: Double
     public var highlightBias: Double
 
     public init(
         effectiveDetailSoftness: Double,
         kernelRadiusPx: Double,
+        rangeSigma: Double,
+        detailAmplitudeLo: Double,
+        detailAmplitudeHi: Double,
         chromaAttenScale: Double,
-        edgeGuardLo: Double,
-        edgeGuardHi: Double,
         highlightBias: Double
     ) {
         self.effectiveDetailSoftness = effectiveDetailSoftness
         self.kernelRadiusPx = kernelRadiusPx
+        self.rangeSigma = rangeSigma
+        self.detailAmplitudeLo = detailAmplitudeLo
+        self.detailAmplitudeHi = detailAmplitudeHi
         self.chromaAttenScale = chromaAttenScale
-        self.edgeGuardLo = edgeGuardLo
-        self.edgeGuardHi = edgeGuardHi
         self.highlightBias = highlightBias
     }
 }
 
 public enum FilmtoneDetailSoftness {
-    public static let effectiveMax: Double = 0.45
+    public static let effectiveMax: Double = 0.65
 
-    static let kernelRadiusMin: Double = 0.62
-    static let kernelRadiusMax: Double = 2.0
+    static let kernelRadiusMin: Double = 1.0
+    static let kernelRadiusMax: Double = 2.5
+    static let rangeSigma: Double = 0.07
+    static let detailAmplitudeLo: Double = 0.0
+    static let detailAmplitudeHi: Double = 0.05
     static let chromaAttenScale: Double = 0.7
-    static let edgeGuardLo: Double = 0.04
-    static let edgeGuardHi: Double = 0.2
     static let highlightBias: Double = 1.18
 
     public static func deriveUniforms(
@@ -56,9 +58,10 @@ public enum FilmtoneDetailSoftness {
         return FilmtoneDetailSoftnessUniforms(
             effectiveDetailSoftness: effective,
             kernelRadiusPx: radius,
+            rangeSigma: rangeSigma,
+            detailAmplitudeLo: detailAmplitudeLo,
+            detailAmplitudeHi: detailAmplitudeHi,
             chromaAttenScale: chromaAttenScale,
-            edgeGuardLo: edgeGuardLo,
-            edgeGuardHi: edgeGuardHi,
             highlightBias: highlightBias
         )
     }
