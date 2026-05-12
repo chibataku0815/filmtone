@@ -1,7 +1,5 @@
-This release improves the native capture flow for real shooting sessions. You can keep recording multiple takes, then choose the take to open in the editor with a focused preview instead of being forced out of capture after each clip.
+This release restores audio through iPhone capture and normal video export. Filmtone records microphone audio for clips captured in the app, keeps audio from imported videos during normal exports, and checks the completed output file before treating audio as preserved. Highlight-reel exports remain silent by design.
 
-Recording preview is lighter in the hot path. When stabilization and a Look are active together, Filmtone uses a visible lightweight monitor mode for capture while preserving the full-quality rendering path for editing and export.
+Advanced controls now include Texture softness. It reduces hard fine detail and digital edge acutance separately from lens/periphery softness, with conservative source-aware tuning when metadata identifies iPhone, Apple Log, or similar sources.
 
-Stone, Urban, Noir, and imported .cube creative LUTs can now be selected from the capture screen. LUTs that look like technical transform LUTs are flagged, and the selected direction carries through capture, editing, and export provenance.
-
-This update also tightens capture orientation handling, storage-pressure warnings, and package stability.
+The capture, editor, and export internals were also tightened, including stronger capture package persistence, sidecar audio diagnostics, and clearer export failures.

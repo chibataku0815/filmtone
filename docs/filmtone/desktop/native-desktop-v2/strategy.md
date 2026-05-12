@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-10 JST
+Last updated: 2026-05-12 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -51,6 +51,7 @@ content layer stays glass-free so color judgment is not compromised.
 | M6 | Release Cutover | M5 | Released 2026-05-05 | Public update metadata reports Desktop `1.4`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M7 | Native Desktop v1.5 Release | M6 | Released 2026-05-06 | Public update metadata reports Desktop `1.5`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M8 | Native Desktop v1.6 Release | M7 | Released 2026-05-10 | Public update metadata reports Desktop `1.6`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M9 | Native Desktop v1.7 Release Prep | M8 | Candidate packaged | Local release candidate reports Desktop `1.7` build `4`; `Filmtone-1.7.dmg` is signed, notarized, stapled, Gatekeeper accepted, and held before public metadata mutation. |
 
 ## Current Strategic State
 
@@ -69,8 +70,9 @@ content layer stays glass-free so color judgment is not compromised.
 - Native Desktop v2 public release is Desktop v1.6. Desktop release truth and
   iOS App Store truth are separate public axes; rerun truth scripts before
   making release/version claims.
-- No Native Desktop release `active.md` remains open after the v1.6 release
-  archive.
+- No Native Desktop release `active.md` remains open after the v1.7 local
+  candidate packaging log was archived. Public DMG upload/update metadata
+  mutation still requires an explicit owner confirmation step.
 
 ## Interrupt / Decision Log
 
@@ -84,6 +86,15 @@ content layer stays glass-free so color judgment is not compromised.
 - 2026-05-10 JST: M8 Native Desktop v1.6 public release completed and archived;
   public update metadata reports `latestVersion: "1.6"` and the fixed download
   page returns `Filmtone-1.6.dmg`.
+- 2026-05-12 JST: M9 Native Desktop v1.7 release prep opened for post-v1.6
+  Desktop changes: completed-output audio preservation, Texture Softness, and
+  source-aware detail compensation. Public release truth remains v1.6 until the
+  DMG/upload/update-meta steps are explicitly completed.
+- 2026-05-12 JST: M9 v1.7 local candidate packaged. `Filmtone-1.7.dmg` is
+  signed, notarized, stapled, Gatekeeper accepted, and sha256
+  `cb23f1f0b1f37c17f4eaf547975a88bc48d6ae28b720256950ffcf821ede2045`.
+  Prep log archived at
+  `archive/2026-05-12-native-desktop-v1-7-release-prep.md`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
