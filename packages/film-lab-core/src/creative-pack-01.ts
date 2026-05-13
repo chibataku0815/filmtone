@@ -75,11 +75,11 @@ export function buildLookParamOverrides(
 }
 
 /**
- * Pack 01 Look catalog. Stone is the Palermo Reference base; Urban is the
- * Palermo Green Density derivative; Noir is Filmtone's toned print
- * monochrome recipe. External reference cubes are build-only inputs; the
- * exported product catalog carries the generated Filmtone recipe and never
- * direct reference cube paths.
+ * Pack 01 Look catalog. Stone adapts DJI D-Log M Palermo into a
+ * display-referred Filmtone cube; Urban is the Palermo Green Density
+ * derivative; Noir is Filmtone's toned print monochrome recipe. External
+ * reference cubes are build-only inputs; the exported product catalog carries
+ * the generated Filmtone recipe and never direct reference cube paths.
  *
  * `colorParams` is baked into the generated 65³ cube. Runtime
  * `paramOverrides` still neutralizes the host color ops so the bundled cube is
@@ -107,17 +107,17 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
-      rgbShift: 0.0032,
-      bloomThreshold: 0.64,
-      bloomStrength: 0.2,
-      bloomRadius: 0.62,
-      halationIntensity: 0.07,
+      rgbShift: 0.0016,
+      bloomThreshold: 0.72,
+      bloomStrength: 0.1,
+      bloomRadius: 0.52,
+      halationIntensity: 0.045,
       halationHue: 24,
-      diffusion: 0.06,
-      lensSoftness: 0.095,
-      grainIntensity: 0.0045,
-      grainSize: 0.13,
-      vignette: 0.055,
+      diffusion: 0.015,
+      lensSoftness: 0.07,
+      grainIntensity: 0.013,
+      grainSize: 0.16,
+      vignette: 0.1,
     }),
     strength: 1.0,
     sourceCubeTransform: CREATIVE_PACK_01_STONE_TRANSFORM,
@@ -149,10 +149,10 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       halationIntensity: 0.055,
       halationHue: 20,
       diffusion: 0.065,
-      lensSoftness: 0.095,
-      grainIntensity: 0.0045,
+      lensSoftness: 0.11,
+      grainIntensity: 0.0075,
       grainSize: 0.13,
-      vignette: 0.06,
+      vignette: 0.075,
     }),
     strength: 1.0,
     sourceCubeTransform: CREATIVE_PACK_01_URBAN_TRANSFORM,

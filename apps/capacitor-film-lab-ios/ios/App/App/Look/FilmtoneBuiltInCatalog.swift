@@ -59,9 +59,9 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: three Creative LUTs. Stone is the Palermo Reference
-    /// base; Urban is the Palermo Green Density derivative; Noir is a toned
-    /// print monochrome recipe.
+    /// Active catalog: three Creative LUTs. Stone adapts DJI D-Log M Palermo
+    /// into a display-referred Filmtone cube; Urban is the Palermo Green
+    /// Density derivative; Noir is a toned print monochrome recipe.
     static let allLooks: [BuiltInLook] = [
         // MARK: - Creative LUT Pack 01
         //
@@ -91,7 +91,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-stone",
                 filename: "filmtone-creative-pack-01-stone.cube",
-                sha256: "2f9e0240450b1b5fe1e78ca88017509eb1c50a050c4a02723a36ac651c9393c4",
+                sha256: "0214095c88056b2b8db83de8d01eb359603a6683a33dced7e77f94ac03d6016a",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -123,7 +123,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-noir",
                 filename: "filmtone-creative-pack-01-noir.cube",
-                sha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
+                sha256: "0c52cf12a0aba090f60c18f23d3712fb80016f436765acfdc99cf9ae93abed56",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id

@@ -2,11 +2,15 @@ import FilmLabSwiftCore
 import Foundation
 
 /// M1 Max Quality Look Director — turns Creative Pack 01 built-in Looks
-/// into source-aware adaptations so that night / high-key / Log / digital
-/// material each receive a tuned LUT intensity plus optical and tonal
-/// adjustments. The director is intentionally biased toward stronger,
-/// visible image moves. Performance cost is visible through the export
-/// sidecar profiler; preview uses the existing scale/proxy path.
+/// into source-aware adaptations. The director is biased toward stronger,
+/// visible image moves, but the M1C pivot fixes a product regression from
+/// M1A/M1B: on owner-side review, night/practical material went gray and
+/// milky because the director was lifting `fade`, lowering `bloomThreshold`,
+/// and adding broad diffusion on night. Those handles read as global haze,
+/// not film signature. M1C removes them and instead drives night quality
+/// through display-domain cube color, controlled contrast, color separation, and
+/// localized practical-light glow that is gated against high-key scenes so
+/// it never washes a daylight sky.
 ///
 /// The director does not own descriptor extraction — `SourceProbeService`
 /// fills the optional score fields. Missing scores fall through to
@@ -14,50 +18,79 @@ import Foundation
 enum FilmtoneLookDirector {
 
     /// Per-Look weighting profile. Stone is the flagship and gets the
-    /// fullest range. Urban runs at ~0.7x to keep its cooler palette
-    /// clean. Noir keeps optics light because the bundled cube already
-    /// carries toned print structure.
+    /// fullest range. Urban keeps its cooler palette but still receives
+    /// a visible practical-light optical response. Noir keeps optics
+    /// light because the bundled cube already carries toned print
+    /// structure.
     struct LookWeights {
         let scale: Double
         let nightOpticsScale: Double
-        let nightFadeBoost: Double
         let highKeyCompressionGain: Double
-        let logFlatLutGain: Double
         let logFlatCompression: Double
+        let highKeyPrintGain: Double
+        let logFlatPrintGain: Double
+        let contrastGain: Double
+        let saturationGain: Double
         let digitalSoftnessGain: Double
+        let practicalBloomGain: Double
+        let practicalHalationGain: Double
+        let practicalRgbShiftGain: Double
         let vignetteGain: Double
     }
 
+    // M2 tuning pass: Stone reads as a flagship Look on first frame and
+    // night/practical material gets visible (not just measurable) bloom /
+    // halation / chromatic spread without lifting the toe or washing
+    // daylight skies. Anti-haze invariants from M1C still hold.
     private static let stoneWeights = LookWeights(
         scale: 1.0,
         nightOpticsScale: 1.0,
-        nightFadeBoost: 0.09,
-        highKeyCompressionGain: 0.16,
-        logFlatLutGain: 0.10,
-        logFlatCompression: 0.18,
-        digitalSoftnessGain: 0.16,
-        vignetteGain: 0.05
+        highKeyCompressionGain: 0.48,
+        logFlatCompression: 0.44,
+        highKeyPrintGain: 0.28,
+        logFlatPrintGain: 0.36,
+        contrastGain: 0.17,
+        saturationGain: 0.23,
+        digitalSoftnessGain: 0.30,
+        practicalBloomGain: 0.86,
+        practicalHalationGain: 0.72,
+        practicalRgbShiftGain: 0.028,
+        vignetteGain: 0.11
     )
 
+    // M2 tuning pass: Urban's cooler character carries more density and
+    // sat-restore weight, and the practical-light optical response is
+    // raised. Effective delta stays below Stone because the global 0.7x
+    // scale plus a slightly reduced nightOpticsScale clamp the magnitude.
     private static let urbanWeights = LookWeights(
         scale: 0.7,
-        nightOpticsScale: 0.7,
-        nightFadeBoost: 0.07,
-        highKeyCompressionGain: 0.12,
-        logFlatLutGain: 0.08,
-        logFlatCompression: 0.14,
-        digitalSoftnessGain: 0.13,
-        vignetteGain: 0.04
+        nightOpticsScale: 0.85,
+        highKeyCompressionGain: 0.34,
+        logFlatCompression: 0.32,
+        highKeyPrintGain: 0.20,
+        logFlatPrintGain: 0.26,
+        contrastGain: 0.13,
+        saturationGain: 0.17,
+        digitalSoftnessGain: 0.24,
+        practicalBloomGain: 1.00,
+        practicalHalationGain: 0.86,
+        practicalRgbShiftGain: 0.038,
+        vignetteGain: 0.09
     )
 
     private static let noirWeights = LookWeights(
         scale: 0.55,
         nightOpticsScale: 0.45,
-        nightFadeBoost: 0.04,
-        highKeyCompressionGain: 0.10,
-        logFlatLutGain: 0.0,
-        logFlatCompression: 0.10,
-        digitalSoftnessGain: 0.08,
+        highKeyCompressionGain: 0.22,
+        logFlatCompression: 0.20,
+        highKeyPrintGain: 0.13,
+        logFlatPrintGain: 0.16,
+        contrastGain: 0.06,
+        saturationGain: 0.0,
+        digitalSoftnessGain: 0.14,
+        practicalBloomGain: 0.18,
+        practicalHalationGain: 0.14,
+        practicalRgbShiftGain: 0.0,
         vignetteGain: 0.0
     )
 
@@ -102,28 +135,14 @@ enum FilmtoneLookDirector {
             lowSatFlat = max(lowSatFlat, 0.6)
         }
 
-        // Intensity — start at base of the bundled cube (1.0) and lean
-        // toward higher intensity on neutral / log material that needs
-        // the LUT to do real grading work. Night material keeps the
-        // headline intensity at base so practical highlights are not
-        // over-saturated.
+        // Intensity — the bundled cube already ships at the schema maximum
+        // (1.0), so stronger high-key / Log moves come from post-cube
+        // tone handles below. Pull intensity down on night material so
+        // saturated practical lights do not clip the cube.
         var intensity = 1.0
         if slug != "filmtone-creative-pack-01-noir" {
-            // Lift LUT intensity on flat material so the Look actually
-            // bites. Capped so we never clip the bundled cube domain.
-            intensity = min(1.0, 1.0 + weights.logFlatLutGain * lowSatFlat)
-            // Slightly bias up on bright high-key shots where a small
-            // intensity bump strengthens the print response without
-            // crushing highlights — the cube already has a soft shoulder.
-            intensity = min(1.0, intensity + 0.04 * highKey)
-            // Pull intensity back when night practical lights dominate
-            // so the warm signage retains color richness rather than
-            // racing toward saturated clip.
             intensity = max(0.82, intensity - 0.10 * night)
         } else {
-            // Noir intensity stays mostly at 1.0 — the toned print cube
-            // is the Look. Pull back slightly on night so high contrast
-            // signage does not lose halation transition.
             intensity = max(0.9, 1.0 - 0.08 * night)
         }
 
@@ -132,36 +151,82 @@ enum FilmtoneLookDirector {
         // we do not override.
         var values: [String: Double] = [:]
 
-        // Compression / shadow latitude — main tonal handles.
+        // Compression — main highlight-rolloff handle. Night material gets
+        // the floor only (its shadow-dominated tone curve does not need a
+        // forced compression rate); high-key and Log/flat get the bigger
+        // moves. The unconditional floor is intentional so ordinary clips
+        // still read as a Look on the cube.
         let compressionAdd =
             weights.highKeyCompressionGain * highKey +
-            weights.logFlatCompression * lowSatFlat
+            weights.logFlatCompression * lowSatFlat +
+            0.105 * weights.scale
         if compressionAdd > 0.005 {
-            values["compressionAmount"] = clamp(0.0, 0.55, compressionAdd)
-            // Pull the compression knee earlier when material is flat so
-            // the compression effect reaches mid tones instead of only
-            // highlights. Range default is 0.5; smaller value lowers the
-            // knee.
-            let kneeShift = -0.18 * lowSatFlat - 0.06 * highKey
-            values["compressionRange"] = clamp(0.25, 0.6, 0.5 + kneeShift)
+            values["compressionAmount"] = clamp(0.0, 0.68, compressionAdd)
+            // Pull the compression knee earlier on flat / high-key material
+            // so compression reaches mid tones, not just highlights. Night
+            // intentionally leaves the knee at default so the natural
+            // shadow→highlight ramp keeps its contour.
+            let kneeShift = -0.28 * lowSatFlat - 0.16 * highKey
+            values["compressionRange"] = clamp(0.20, 0.6, 0.5 + kneeShift)
         }
 
-        // Shadow latitude — raise the curve toe on shadow-heavy material so
-        // detail breathes without lifting highlight punch. `fade` is the
-        // density-curve handle here: its baseGradeV2 kernel applies
-        // `shadowFadeMask * fade * (1 - color) * 0.6`, a shadow-only mask
-        // that decays smoothly above 0.4 luma. shadowTone is intentionally
-        // not touched — that key is the density-dependent split-tone color
-        // cast (shadowChroma direction from shadowHue), not a latitude
-        // handle, and using it for "open shadows on night material" would
-        // tip the shadow chroma direction instead of giving the toe
-        // headroom. Capped at 0.10 so it never reads as a matte/wash.
-        let fadeAdd =
-            weights.nightFadeBoost * max(night, shadowCoverage * 0.6)
-        if fadeAdd > 0.005 {
-            let baselineFade = catalogValue(slug: slug, key: "fade")
-            values["fade"] = clamp(0.0, 0.10, baselineFade + fadeAdd)
+        // Print curve — useful on high-key / Log material, but not a night
+        // black-floor lever. The print-stage sigmoid lifts the deepest
+        // shadows, so M2 removes the old night print boost that caused
+        // Stone to drift gray even after `fade` was removed.
+        let nightPrintGuard = 1.0 - 0.85 * night
+        let printAdd =
+            (
+                weights.highKeyPrintGain * highKey +
+                weights.logFlatPrintGain * lowSatFlat
+            ) * nightPrintGuard +
+            0.014 * weights.scale
+        if printAdd > 0.005 {
+            values["printContrast"] = clamp(0.0, 0.42,
+                catalogValue(slug: slug, key: "printContrast") + printAdd
+            )
         }
+
+        // Contrast — keep the punch on flat or high-key material; on night,
+        // a small contrast bump preserves shape without lifting the toe.
+        let contrastAdd = weights.contrastGain * max(
+            highKey * 0.8,
+            lowSatFlat * 0.65,
+            night * 0.5
+        )
+        if contrastAdd > 0.005 {
+            values["contrast"] = clamp(1.0, 1.22,
+                catalogValue(slug: slug, key: "contrast") + contrastAdd
+            )
+        }
+
+        // Saturation — color separation. Low-sat flat gets the biggest
+        // restore. Night needs a moderate lift so colored practicals
+        // (sodium, neon, tungsten) keep their hue instead of smearing
+        // toward the cube's neutral. Noir's saturationGain is zero by
+        // design.
+        let saturationAdd = weights.saturationGain * max(
+            lowSatFlat,
+            highKey * 0.35,
+            night * 0.5
+        )
+        if saturationAdd > 0.005 {
+            values["saturation"] = clamp(1.0, 1.24,
+                catalogValue(slug: slug, key: "saturation") + saturationAdd
+            )
+        }
+
+        // M1C: `fade` is intentionally NOT written by the resolver. The
+        // baseGradeV2 kernel uses `fade` as a shadow-only toe-lift mask
+        // (`shadowFadeMask * fade * (1 - color) * 0.6`). On owner-side
+        // review the M1A-strong nightFadeBoost made shadows gray and the
+        // overall image milky on night/practical material — the failure
+        // mode of "lift the toe to give film latitude headroom." M1C
+        // replaces that with contrast / saturation / localized glow. The
+        // print curve is deliberately guarded above because it can lift the
+        // deepest shadows. `shadowCoverage` is therefore unused in the
+        // night path except for vignette below.
+        _ = shadowCoverage
 
         // Detail softness — protect against digital hardness. Independent
         // of the export-pipeline `sourceDetailBias` (those add together
@@ -175,25 +240,29 @@ enum FilmtoneLookDirector {
             values["detailSoftness"] = clamp(0.0, 0.25, softnessAfterBias)
         }
 
-        // Glow family — bloom / halation / diffusion. Push these for
-        // night practical-light material; mild on high-key to avoid
-        // halation washout on pale skies.
+        // Glow family — bloom / halation. M1C rule: glow is a LOCAL
+        // practical-light effect, not a night-wide diffuser. Drive bloom
+        // and halation from `highlightCoverage` (the actual measured area
+        // of bright pixels), then gate against `highKey` so a daylight sky
+        // cannot blow into the bloom band. `bloomThreshold` is never
+        // lowered: lowering it pulled midtones into the bloom kernel and
+        // read as milky veil on the M1A/M1B owner-side review.
         let opticsScale = weights.nightOpticsScale * weights.scale
-        let bloomAdd = 0.10 * night * opticsScale + 0.03 * highlightCoverage * opticsScale
-        let halationAdd = 0.04 * night * opticsScale
-        let diffusionAdd = 0.05 * night * opticsScale + 0.02 * lowSatFlat * opticsScale
+        // 0 at highKey ≥ 0.7, 1.0 at highKey ≤ 0.3, smooth linear in between.
+        let practicalGlowGate = clamp01(1.0 - (highKey - 0.3) / 0.4)
+        // M4: require measured highlight coverage, but let night/practical
+        // confidence decide how much of that highlight area is allowed into
+        // the optics path. This keeps ordinary highlights restrained and
+        // makes lantern/neon sources visibly better without lowering the
+        // bloom threshold or adding broad diffusion.
+        let practicalAffinity = 0.25 + 0.75 * night
+        let practicalGlowEnergy = highlightCoverage * practicalGlowGate * practicalAffinity
+        let bloomAdd = weights.practicalBloomGain * practicalGlowEnergy * opticsScale
+        let halationAdd = weights.practicalHalationGain * practicalGlowEnergy * opticsScale
+        let rgbShiftAdd = weights.practicalRgbShiftGain * practicalGlowEnergy * opticsScale
         if bloomAdd > 0.005 {
-            // Build on top of the catalog values rather than overwriting
-            // them — return the overlay only. Editor / capture relay
-            // merge by replacing the key, so we must read the catalog
-            // baseline.
             values["bloomStrength"] = clamp(0.0, 0.55,
                 catalogValue(slug: slug, key: "bloomStrength") + bloomAdd
-            )
-            // Lower threshold slightly so practical highlights sit
-            // inside the bloom band.
-            values["bloomThreshold"] = clamp(0.4, 0.85,
-                catalogValue(slug: slug, key: "bloomThreshold") - 0.04 * night
             )
         }
         if halationAdd > 0.005 {
@@ -201,15 +270,27 @@ enum FilmtoneLookDirector {
                 catalogValue(slug: slug, key: "halationIntensity") + halationAdd
             )
         }
+        if rgbShiftAdd > 0.0004 {
+            values["rgbShift"] = clamp(0.0, 0.0045,
+                catalogValue(slug: slug, key: "rgbShift") + rgbShiftAdd
+            )
+        }
+
+        // Diffusion — adapt only on Log/flat material so a milky-flat clip
+        // gets a little surface texture beyond the catalog baseline. Night
+        // intentionally does NOT add diffusion: a broad diffuser on a
+        // shadow-heavy frame reads as fog, the exact M1A/M1B failure mode
+        // M1C corrects.
+        let diffusionAdd = 0.030 * lowSatFlat * opticsScale
         if diffusionAdd > 0.005 {
-            values["diffusion"] = clamp(0.0, 0.30,
+            values["diffusion"] = clamp(0.0, 0.28,
                 catalogValue(slug: slug, key: "diffusion") + diffusionAdd
             )
         }
 
         // Vignette — only deepen on night frames with strong shadow
-        // coverage. Skip on Noir (catalog already at 0.16) and Urban /
-        // Stone keep the catalog default unless night is dominant.
+        // coverage. Vignette darkens corners, so it works WITH the
+        // black-floor-first direction.
         let vignetteAdd = weights.vignetteGain *
             min(1.0, night * 0.7 + shadowCoverage * 0.3) *
             (saturationMean < 0.55 ? 1.0 : 0.6)

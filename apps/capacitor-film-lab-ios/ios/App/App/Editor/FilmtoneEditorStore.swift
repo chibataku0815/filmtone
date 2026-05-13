@@ -343,8 +343,17 @@ final class FilmtoneEditorStore: ObservableObject {
             self?.objectWillChange.send()
         }
 
+        // M1A visible-pass correction: persisted projects can carry an old
+        // baked Pack 01 overlay from a prior build. Re-resolve once at launch
+        // so installing a stronger catalog / Look Director actually reaches
+        // the current preview/export state without requiring the owner to
+        // re-tap Stone or swap sources.
+        let refreshedCreativePack01OnLaunch = refreshCreativePack01AdaptationIfApplicable()
+
         if self.source != nil {
-            schedulePreviewRender()
+            if !refreshedCreativePack01OnLaunch {
+                schedulePreviewRender()
+            }
         }
 
         bootstrapLibraryAsync()
@@ -1634,18 +1643,22 @@ final class FilmtoneEditorStore: ObservableObject {
     /// apply-time. No-op when the current `creativeLut` is not a Pack 01
     /// bundled Look. Returns `true` when it mutated state and already
     /// persisted + scheduled a re-render via
-    /// `recomputeProjectParamsPreservingOpticsGlow`. User-driven tweaks
-    /// on the overlay keys (`compressionAmount`, `fade`, `detailSoftness`,
-    /// bloom / halation / diffusion / vignette) are overwritten by
-    /// design — the Look is supposed to respond to the new source. Keys
-    /// the new adaptation drops fall back to the catalog baseline so a
-    /// previous source's overlay does not linger.
+    /// `recomputeProjectParamsPreservingOpticsGlow`.
+    ///
+    /// M1C: the merge now writes the FULL catalog baseline first (every
+    /// Pack 01 key, not just the adaptation overlay subset), then layers
+    /// the Look Director overlay on top. This is the migration mechanism
+    /// for persisted projects from earlier builds: their stale
+    /// `grainIntensity`, `lensSoftness`, `bloomRadius`, etc. get
+    /// overwritten with the current M1C catalog values without needing a
+    /// `Profile.version` bump. User-side tweaks on Pack 01 baseline keys
+    /// are reset on every refresh by design — bundled Looks are owned by
+    /// the catalog, custom variants belong in saved Looks.
     @discardableResult
     fileprivate func refreshCreativePack01AdaptationIfApplicable() -> Bool {
         guard
             let creativeLut = project.creativeLut,
-            let slug = creativeLut.bundledSlug,
-            let baseline = FilmtoneCreativePack01Patches.baselinePatch(for: slug)
+            let slug = creativeLut.bundledSlug
         else {
             return false
         }
@@ -1662,16 +1675,16 @@ final class FilmtoneEditorStore: ObservableObject {
             )
         )
 
-        var nextOverrides = project.paramOverrides
-        for key in FilmtoneCreativePack01Patches.adaptationOverlayKeys {
-            if let v = adaptation?.paramOverrides.values[key] {
-                nextOverrides.values[key] = v
-            } else if let v = baseline.values[key] {
-                nextOverrides.values[key] = v
-            } else {
-                nextOverrides.values.removeValue(forKey: key)
-            }
+        guard let mergedValues = FilmtoneCreativePack01Patches.refreshedParamOverrides(
+            existing: project.paramOverrides.values,
+            slug: slug,
+            adaptation: adaptation
+        ) else {
+            return false
         }
+
+        var nextOverrides = project.paramOverrides
+        nextOverrides.values = mergedValues
 
         let nextIntensity = adaptation?.intensity ?? 1.0
         let intensityChanged = abs(creativeLut.intensity - nextIntensity) > 1e-6

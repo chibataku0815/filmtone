@@ -8,8 +8,10 @@ import Foundation
 enum FilmtoneCreativePack01Patches {
 
     /// Color neutralization values shared by every Pack 01 patch. The
-    /// cube is SSOT for color, so the runtime kernel must produce
-    /// identity in these fields before the cube is sampled.
+    /// cube is SSOT for color, so the runtime kernel starts from identity
+    /// in these fields before the cube is sampled. Individual Look baselines
+    /// may then add post-cube print density / optics where the owner-side
+    /// visual target needs a stronger product-level signature.
     static let colorOpNeutralEntries: [String: Double] = [
         "exposure": 0,
         "contrast": 1,
@@ -27,56 +29,68 @@ enum FilmtoneCreativePack01Patches {
         "highlightTone": 0,
     ]
 
-    /// Stone — generated 65³ cube plus a restrained optical baseline.
+    /// Stone — generated 65³ display-domain Palermo adaptation plus a restrained
+    /// optical baseline. M2 tuning lifts the catalog texture (grain / lensSoftness
+    /// / vignette) so a "no descriptor signal" export already reads as a real
+    /// Look. Keep the baseline sharply black-floor-safe; this source typically
+    /// already has lens blur/glow, so the Look improves color separation and
+    /// frame attention without adding broad softness.
     static let stonePatch: FilmtonePhase0ParamsPatch = {
         var values = colorOpNeutralEntries
-        values["rgbShift"] = 0.0032
-        values["bloomThreshold"] = 0.64
-        values["bloomStrength"] = 0.20
-        values["bloomRadius"] = 0.62
-        values["halationIntensity"] = 0.07
+        values["printContrast"] = 0
+        values["rgbShift"] = 0.0016
+        values["bloomThreshold"] = 0.72
+        values["bloomStrength"] = 0.10
+        values["bloomRadius"] = 0.52
+        values["halationIntensity"] = 0.045
         values["halationHue"] = 24
-        values["diffusion"] = 0.06
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.055
+        values["diffusion"] = 0.015
+        values["lensSoftness"] = 0.070
+        values["grainIntensity"] = 0.013
+        values["grainSize"] = 0.16
+        values["vignette"] = 0.10
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
-    /// Urban — generated 65³ cube plus a restrained optical baseline.
+    /// Urban — generated 65³ cube plus a product-quality Pack 01 baseline.
+    /// Cooler cube than Stone, and M2 lifts the post-cube density / softness /
+    /// vignette baseline by a slightly larger increment than Stone so the
+    /// cool urban character does not feel watered down against an untouched
+    /// export.
     static let urbanPatch: FilmtonePhase0ParamsPatch = {
         var values = colorOpNeutralEntries
-        values["rgbShift"] = 0.0028
-        values["bloomThreshold"] = 0.66
-        values["bloomStrength"] = 0.18
+        values["printContrast"] = 0.065
+        values["rgbShift"] = 0.0032
+        values["bloomThreshold"] = 0.67
+        values["bloomStrength"] = 0.16
         values["bloomRadius"] = 0.58
-        values["halationIntensity"] = 0.055
+        values["halationIntensity"] = 0.06
         values["halationHue"] = 20
-        values["diffusion"] = 0.065
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.06
+        values["diffusion"] = 0.045
+        values["lensSoftness"] = 0.115
+        values["grainIntensity"] = 0.013
+        values["grainSize"] = 0.17
+        values["vignette"] = 0.095
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
     /// Noir — generated 65³ toned print monochrome cube plus a denser
-    /// optical baseline.
+    /// optical baseline. Print density carries most of the Noir signature.
     static let noirPatch: FilmtonePhase0ParamsPatch = {
         var values = colorOpNeutralEntries
+        values["printContrast"] = 0.13
         values["rgbShift"] = 0
-        values["bloomThreshold"] = 0.56
-        values["bloomStrength"] = 0.2
+        values["bloomThreshold"] = 0.58
+        values["bloomStrength"] = 0.18
         values["bloomRadius"] = 0.64
-        values["halationIntensity"] = 0.028
+        values["halationIntensity"] = 0.035
         values["halationHue"] = 36
-        values["diffusion"] = 0.13
+        values["diffusion"] = 0.10
         values["lensSoftness"] = 0.16
         values["grainRadialMix"] = 0.9
-        values["grainIntensity"] = 0.075
-        values["grainSize"] = 0.48
-        values["vignette"] = 0.16
+        values["grainIntensity"] = 0.08
+        values["grainSize"] = 0.52
+        values["vignette"] = 0.18
         return FilmtonePhase0ParamsPatch(values: values)
     }()
 
@@ -103,12 +117,52 @@ enum FilmtoneCreativePack01Patches {
     static let adaptationOverlayKeys: Set<String> = [
         "compressionAmount",
         "compressionRange",
+        "contrast",
         "fade",
         "detailSoftness",
+        "printContrast",
+        "saturation",
         "bloomStrength",
         "bloomThreshold",
         "halationIntensity",
+        "rgbShift",
         "diffusion",
         "vignette",
     ]
+
+    /// M1C: full Pack 01 baseline rematerialization. Persisted projects
+    /// from earlier installs carry baked baseline values for keys outside
+    /// `adaptationOverlayKeys` (`grainIntensity`, `lensSoftness`,
+    /// `halationHue`, `bloomRadius`). Without forcing them on
+    /// refresh, an old persisted Stone project keeps the old optics even
+    /// after the catalog is bumped — exactly the failure mode the
+    /// M1A-strong → M1B install did not fix on its own. This helper does
+    /// the merge: baseline first (every catalog key gets the current
+    /// value), then the Look Director adaptation overlay on top for the
+    /// overlay-key subset.
+    ///
+    /// Trade-off: user-side tweaks to baseline-only keys are reset on every
+    /// refresh. For bundled built-in Looks this is the intended behavior —
+    /// the Look definition is the source of truth. User customizations
+    /// should live in saved Looks, not in the bundled Look's persisted
+    /// overrides.
+    static func refreshedParamOverrides(
+        existing: [String: Double],
+        slug: String,
+        adaptation: FilmtoneCreativePack01Adaptation.Resolved?
+    ) -> [String: Double]? {
+        guard let baseline = baselinePatch(for: slug) else { return nil }
+        var merged = existing
+        for (key, value) in baseline.values {
+            merged[key] = value
+        }
+        if let overlay = adaptation?.paramOverrides.values {
+            for key in adaptationOverlayKeys {
+                if let value = overlay[key] {
+                    merged[key] = value
+                }
+            }
+        }
+        return merged
+    }
 }

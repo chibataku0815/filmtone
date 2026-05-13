@@ -459,7 +459,18 @@ final class EditorProjectMutationCoordinator {
         guard let store else { return }
         store.appliedSavedLookId = nil
         applyLutMutation {
+            let presetName = FilmtonePhase0Generated.presetDefault
             $0.creativeLut = nil
+            $0.presetName = presetName
+            $0.presetVersion = FilmtonePhase0Math.presetVersion
+            $0.strength = FilmtonePhase0Math.presetStrengthDefault
+            $0.quickState = .zero
+            $0.paramOverrides = .empty
+            $0.params = FilmtonePhase0Math.deriveParams(
+                presetName: presetName,
+                strength: FilmtonePhase0Math.presetStrengthDefault,
+                quickState: .zero
+            )
         }
     }
 

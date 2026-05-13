@@ -24,7 +24,7 @@ const NOIR_CUBE_PATH = resolve(
   REPO_ROOT,
   "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir.cube",
 );
-const PALERMO_REFERENCE_SOURCE =
+const PALERMO_DLOGM_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
 const PALERMO_GREEN_DENSITY_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube";
@@ -100,12 +100,12 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
 });
 
 describe("Creative LUT Pack 01 — generated cubes", () => {
-  test("source-derived generated cubes are originalized, not Palermo byte copies", () => {
+  test("source-derived Stone and Urban cubes are originalized, not Palermo byte copies", () => {
     const cases = [
       {
         cubePath: STONE_CUBE_PATH,
-        sourcePath: PALERMO_REFERENCE_SOURCE,
-        generator: "generator=filmtone-stone-palermo-reference-v1",
+        sourcePath: PALERMO_DLOGM_SOURCE,
+        generator: "generator=filmtone-stone-dlogm-palermo-display-v1",
       },
       {
         cubePath: URBAN_CUBE_PATH,
@@ -124,19 +124,46 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     }
   });
 
-  test("sample points stay aligned to their Palermo source within per-Look tolerance", () => {
-    // Stone is the faithful Palermo Reference base — fingerprint-only.
-    // Urban layers Filmtone's "cool urban density" character on top of
-    // the Green Density source, so its delta envelope is intentionally
-    // larger but still bounded so highlights / saturated reds remain
-    // readable (no crushed signage, no muddy skin).
+  test("Stone adapts D-Log M Palermo into a Palermo-primary display-domain cube with a protected black floor", () => {
+    const stoneLook = CREATIVE_PACK_01_LOOKS.find(
+      (look) => look.slug === "filmtone-creative-pack-01-stone",
+    );
+    expect(stoneLook?.sourceCubeTransform).toBe(
+      "filmtone-stone-dlogm-palermo-display-v1",
+    );
+    const stone = parseCube(readFileSync(STONE_CUBE_PATH, "utf8"));
+    const stoneText = readFileSync(STONE_CUBE_PATH, "utf8");
+    expect(stoneText).toContain("generator=filmtone-stone-dlogm-palermo-display-v1");
+    expect(stoneText).not.toContain("filmtone-stone-palermo-reference");
+
+    const black = sampleCube(stone, [0.02, 0.02, 0.02]);
+    const shadow = sampleCube(stone, [0.08, 0.08, 0.08]);
+    const gray18 = sampleCube(stone, [0.18, 0.18, 0.18]);
+    const mid = sampleCube(stone, [0.45, 0.45, 0.45]);
+    const high = sampleCube(stone, [0.72, 0.72, 0.72]);
+    const lanternRed = sampleCube(stone, [0.78, 0.08, 0.05]);
+    const skin = sampleCube(stone, [0.62, 0.45, 0.36]);
+
+    expect(luma(black)).toBeLessThanOrEqual(0.022);
+    expect(luma(shadow)).toBeLessThan(0.079);
+    expect(luma(gray18)).toBeGreaterThan(0.088);
+    expect(luma(gray18)).toBeLessThan(0.105);
+    expect(luma(mid)).toBeGreaterThan(0.37);
+    expect(luma(mid)).toBeLessThan(0.405);
+    expect(luma(high)).toBeGreaterThan(0.69);
+    expect(luma(high)).toBeLessThan(0.71);
+    expect(lanternRed[0]).toBeGreaterThan(0.52);
+    expect(lanternRed[0]).toBeLessThan(0.57);
+    expect(lanternRed[0]).toBeGreaterThan(lanternRed[1] * 8);
+    expect(lanternRed[2]).toBeLessThan(0.004);
+    expect(Math.abs(luma(skin) - luma([0.62, 0.45, 0.36]))).toBeLessThan(0.09);
+  });
+
+  test("source-derived Urban sample points stay aligned to Palermo within tolerance", () => {
+    // Urban layers Filmtone's "cool urban density" character on top of the
+    // Green Density source, so its delta envelope is intentionally bounded
+    // while still clearly distinct from Stone.
     const cases = [
-      {
-        cubePath: STONE_CUBE_PATH,
-        sourcePath: PALERMO_REFERENCE_SOURCE,
-        channelTol: 0.006,
-        lumaTol: 0.004,
-      },
       {
         cubePath: URBAN_CUBE_PATH,
         sourcePath: PALERMO_GREEN_DENSITY_SOURCE,

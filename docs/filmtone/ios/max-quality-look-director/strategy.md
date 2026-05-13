@@ -67,15 +67,16 @@ and follow-up acceleration rather than by reducing the visual target upfront.
 
 | ID | Milestone | Status | Done Condition |
 |---|---|---|---|
-| M1 | Max Quality Look Director Pilot | Active | Source-profile detail fix, stronger source descriptor, Look Director resolver, wiring, logic tests, iOS verify, and 3-source minimal visual/perf check. |
-| M2 | Tuning Pass | Planned | Adjust constants only if M1 visual result is promising but too strong/weak on one of the three representative sources. |
+| M1 | Max Quality Look Director Pilot | Completed | Source-profile detail fix, stronger source descriptor, Look Director resolver, wiring, logic tests, iOS verify, owner-side visual direction acceptance, and installed iPhone build. |
+| M2 | Tuning Pass | Completed | Stone / Urban resolver gains and catalog baselines lifted past M1 conservative ceiling, anti-haze invariants preserved, verify + iPhone install green. |
 | M3 | Optics Performance Escalation | Planned, gated | If M1/M2 proves image value but `GlowFamily` cost blocks acceptance, evaluate Metal optics productionization or lower-cost optical composition. |
 | M4 | Depth-Aware Stills Experiment | Planned, gated | HEIC/depth still-image glow/mist experiment only after M1 is stable; video depth remains out of this lane until explicitly opened. |
 
 ## Current Active
 
-`active.md` tracks M1 only. Do not mix M2/M3/M4 work into M1 unless the active
-file is explicitly replaced or paused.
+No current `active.md` after M2 archive. M3 / M4 (optics performance escalation
+or depth-aware stills) remain planned/gated; open a fresh `active.md` if and
+when the owner decides to proceed.
 
 ## Dependencies And Evidence
 
@@ -145,3 +146,17 @@ visual/performance check, likely classification is:
 - 2026-05-13 JST: Lane opened from latest `origin/main` in a dedicated worktree.
   M1 active drafted for a batched iOS Max Quality Look Director pilot with
   minimal visual/performance verification.
+- 2026-05-13 JST: M1 completed after Stone reached passable black-floor-safe
+  quality and Urban received the same source-aware localized optics/glow
+  direction. Further visual ceiling work moves to a new tuning task.
+- 2026-05-13 JST: M2 tuning pass landed — Stone / Urban resolver gains,
+  unconditional compression / print floor, and catalog grain / softness /
+  vignette baselines lifted while M1C anti-haze invariants stayed
+  structurally in force. iOS Debug build installed on iPhone 17 Pro.
+- 2026-05-13 JST: M2.1 restored more Stone Palermo character in the generated
+  display-domain cube by increasing mid/high Palermo mix and reducing saturated
+  color dilution, with black-floor sample bounds still protected. iOS Debug
+  build installed on iPhone 17 Pro.
+- 2026-05-13 JST: M2.2 replaced Stone's whole-lattice identity mix with a
+  Palermo-primary display-domain cube; only deepest shadows blend back toward
+  identity for black-floor safety. iOS Debug build installed on iPhone 17 Pro.

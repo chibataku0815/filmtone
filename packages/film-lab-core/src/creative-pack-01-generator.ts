@@ -1,7 +1,7 @@
 import type { CreativeCube } from "./creative-cube";
 
 export const CREATIVE_PACK_01_STONE_TRANSFORM =
-  "filmtone-stone-palermo-reference-v1" as const;
+  "filmtone-stone-dlogm-palermo-display-v1" as const;
 export const CREATIVE_PACK_01_URBAN_TRANSFORM =
   "filmtone-urban-palermo-green-density-v1" as const;
 
@@ -20,11 +20,165 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
+function luma(r: number, g: number, b: number): number {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function mix(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function rec709Decode(encoded: number): number {
+  const v = clamp01(encoded);
+  if (v < 0.081) return v / 4.5;
+  return Math.pow((v + 0.099) / 1.099, 1 / 0.45);
+}
+
+function inverseFilmtoneSdrShoulder(shouldered: number): number {
+  const y = clamp01(shouldered);
+  const exposed = y <= 0.18 ? y : (0.9244 * y) / (1 - 0.42 * y);
+  return exposed / 1.18;
+}
+
+function dlogMEncode(linear: number): number {
+  const cut = 0.1113510236;
+  const linearOffset = 0.000000012;
+  const linearSlope = 7.5547639793;
+  const logA = 1.538947658;
+  const logB = -1.8459129538;
+  const logC = 0.0165823994;
+  const logD = 0.3103580873;
+  const linearCut = (cut - linearOffset) / linearSlope;
+  const value = Math.max(0, linear);
+  if (value <= linearCut) {
+    return clamp01(value * linearSlope + linearOffset);
+  }
+  return clamp01((Math.log10(value * logD + logC) - logB) / logA);
+}
+
+function rec709DisplayToDlogMCode(
+  r: number,
+  g: number,
+  b: number,
+): [number, number, number] {
+  const rr = inverseFilmtoneSdrShoulder(rec709Decode(r));
+  const rg = inverseFilmtoneSdrShoulder(rec709Decode(g));
+  const rb = inverseFilmtoneSdrShoulder(rec709Decode(b));
+  const dR = 0.7134498128 * rr + 0.271008975 * rg + 0.0155412122 * rb;
+  const dG = 0.0489651885 * rr + 0.8951909448 * rg + 0.0558438666 * rb;
+  const dB = 0.0406336115 * rr + 0.1954332565 * rg + 0.763933132 * rb;
+  return [dlogMEncode(dR), dlogMEncode(dG), dlogMEncode(dB)];
+}
+
+function sampleCube(sourceCube: CreativeCube, r: number, g: number, b: number): [number, number, number] {
+  const n = sourceCube.size - 1;
+  const x = clamp01(r) * n;
+  const y = clamp01(g) * n;
+  const z = clamp01(b) * n;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const z0 = Math.floor(z);
+  const x1 = Math.min(n, x0 + 1);
+  const y1 = Math.min(n, y0 + 1);
+  const z1 = Math.min(n, z0 + 1);
+  const fx = x - x0;
+  const fy = y - y0;
+  const fz = z - z0;
+  let outR = 0;
+  let outG = 0;
+  let outB = 0;
+
+  for (let dz = 0; dz < 2; dz++) {
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const ix = dx ? x1 : x0;
+        const iy = dy ? y1 : y0;
+        const iz = dz ? z1 : z0;
+        const weight =
+          (dx ? fx : 1 - fx) *
+          (dy ? fy : 1 - fy) *
+          (dz ? fz : 1 - fz);
+        const index = (iz * sourceCube.size * sourceCube.size + iy * sourceCube.size + ix) * 3;
+        outR += sourceCube.data[index + 0] * weight;
+        outG += sourceCube.data[index + 1] * weight;
+        outB += sourceCube.data[index + 2] * weight;
+      }
+    }
+  }
+
+  return [outR, outG, outB];
+}
+
+function protectShadowFloor(
+  input: [number, number, number],
+  output: [number, number, number],
+): [number, number, number] {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const outputLuma = luma(output[0], output[1], output[2]);
+  if (inputLuma >= 0.26 || outputLuma <= 0.0001) return output;
+
+  const shadowMask = 1 - smoothstep(0.08, 0.26, inputLuma);
+  const maxLift = 0.004 + inputLuma * (1.05 + 0.18 * (1 - shadowMask));
+  if (outputLuma <= maxLift) return output;
+
+  const scale = mix(1, maxLift / outputLuma, shadowMask);
+  return [
+    clamp01(output[0] * scale),
+    clamp01(output[1] * scale),
+    clamp01(output[2] * scale),
+  ];
+}
+
 /**
- * Stone — fingerprint-only transform applied to the Palermo Reference source.
- * Intentionally tiny: produces a non-byte-identical cube that stays within
- * 0.006 / channel of source. Stone's role is the faithful Palermo Reference
- * base; per-Look character lives in the bundled cube selection, not here.
+ * Stone — display-referred adaptation of the DJI D-Log M Palermo source LUT.
+ *
+ * The source cube is valuable, but its input domain is D-Log M / D-Gamut M.
+ * Applying it directly to display-referred Rec.709 was the M1/M2 failure mode:
+ * shadows went gray and the result read sleepy. This transform maps each
+ * Rec.709 display-domain lattice point back into an approximate D-Log M code
+ * value before sampling Palermo, then clamps the result through a black-floor
+ * protector. That keeps Palermo's color separation / highlight personality
+ * without treating Rec.709 values as Log values.
+ */
+export function applyStoneDisplayPalermoTransform(sourceCube: CreativeCube): CreativeCube {
+  const { size } = sourceCube;
+  const data = new Float32Array(sourceCube.data.length);
+  const denom = size - 1;
+
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        const input: [number, number, number] = [r, g, b];
+        const sourceInput = rec709DisplayToDlogMCode(r, g, b);
+        const palermo = sampleCube(sourceCube, sourceInput[0], sourceInput[1], sourceInput[2]);
+        const safePalermo = protectShadowFloor(input, palermo);
+        const inputLuma = luma(r, g, b);
+        // M2.2: Stone must be Palermo-primary. Earlier versions mixed the
+        // sampled Palermo output back toward identity across the whole lattice,
+        // which made the Look technically safe but visually stripped out the
+        // source LUT's density and color separation. Keep only a deep-shadow
+        // identity blend so the black floor stays anchored; from low-mids up,
+        // ship the protected Palermo output directly.
+        const strength = smoothstep(0.025, 0.12, inputLuma);
+
+        data[idx + 0] = clamp01(mix(r, safePalermo[0], strength));
+        data[idx + 1] = clamp01(mix(g, safePalermo[1], strength));
+        data[idx + 2] = clamp01(mix(b, safePalermo[2], strength));
+      }
+    }
+  }
+
+  return { size, data };
+}
+
+/**
+ * Legacy Stone fingerprint helper retained for older pack-generation
+ * experiments. The current product Stone path uses
+ * `applyStoneDisplayPalermoTransform`.
  */
 export function applyStoneFingerprintTransform(sourceCube: CreativeCube): CreativeCube {
   const { size } = sourceCube;
@@ -128,7 +282,7 @@ export function applyCreativePack01SourceTransform(
 ): CreativeCube {
   switch (transformName) {
     case CREATIVE_PACK_01_STONE_TRANSFORM:
-      return applyStoneFingerprintTransform(sourceCube);
+      return applyStoneDisplayPalermoTransform(sourceCube);
     case CREATIVE_PACK_01_URBAN_TRANSFORM:
       return applyUrbanCoolDensityTransform(sourceCube);
   }
