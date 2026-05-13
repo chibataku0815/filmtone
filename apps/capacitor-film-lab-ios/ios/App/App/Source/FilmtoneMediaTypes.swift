@@ -206,16 +206,10 @@ struct SourceVideoMetadataDTO: Codable {
     }
 }
 
-struct FilmtoneSourceToneDescriptor: Codable, Equatable {
-    let lumaP05: Double
-    let lumaP50: Double
-    let lumaP95: Double
-    let lumaRangeP05P95: Double
-    let shadowCoverage: Double
-    let highlightCoverage: Double
-    let lowMidCoverage: Double
-    let saturationMean: Double
-}
+// `FilmtoneSourceToneDescriptor` lives in its own file
+// (`Source/FilmtoneSourceToneDescriptor.swift`) so the standalone Look
+// Director tests can link the descriptor without dragging UIKit through
+// this file.
 
 struct SourceProbeDTO: Codable {
     let uri: String

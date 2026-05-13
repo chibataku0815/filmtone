@@ -163,7 +163,9 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
   sourceCubePath?: string;
   sourceCubeTransform?: string;
 } {
-  const sourceCubePath = CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG[look.slug];
+  const sourceCubePath = look.sourceCubeTransform
+    ? CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG[look.slug]
+    : undefined;
   if (mode === "regenerate" && sourceCubePath) {
     const bytes = readFileSync(sourceCubePath);
     const text = bytes.toString("utf8");

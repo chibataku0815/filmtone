@@ -3210,7 +3210,7 @@ function serializeCreativeCubeToText(cube, options) {
 }
 
 // src/creative-pack-01-generator.ts
-var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-palermo-reference-v1";
+var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-dlogm-palermo-display-v1";
 var CREATIVE_PACK_01_URBAN_TRANSFORM = "filmtone-urban-palermo-green-density-v1";
 function clamp014(x) {
   if (x < 0) return 0;
@@ -3220,6 +3220,118 @@ function clamp014(x) {
 function smoothstep2(edge0, edge1, x) {
   const t = clamp014((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
+}
+function luma(r, g, b) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function mix3(a, b, t) {
+  return a + (b - a) * t;
+}
+function rec709Decode(encoded) {
+  const v = clamp014(encoded);
+  if (v < 0.081) return v / 4.5;
+  return Math.pow((v + 0.099) / 1.099, 1 / 0.45);
+}
+function inverseFilmtoneSdrShoulder(shouldered) {
+  const y = clamp014(shouldered);
+  const exposed = y <= 0.18 ? y : 0.9244 * y / (1 - 0.42 * y);
+  return exposed / 1.18;
+}
+function dlogMEncode(linear) {
+  const cut = 0.1113510236;
+  const linearOffset = 12e-9;
+  const linearSlope = 7.5547639793;
+  const logA = 1.538947658;
+  const logB = -1.8459129538;
+  const logC = 0.0165823994;
+  const logD = 0.3103580873;
+  const linearCut = (cut - linearOffset) / linearSlope;
+  const value = Math.max(0, linear);
+  if (value <= linearCut) {
+    return clamp014(value * linearSlope + linearOffset);
+  }
+  return clamp014((Math.log10(value * logD + logC) - logB) / logA);
+}
+function rec709DisplayToDlogMCode(r, g, b) {
+  const rr = inverseFilmtoneSdrShoulder(rec709Decode(r));
+  const rg = inverseFilmtoneSdrShoulder(rec709Decode(g));
+  const rb = inverseFilmtoneSdrShoulder(rec709Decode(b));
+  const dR = 0.7134498128 * rr + 0.271008975 * rg + 0.0155412122 * rb;
+  const dG = 0.0489651885 * rr + 0.8951909448 * rg + 0.0558438666 * rb;
+  const dB = 0.0406336115 * rr + 0.1954332565 * rg + 0.763933132 * rb;
+  return [dlogMEncode(dR), dlogMEncode(dG), dlogMEncode(dB)];
+}
+function sampleCube(sourceCube, r, g, b) {
+  const n = sourceCube.size - 1;
+  const x = clamp014(r) * n;
+  const y = clamp014(g) * n;
+  const z5 = clamp014(b) * n;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const z0 = Math.floor(z5);
+  const x1 = Math.min(n, x0 + 1);
+  const y1 = Math.min(n, y0 + 1);
+  const z1 = Math.min(n, z0 + 1);
+  const fx = x - x0;
+  const fy = y - y0;
+  const fz = z5 - z0;
+  let outR = 0;
+  let outG = 0;
+  let outB = 0;
+  for (let dz = 0; dz < 2; dz++) {
+    for (let dy = 0; dy < 2; dy++) {
+      for (let dx = 0; dx < 2; dx++) {
+        const ix = dx ? x1 : x0;
+        const iy = dy ? y1 : y0;
+        const iz = dz ? z1 : z0;
+        const weight = (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+        const index = (iz * sourceCube.size * sourceCube.size + iy * sourceCube.size + ix) * 3;
+        outR += sourceCube.data[index + 0] * weight;
+        outG += sourceCube.data[index + 1] * weight;
+        outB += sourceCube.data[index + 2] * weight;
+      }
+    }
+  }
+  return [outR, outG, outB];
+}
+function protectShadowFloor(input, output) {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const outputLuma = luma(output[0], output[1], output[2]);
+  if (inputLuma >= 0.26 || outputLuma <= 1e-4) return output;
+  const shadowMask = 1 - smoothstep2(0.08, 0.26, inputLuma);
+  const maxLift = 4e-3 + inputLuma * (1.05 + 0.18 * (1 - shadowMask));
+  if (outputLuma <= maxLift) return output;
+  const scale = mix3(1, maxLift / outputLuma, shadowMask);
+  return [
+    clamp014(output[0] * scale),
+    clamp014(output[1] * scale),
+    clamp014(output[2] * scale)
+  ];
+}
+function applyStoneDisplayPalermoTransform(sourceCube) {
+  const { size } = sourceCube;
+  const data = new Float32Array(sourceCube.data.length);
+  const denom = size - 1;
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        const input = [r, g, b];
+        const sourceInput = rec709DisplayToDlogMCode(r, g, b);
+        const palermo = sampleCube(sourceCube, sourceInput[0], sourceInput[1], sourceInput[2]);
+        const safePalermo = protectShadowFloor(input, palermo);
+        const inputLuma = luma(r, g, b);
+        const strength = smoothstep2(0.025, 0.12, inputLuma);
+        data[idx + 0] = clamp014(mix3(r, safePalermo[0], strength));
+        data[idx + 1] = clamp014(mix3(g, safePalermo[1], strength));
+        data[idx + 2] = clamp014(mix3(b, safePalermo[2], strength));
+      }
+    }
+  }
+  return { size, data };
 }
 function applyStoneFingerprintTransform(sourceCube) {
   const { size } = sourceCube;
@@ -3288,7 +3400,7 @@ function applyUrbanCoolDensityTransform(sourceCube) {
 function applyCreativePack01SourceTransform(sourceCube, transformName) {
   switch (transformName) {
     case CREATIVE_PACK_01_STONE_TRANSFORM:
-      return applyStoneFingerprintTransform(sourceCube);
+      return applyStoneDisplayPalermoTransform(sourceCube);
     case CREATIVE_PACK_01_URBAN_TRANSFORM:
       return applyUrbanCoolDensityTransform(sourceCube);
   }
@@ -3328,17 +3440,17 @@ var CREATIVE_PACK_01_LOOKS = [
       yellow: 0
     },
     paramOverrides: buildLookParamOverrides({
-      rgbShift: 32e-4,
-      bloomThreshold: 0.64,
-      bloomStrength: 0.2,
-      bloomRadius: 0.62,
-      halationIntensity: 0.07,
+      rgbShift: 16e-4,
+      bloomThreshold: 0.72,
+      bloomStrength: 0.1,
+      bloomRadius: 0.52,
+      halationIntensity: 0.045,
       halationHue: 24,
-      diffusion: 0.06,
-      lensSoftness: 0.095,
-      grainIntensity: 45e-4,
-      grainSize: 0.13,
-      vignette: 0.055
+      diffusion: 0.015,
+      lensSoftness: 0.07,
+      grainIntensity: 0.013,
+      grainSize: 0.16,
+      vignette: 0.1
     }),
     strength: 1,
     sourceCubeTransform: CREATIVE_PACK_01_STONE_TRANSFORM
@@ -3370,10 +3482,10 @@ var CREATIVE_PACK_01_LOOKS = [
       halationIntensity: 0.055,
       halationHue: 20,
       diffusion: 0.065,
-      lensSoftness: 0.095,
-      grainIntensity: 45e-4,
+      lensSoftness: 0.11,
+      grainIntensity: 75e-4,
       grainSize: 0.13,
-      vignette: 0.06
+      vignette: 0.075
     }),
     strength: 1,
     sourceCubeTransform: CREATIVE_PACK_01_URBAN_TRANSFORM
@@ -4106,6 +4218,7 @@ export {
   applyQuickStateToParams,
   applyQuickStateToPhase0Params,
   applyShadowLatitudeSample,
+  applyStoneDisplayPalermoTransform,
   applyStoneFingerprintTransform,
   applyUrbanCoolDensityTransform,
   assertPhase0SourceProbeWithinCaps,

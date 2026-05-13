@@ -343,8 +343,17 @@ final class FilmtoneEditorStore: ObservableObject {
             self?.objectWillChange.send()
         }
 
+        // M1A visible-pass correction: persisted projects can carry an old
+        // baked Pack 01 overlay from a prior build. Re-resolve once at launch
+        // so installing a stronger catalog / Look Director actually reaches
+        // the current preview/export state without requiring the owner to
+        // re-tap Stone or swap sources.
+        let refreshedCreativePack01OnLaunch = refreshCreativePack01AdaptationIfApplicable()
+
         if self.source != nil {
-            schedulePreviewRender()
+            if !refreshedCreativePack01OnLaunch {
+                schedulePreviewRender()
+            }
         }
 
         bootstrapLibraryAsync()
@@ -606,8 +615,15 @@ final class FilmtoneEditorStore: ObservableObject {
         // source-independent (see Item 3 contract).
         project.inputLut = nil
         project.updatedAt = FilmtonePhase0Math.isoTimestamp()
-        persist()
-        schedulePreviewRender()
+        // M1 Max Quality Look Director — Camera Profile is one half of
+        // the adaptation input. Re-resolve so a Pack 01 Look picks up
+        // the new sourceProfileId / sourceDetailBias signals. When the
+        // refresher mutates state it already persists + schedules a
+        // render, so we skip the redundant calls below.
+        if !refreshCreativePack01AdaptationIfApplicable() {
+            persist()
+            schedulePreviewRender()
+        }
     }
 
     /// D-CP4 retention rule on source change. Called from `applyProbe`.
@@ -786,7 +802,14 @@ final class FilmtoneEditorStore: ObservableObject {
             }
             if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
                 slug: builtIn.slug,
-                descriptor: effectiveProbe?.sourceToneDescriptor
+                descriptor: effectiveProbe?.sourceToneDescriptor,
+                sourceProfileId: FilmtoneLookDirector.sourceProfileId(
+                    for: project.cameraProfile
+                ),
+                sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
+                    probe: effectiveProbe,
+                    cameraProfile: project.cameraProfile
+                )
             ) {
                 for (key, value) in adaptation.paramOverrides.values {
                     paramOverrides.values[key] = value
@@ -1614,6 +1637,68 @@ final class FilmtoneEditorStore: ObservableObject {
         schedulePreviewRender()
     }
 
+    /// M1 Max Quality Look Director — re-resolve adaptation when source
+    /// or Camera Profile changes so a previously-applied Creative Pack 01
+    /// Look re-adapts to the new context instead of staying baked from
+    /// apply-time. No-op when the current `creativeLut` is not a Pack 01
+    /// bundled Look. Returns `true` when it mutated state and already
+    /// persisted + scheduled a re-render via
+    /// `recomputeProjectParamsPreservingOpticsGlow`.
+    ///
+    /// M1C: the merge now writes the FULL catalog baseline first (every
+    /// Pack 01 key, not just the adaptation overlay subset), then layers
+    /// the Look Director overlay on top. This is the migration mechanism
+    /// for persisted projects from earlier builds: their stale
+    /// `grainIntensity`, `lensSoftness`, `bloomRadius`, etc. get
+    /// overwritten with the current M1C catalog values without needing a
+    /// `Profile.version` bump. User-side tweaks on Pack 01 baseline keys
+    /// are reset on every refresh by design — bundled Looks are owned by
+    /// the catalog, custom variants belong in saved Looks.
+    @discardableResult
+    fileprivate func refreshCreativePack01AdaptationIfApplicable() -> Bool {
+        guard
+            let creativeLut = project.creativeLut,
+            let slug = creativeLut.bundledSlug
+        else {
+            return false
+        }
+
+        let adaptation = FilmtoneCreativePack01Adaptation.resolve(
+            slug: slug,
+            descriptor: probe?.sourceToneDescriptor,
+            sourceProfileId: FilmtoneLookDirector.sourceProfileId(
+                for: project.cameraProfile
+            ),
+            sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
+                probe: probe,
+                cameraProfile: project.cameraProfile
+            )
+        )
+
+        guard let mergedValues = FilmtoneCreativePack01Patches.refreshedParamOverrides(
+            existing: project.paramOverrides.values,
+            slug: slug,
+            adaptation: adaptation
+        ) else {
+            return false
+        }
+
+        var nextOverrides = project.paramOverrides
+        nextOverrides.values = mergedValues
+
+        let nextIntensity = adaptation?.intensity ?? 1.0
+        let intensityChanged = abs(creativeLut.intensity - nextIntensity) > 1e-6
+        let overridesChanged = nextOverrides.values != project.paramOverrides.values
+        guard intensityChanged || overridesChanged else {
+            return false
+        }
+
+        project.paramOverrides = nextOverrides
+        project.creativeLut = creativeLut.withIntensity(nextIntensity)
+        recomputeProjectParamsPreservingOpticsGlow()
+        return true
+    }
+
     func applyProbe(source: SourceInfoDTO, probe: SourceProbeDTO) {
         let isSourceReplacement = self.source?.uri != source.uri
         self.source = source
@@ -1638,6 +1723,15 @@ final class FilmtoneEditorStore: ObservableObject {
         }
         previewOrchestrator.reset()
         exportCoordinator.resetForSourceChange()
+        // M1 Max Quality Look Director — new probe means a new
+        // `sourceToneDescriptor`. If a Pack 01 bundled Look is current,
+        // re-resolve so the night / high-key / Log / digital signals from
+        // the new clip drive intensity + overlay overrides. Caller's own
+        // persist/reclaim path runs after this returns; the refresher's
+        // recompute (if it mutated) also persists + schedules. Placing
+        // this after the orchestrator reset so the scheduled render is
+        // not immediately canceled.
+        refreshCreativePack01AdaptationIfApplicable()
         self.error = nil
         self.notice = nil
         self.sourceLoadState = nil

@@ -61,14 +61,14 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: three Creative LUTs plus one preset-only Look.
-    /// Stone is the Palermo Reference base; Urban is the Palermo Green
-    /// Density derivative; Noir is a toned print monochrome recipe.
-    /// Twilight is a preset-only built-in (no cube) sourced from
-    /// `packages/film-lab-core/src/presets.ts` `vision3500t` — a tungsten
+    /// Active catalog: three Creative LUTs plus one preset-only Look. Stone
+    /// adapts DJI D-Log M Palermo into a display-referred Filmtone cube; Urban
+    /// is the Palermo Green Density derivative; Noir is a toned print
+    /// monochrome recipe. Twilight is a preset-only built-in (no cube) sourced
+    /// from `packages/film-lab-core/src/presets.ts` `vision3500t` — a tungsten
     /// 500T blue-hour recipe expressed entirely through `paramOverrides`.
-    /// Twilight carries `creativeLut: nil` and `packId: nil` because it
-    /// does not belong to Creative LUT Pack 01.
+    /// Twilight carries `creativeLut: nil` and `packId: nil` because it does
+    /// not belong to Creative LUT Pack 01.
     static let allLooks: [BuiltInLook] = [
         // MARK: - Creative LUT Pack 01
         //
@@ -98,7 +98,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-stone",
                 filename: "filmtone-creative-pack-01-stone.cube",
-                sha256: "2f9e0240450b1b5fe1e78ca88017509eb1c50a050c4a02723a36ac651c9393c4",
+                sha256: "0214095c88056b2b8db83de8d01eb359603a6683a33dced7e77f94ac03d6016a",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -130,7 +130,7 @@ enum FilmtoneBuiltInCatalog {
             creativeLut: .bundled(
                 slug: "filmtone-creative-pack-01-noir",
                 filename: "filmtone-creative-pack-01-noir.cube",
-                sha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
+                sha256: "0c52cf12a0aba090f60c18f23d3712fb80016f436765acfdc99cf9ae93abed56",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -158,83 +158,21 @@ enum FilmtoneBuiltInCatalog {
         ),
     ]
 
-    /// Color neutralization values shared by every Pack 01 patch.
-    /// The cube is SSOT for color, so the runtime kernel must produce
-    /// identity in these fields before the cube is sampled. `shadowTone`
-    /// and `highlightTone` are included because v2 baseGrade applies them
-    /// before the creative LUT stage.
-    private static let creativePack01ColorOpNeutralEntries: [String: Double] = [
-        "exposure": 0,
-        "contrast": 1,
-        "saturation": 1,
-        "temperature": 0,
-        "tint": 0,
-        "fade": 0,
-        "compressionAmount": 0,
-        "compressionRange": 0.5,
-        "printContrast": 0,
-        "cyan": 0,
-        "magenta": 0,
-        "yellow": 0,
-        "shadowTone": 0,
-        "highlightTone": 0,
-    ]
+    /// Baseline patches live in `FilmtoneCreativePack01Patches` so the
+    /// Look Director resolver tests can link the same constants without
+    /// pulling in the catalog graph. The catalog re-exports them under
+    /// the original public names for callers that read them directly.
+    static var creativePack01StonePatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.stonePatch
+    }
 
-    /// Stone — generated 65³ cube plus a restrained optical
-    /// baseline. Color stays in the cube; these values carry lens behavior.
-    static let creativePack01StonePatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0.0032
-        values["bloomThreshold"] = 0.64
-        values["bloomStrength"] = 0.20
-        values["bloomRadius"] = 0.62
-        values["halationIntensity"] = 0.07
-        values["halationHue"] = 24
-        values["diffusion"] = 0.06
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.055
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
+    static var creativePack01UrbanPatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.urbanPatch
+    }
 
-    /// Urban — generated 65³ cube plus a restrained optical baseline.
-    /// Color stays in the cube; these values carry lens behavior.
-    static let creativePack01UrbanPatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0.0028
-        values["bloomThreshold"] = 0.66
-        values["bloomStrength"] = 0.18
-        values["bloomRadius"] = 0.58
-        values["halationIntensity"] = 0.055
-        values["halationHue"] = 20
-        values["diffusion"] = 0.065
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.06
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
-
-    /// Noir — generated 65³ toned print monochrome cube plus a denser optical
-    /// baseline. The cube carries a visible olive print tone instead of
-    /// forcing RGB-equal grayscale.
-    static let creativePack01NoirPatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0
-        values["bloomThreshold"] = 0.56
-        values["bloomStrength"] = 0.2
-        values["bloomRadius"] = 0.64
-        values["halationIntensity"] = 0.028
-        values["halationHue"] = 36
-        values["diffusion"] = 0.13
-        values["lensSoftness"] = 0.16
-        values["grainRadialMix"] = 0.9
-        values["grainIntensity"] = 0.075
-        values["grainSize"] = 0.48
-        values["vignette"] = 0.16
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
+    static var creativePack01NoirPatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.noirPatch
+    }
 
     /// Twilight — preset-only Look (no cube). Patch ports the
     /// native-supported subset of `vision3500t` Phase0 from
@@ -245,9 +183,9 @@ enum FilmtoneBuiltInCatalog {
     /// the Phase0 schema and is out of scope for this bundled-Look
     /// lane. The native tone is reproduced through `shadowTone` /
     /// `highlightTone` / `compressionAmount` / `printContrast`
-    /// instead. rgbShift `0.0015` sits below Stone (`0.0032`) /
-    /// Urban (`0.0028`) / Adjust-sheet default (`0.0038`), consistent
-    /// with `docs/builtin-catalog.md` "rgbShift signature ordering".
+    /// instead. rgbShift `0.0015` sits just below Stone (`0.0016`) and
+    /// below Urban (`0.0032`) / Adjust-sheet default (`0.0038`),
+    /// consistent with `docs/builtin-catalog.md` "rgbShift signature ordering".
     static let twilightPatch: FilmtonePhase0ParamsPatch = {
         var values: [String: Double] = [:]
         values["exposure"] = -0.04
@@ -329,22 +267,6 @@ enum FilmtoneBuiltInCatalog {
             immutable: true,
             bundledSlug: builtIn.slug
         )
-    }
-}
-
-enum FilmtoneCreativePack01Adaptation {
-    struct Resolved {
-        let intensity: Double
-        let paramOverrides: FilmtonePhase0ParamsPatch
-    }
-
-    static func resolve(
-        slug: String,
-        descriptor: FilmtoneSourceToneDescriptor?
-    ) -> Resolved? {
-        // Material-adaptive adjustments stay disabled until the flagship LUT
-        // is visually signed off on device.
-        return nil
     }
 }
 
