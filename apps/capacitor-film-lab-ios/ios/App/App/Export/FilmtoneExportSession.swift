@@ -318,7 +318,10 @@ final class FilmtoneExportSession {
             colorPipeline: colorPipeline
         )
         self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
-        self.sourceDetailBias = Self.resolveSourceDetailBias(from: request.sourceProbe)
+        self.sourceDetailBias = Self.resolveSourceDetailBias(
+            from: request.sourceProbe,
+            cameraProfile: cameraProfile
+        )
         self.connectPackageAssembler = ExportConnectPackageAssembler(
             request: request,
             sourceURL: sourceURL,
@@ -1102,14 +1105,29 @@ final class FilmtoneExportSession {
     // export from the metadata already on `SourceProbeDTO`. Combined
     // with `request.grade.params.detailSoftness` at the stage via
     // `FilmtoneDetailSoftness.deriveUniforms(...)`. Not stored.
+    //
+    // M1 Look Director: when the caller passes an explicit built-in
+    // Camera Profile, contribute the matching `sourceProfileId` so the
+    // resolver can promote confidence and pick the right log/profile
+    // bucket. `.auto` and `.userImport` leave the profile id unset so
+    // the existing auto path keeps owning detection.
     private static func resolveSourceDetailBias(
-        from probe: SourceProbeDTO?
+        from probe: SourceProbeDTO?,
+        cameraProfile: CameraProfileSelection?
     ) -> Double {
         guard let probe else { return 0 }
         let video = probe.sourceVideoMetadata
         let logTransfer = video?.logTransferFunction ?? probe.logTransferFunction
         let transformStrategy = (video?.inputTransformPolicy ?? probe.inputTransformPolicy)?.strategy
         let codec = video?.codecFamily ?? probe.codecFamily
+        let resolvedProfileId: String? = {
+            switch cameraProfile {
+            case .some(.builtIn(let catalogId)):
+                return catalogId
+            case .some(.auto), .some(.userImport), nil:
+                return nil
+            }
+        }()
         let input = FilmtoneSourceDetailCompensationInput(
             cameraMake: probe.cameraOptics?.cameraMake,
             cameraModel: probe.cameraOptics?.cameraModel,
@@ -1117,7 +1135,7 @@ final class FilmtoneExportSession {
             inputTransformStrategy: transformStrategy?.rawValue,
             codecFamily: codec?.rawValue,
             colorClass: video?.colorClass.rawValue,
-            sourceProfileId: nil
+            sourceProfileId: resolvedProfileId
         )
         return FilmtoneSourceDetailCompensation.resolve(input).recommendedBias
     }

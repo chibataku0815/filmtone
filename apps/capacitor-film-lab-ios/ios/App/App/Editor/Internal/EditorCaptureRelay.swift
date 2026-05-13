@@ -300,7 +300,14 @@ final class EditorCaptureRelay: ObservableObject {
                 }
                 if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
                     slug: builtIn.slug,
-                    descriptor: probe.sourceToneDescriptor
+                    descriptor: probe.sourceToneDescriptor,
+                    sourceProfileId: FilmtoneLookDirector.sourceProfileId(
+                        for: store.project.cameraProfile
+                    ),
+                    sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
+                        probe: probe,
+                        cameraProfile: store.project.cameraProfile
+                    )
                 ) {
                     for (key, value) in adaptation.paramOverrides.values {
                         paramOverrides.values[key] = value

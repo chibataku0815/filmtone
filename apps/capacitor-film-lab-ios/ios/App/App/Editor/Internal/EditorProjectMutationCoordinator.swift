@@ -388,7 +388,14 @@ final class EditorProjectMutationCoordinator {
                     resolvedCreativeLut = resolved
                     creativePack01Adaptation = FilmtoneCreativePack01Adaptation.resolve(
                         slug: slug,
-                        descriptor: store.probe?.sourceToneDescriptor
+                        descriptor: store.probe?.sourceToneDescriptor,
+                        sourceProfileId: FilmtoneLookDirector.sourceProfileId(
+                            for: store.project.cameraProfile
+                        ),
+                        sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
+                            probe: store.probe,
+                            cameraProfile: store.project.cameraProfile
+                        )
                     )
                 } else {
                     lutMissingForApply = true

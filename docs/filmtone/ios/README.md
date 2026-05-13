@@ -47,6 +47,7 @@ move to `<lane>/archive/`.
 | React / Capacitor purge | **Closed + merged into main as `47a1d76d` (2026-05-09)** | [`react-capacitor-purge/strategy.md`](./react-capacitor-purge/strategy.md) | Stages A → E archived. Worktree + branch removed post-merge. |
 | Meta Before/After DaVinci shell | Asset directory, not a lane | [`meta-before-after-davinci-shell/README.md`](./meta-before-after-davinci-shell/README.md) | Placeholder Resolve project + Lua helpers for ad production. Not active product work. |
 | Feature Architecture Refactor | **Closed + merged into main (2026-05-12)** | [`feature-architecture-refactor/strategy.md`](./feature-architecture-refactor/strategy.md) | Reorganized the flat App source root into feature folders and split the capture, editor, and export collaborators. Final smoke passed on device before the 1.9 release candidate. |
+| Max Quality Look Director | **Active M1 pilot** | [`max-quality-look-director/strategy.md`](./max-quality-look-director/strategy.md) | Source-aware built-in Look adaptation for higher iOS image ceiling, with minimal visual/performance verification in [`max-quality-look-director/active.md`](./max-quality-look-director/active.md). |
 
 ## Idea Notes
 

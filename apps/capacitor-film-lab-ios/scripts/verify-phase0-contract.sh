@@ -185,6 +185,28 @@ if [ -f "$SOURCE_PROFILE_MATH_SCRIPT" ] && [ -f "$SOURCE_PROFILE_MATH_SRC" ] && 
   "$SOURCE_PROFILE_MATH_BIN" "$SOURCE_PROFILE_FIXTURES"
 fi
 
+# --- M1 Max Quality Look Director resolver test ---
+LOOK_DIRECTOR_SCRIPT="$SCRIPT_DIR/swift/test-look-director.swift"
+LOOK_DIRECTOR_SRC="$APP_DIR/ios/App/App/Look/FilmtoneLookDirector.swift"
+PACK01_PATCHES_SRC="$APP_DIR/ios/App/App/Look/FilmtoneCreativePack01Patches.swift"
+PACK01_ADAPTATION_SRC="$APP_DIR/ios/App/App/Look/FilmtoneCreativePack01Adaptation.swift"
+SOURCE_TONE_DESCRIPTOR_SRC="$APP_DIR/ios/App/App/Source/FilmtoneSourceToneDescriptor.swift"
+if [ -f "$LOOK_DIRECTOR_SCRIPT" ] && [ -f "$LOOK_DIRECTOR_SRC" ] && [ -f "$PACK01_PATCHES_SRC" ]; then
+  echo "==> look director resolver test"
+  LOOK_DIRECTOR_BIN=$(mktemp "${TMPDIR:-/tmp}/phase0-look-director-check.XXXXXX")
+  CLEANUP_FILES="$CLEANUP_FILES $LOOK_DIRECTOR_BIN"
+  xcrun swiftc \
+    -o "$LOOK_DIRECTOR_BIN" \
+    -I "$HOST_CORE_MODULE_DIR" \
+    "$HOST_CORE_LIB" \
+    "$SOURCE_TONE_DESCRIPTOR_SRC" \
+    "$PACK01_PATCHES_SRC" \
+    "$LOOK_DIRECTOR_SRC" \
+    "$PACK01_ADAPTATION_SRC" \
+    "$LOOK_DIRECTOR_SCRIPT"
+  "$LOOK_DIRECTOR_BIN"
+fi
+
 # --- Look × Veil energy max-merge contract (2026-05-06 iOS port) ---
 LOOK_VEIL_MERGE_SCRIPT="$SCRIPT_DIR/swift/test-look-veil-energy-merge.swift"
 if [ -f "$LOOK_VEIL_MERGE_SCRIPT" ]; then

@@ -171,20 +171,85 @@ final class SourceProbeService {
         generator.requestedTimeToleranceBefore = .positiveInfinity
         generator.requestedTimeToleranceAfter = .positiveInfinity
 
-        let sampleSecond: Double
-        if durationSec.isFinite && durationSec > 0 {
-            sampleSecond = min(max(durationSec * 0.5, 0), durationSec)
+        // M1 Look Director: sample at 20/50/80% of the source duration so a
+        // single mid-frame can't hide an entire night sequence or a flat
+        // intro card. Single-frame / zero-duration sources keep the
+        // legacy mid-frame behavior.
+        let fractions: [Double]
+        if durationSec.isFinite && durationSec > 0.05 {
+            fractions = [0.2, 0.5, 0.8]
         } else {
-            sampleSecond = 0
+            fractions = [0.0]
         }
 
-        guard let image = try? generator.copyCGImage(
-            at: CMTime(seconds: sampleSecond, preferredTimescale: 600),
-            actualTime: nil
-        ) else {
+        var samples: [FilmtoneSourceToneDescriptor] = []
+        samples.reserveCapacity(fractions.count)
+        for fraction in fractions {
+            let second = durationSec.isFinite && durationSec > 0
+                ? min(max(durationSec * fraction, 0), durationSec)
+                : 0
+            if let image = try? generator.copyCGImage(
+                at: CMTime(seconds: second, preferredTimescale: 600),
+                actualTime: nil
+            ), let descriptor = toneDescriptor(from: image) {
+                samples.append(descriptor)
+            }
+        }
+
+        if samples.isEmpty {
             return nil
         }
-        return toneDescriptor(from: image)
+        return mergeDescriptors(samples)
+    }
+
+    /// Merge per-frame descriptors so a multi-shot clip can't be hidden by a
+    /// single neutral middle frame. Percentile values average, coverage and
+    /// score signals take the maximum so a single night scene survives.
+    private static func mergeDescriptors(
+        _ samples: [FilmtoneSourceToneDescriptor]
+    ) -> FilmtoneSourceToneDescriptor {
+        guard let first = samples.first else {
+            return FilmtoneSourceToneDescriptor(
+                lumaP05: 0,
+                lumaP50: 0,
+                lumaP95: 0,
+                lumaRangeP05P95: 0,
+                shadowCoverage: 0,
+                highlightCoverage: 0,
+                lowMidCoverage: 0,
+                saturationMean: 0
+            )
+        }
+        if samples.count == 1 {
+            return first
+        }
+        let count = Double(samples.count)
+        let lumaP05 = samples.reduce(0.0) { $0 + $1.lumaP05 } / count
+        let lumaP50 = samples.reduce(0.0) { $0 + $1.lumaP50 } / count
+        let lumaP95 = samples.reduce(0.0) { $0 + $1.lumaP95 } / count
+        let lumaRange = samples.reduce(0.0) { $0 + $1.lumaRangeP05P95 } / count
+        let shadow = samples.map { $0.shadowCoverage }.max() ?? 0
+        let highlight = samples.map { $0.highlightCoverage }.max() ?? 0
+        let lowMid = samples.map { $0.lowMidCoverage }.max() ?? 0
+        let saturationMean = samples.reduce(0.0) { $0 + $1.saturationMean } / count
+        let night = samples.compactMap { $0.nightPracticalScore }.max()
+        let highKey = samples.compactMap { $0.highKeyScore }.max()
+        let lowSat = samples.compactMap { $0.lowSaturationFlatScore }.max()
+        let hardness = samples.compactMap { $0.digitalHardnessScore }.max()
+        return FilmtoneSourceToneDescriptor(
+            lumaP05: lumaP05,
+            lumaP50: lumaP50,
+            lumaP95: lumaP95,
+            lumaRangeP05P95: lumaRange,
+            shadowCoverage: shadow,
+            highlightCoverage: highlight,
+            lowMidCoverage: lowMid,
+            saturationMean: saturationMean,
+            nightPracticalScore: night,
+            highKeyScore: highKey,
+            lowSaturationFlatScore: lowSat,
+            digitalHardnessScore: hardness
+        )
     }
 
     private static func toneDescriptor(from image: CGImage) -> FilmtoneSourceToneDescriptor? {
@@ -229,36 +294,51 @@ final class SourceProbeService {
 
         var lumas: [Double] = []
         lumas.reserveCapacity(width * height)
+        // Track per-pixel luma in a parallel grid so we can run a cheap
+        // 4-neighbor Laplacian to estimate digital hardness without a
+        // second pass over the bitmap.
+        var lumaGrid = [Double](repeating: -1, count: width * height)
         var shadowCount = 0
         var highlightCount = 0
         var lowMidCount = 0
         var saturationSum = 0.0
+        // Warm highlight pixel = bright luma with a red/yellow hue,
+        // proxy for practical lights / candles / signage.
+        var warmHighlightCount = 0
+        // Saturated bright pixel = bright luma with strong chroma,
+        // used as a stricter night-practical signal.
+        var saturatedBrightCount = 0
 
-        for offset in stride(from: 0, to: pixels.count, by: bytesPerPixel) {
-            let alpha = Double(pixels[offset + 3]) / 255.0
-            guard alpha > 0.001 else {
-                continue
-            }
+        var pixelIndex = 0
+        for y in 0..<height {
+            let rowBase = y * bytesPerRow
+            for x in 0..<width {
+                let offset = rowBase + x * bytesPerPixel
+                let alpha = Double(pixels[offset + 3]) / 255.0
+                if alpha > 0.001 {
+                    let premultiplyScale = alpha < 1 ? 1.0 / alpha : 1.0
+                    let red = min(1.0, Double(pixels[offset]) / 255.0 * premultiplyScale)
+                    let green = min(1.0, Double(pixels[offset + 1]) / 255.0 * premultiplyScale)
+                    let blue = min(1.0, Double(pixels[offset + 2]) / 255.0 * premultiplyScale)
+                    let luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+                    let maxChannel = max(red, green, blue)
+                    let minChannel = min(red, green, blue)
+                    let saturation = maxChannel > 0 ? (maxChannel - minChannel) / maxChannel : 0
 
-            let premultiplyScale = alpha < 1 ? 1.0 / alpha : 1.0
-            let red = min(1.0, Double(pixels[offset]) / 255.0 * premultiplyScale)
-            let green = min(1.0, Double(pixels[offset + 1]) / 255.0 * premultiplyScale)
-            let blue = min(1.0, Double(pixels[offset + 2]) / 255.0 * premultiplyScale)
-            let luma = 0.2126 * red + 0.7152 * green + 0.0722 * blue
-            let maxChannel = max(red, green, blue)
-            let minChannel = min(red, green, blue)
-            let saturation = maxChannel > 0 ? (maxChannel - minChannel) / maxChannel : 0
-
-            lumas.append(luma)
-            saturationSum += saturation
-            if luma < 0.12 {
-                shadowCount += 1
-            }
-            if luma > 0.78 {
-                highlightCount += 1
-            }
-            if luma < 0.28 {
-                lowMidCount += 1
+                    lumas.append(luma)
+                    lumaGrid[pixelIndex] = luma
+                    saturationSum += saturation
+                    if luma < 0.12 { shadowCount += 1 }
+                    if luma > 0.78 { highlightCount += 1 }
+                    if luma < 0.28 { lowMidCount += 1 }
+                    if luma > 0.7 && red > green && red >= blue && (red - blue) > 0.18 {
+                        warmHighlightCount += 1
+                    }
+                    if luma > 0.6 && saturation > 0.35 {
+                        saturatedBrightCount += 1
+                    }
+                }
+                pixelIndex += 1
             }
         }
 
@@ -271,17 +351,87 @@ final class SourceProbeService {
         let lumaP05 = percentile(lumas, 0.05)
         let lumaP50 = percentile(lumas, 0.50)
         let lumaP95 = percentile(lumas, 0.95)
+        let shadowCoverage = Double(shadowCount) / sampleCount
+        let highlightCoverage = Double(highlightCount) / sampleCount
+        let lowMidCoverage = Double(lowMidCount) / sampleCount
+        let saturationMean = saturationSum / sampleCount
+
+        // 4-neighbor Laplacian magnitude over the populated grid. Cheap
+        // proxy for "looks like digital sharpness" — high values on phone
+        // HEVC, lower on Log/flat or genuine film capture. Skip if either
+        // dimension is too small to have interior pixels — `1..<(n - 1)`
+        // would otherwise trap on 1px / 2px-edge inputs.
+        var laplacianSum = 0.0
+        var laplacianCount = 0
+        if width > 2 && height > 2 {
+            for y in 1..<(height - 1) {
+                for x in 1..<(width - 1) {
+                    let i = y * width + x
+                    let center = lumaGrid[i]
+                    if center < 0 { continue }
+                    let n = lumaGrid[i - width]
+                    let s = lumaGrid[i + width]
+                    let e = lumaGrid[i + 1]
+                    let w = lumaGrid[i - 1]
+                    if n < 0 || s < 0 || e < 0 || w < 0 { continue }
+                    let lap = abs(4 * center - n - s - e - w)
+                    laplacianSum += lap
+                    laplacianCount += 1
+                }
+            }
+        }
+        let laplacianMean = laplacianCount > 0 ? laplacianSum / Double(laplacianCount) : 0
+
+        let warmHighlightRatio = Double(warmHighlightCount) / sampleCount
+        let saturatedBrightRatio = Double(saturatedBrightCount) / sampleCount
+
+        // Night / practical-light: shadow-heavy frame with at least some
+        // bright warm or saturated highlights. Both signals contribute, so
+        // a dim shot without practical lights does not register and a bright
+        // signage shot without dark surroundings does not register.
+        let practicalLightTerm = min(1.0, warmHighlightRatio * 6 + saturatedBrightRatio * 4)
+        let shadowTerm = clamp01((shadowCoverage - 0.18) / 0.42)
+        let nightPracticalScore = clamp01(shadowTerm * practicalLightTerm)
+
+        // High-key: bright mid-tones with sustained highlight coverage and
+        // very few shadows.
+        let p50Bright = clamp01((lumaP50 - 0.5) / 0.25)
+        let highlightTerm = clamp01((highlightCoverage - 0.08) / 0.3)
+        let shadowQuiet = clamp01(1.0 - shadowCoverage / 0.12)
+        let highKeyScore = clamp01(p50Bright * 0.5 + highlightTerm * 0.4 + shadowQuiet * 0.1)
+
+        // Low-saturation flat: narrow tonal range and low chroma. Catches
+        // Log/profile material that did not metadata-match, plus genuinely
+        // flat captures.
+        let rangeNarrow = clamp01(1.0 - max(0, lumaP95 - lumaP05) / 0.6)
+        let satLow = clamp01(1.0 - saturationMean / 0.28)
+        let lowSaturationFlatScore = clamp01(rangeNarrow * 0.55 + satLow * 0.45)
+
+        // Digital hardness: high local contrast with low chroma is the
+        // worst-case for a film Look. We add detailSoftness when this is
+        // high. The Laplacian threshold is calibrated empirically — phone
+        // HEVC averages ~0.06, Log/flat averages ~0.02.
+        let lapTerm = clamp01((laplacianMean - 0.025) / 0.06)
+        let digitalHardnessScore = clamp01(lapTerm * 0.7 + (1.0 - saturationMean) * 0.3)
 
         return FilmtoneSourceToneDescriptor(
             lumaP05: lumaP05,
             lumaP50: lumaP50,
             lumaP95: lumaP95,
             lumaRangeP05P95: max(0, lumaP95 - lumaP05),
-            shadowCoverage: Double(shadowCount) / sampleCount,
-            highlightCoverage: Double(highlightCount) / sampleCount,
-            lowMidCoverage: Double(lowMidCount) / sampleCount,
-            saturationMean: saturationSum / sampleCount
+            shadowCoverage: shadowCoverage,
+            highlightCoverage: highlightCoverage,
+            lowMidCoverage: lowMidCoverage,
+            saturationMean: saturationMean,
+            nightPracticalScore: nightPracticalScore,
+            highKeyScore: highKeyScore,
+            lowSaturationFlatScore: lowSaturationFlatScore,
+            digitalHardnessScore: digitalHardnessScore
         )
+    }
+
+    private static func clamp01(_ value: Double) -> Double {
+        return max(0, min(1, value))
     }
 
     private static func percentile(_ sortedValues: [Double], _ fraction: Double) -> Double {

@@ -130,83 +130,21 @@ enum FilmtoneBuiltInCatalog {
         ),
     ]
 
-    /// Color neutralization values shared by every Pack 01 patch.
-    /// The cube is SSOT for color, so the runtime kernel must produce
-    /// identity in these fields before the cube is sampled. `shadowTone`
-    /// and `highlightTone` are included because v2 baseGrade applies them
-    /// before the creative LUT stage.
-    private static let creativePack01ColorOpNeutralEntries: [String: Double] = [
-        "exposure": 0,
-        "contrast": 1,
-        "saturation": 1,
-        "temperature": 0,
-        "tint": 0,
-        "fade": 0,
-        "compressionAmount": 0,
-        "compressionRange": 0.5,
-        "printContrast": 0,
-        "cyan": 0,
-        "magenta": 0,
-        "yellow": 0,
-        "shadowTone": 0,
-        "highlightTone": 0,
-    ]
+    /// Baseline patches live in `FilmtoneCreativePack01Patches` so the
+    /// Look Director resolver tests can link the same constants without
+    /// pulling in the catalog graph. The catalog re-exports them under
+    /// the original public names for callers that read them directly.
+    static var creativePack01StonePatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.stonePatch
+    }
 
-    /// Stone — generated 65³ cube plus a restrained optical
-    /// baseline. Color stays in the cube; these values carry lens behavior.
-    static let creativePack01StonePatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0.0032
-        values["bloomThreshold"] = 0.64
-        values["bloomStrength"] = 0.20
-        values["bloomRadius"] = 0.62
-        values["halationIntensity"] = 0.07
-        values["halationHue"] = 24
-        values["diffusion"] = 0.06
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.055
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
+    static var creativePack01UrbanPatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.urbanPatch
+    }
 
-    /// Urban — generated 65³ cube plus a restrained optical baseline.
-    /// Color stays in the cube; these values carry lens behavior.
-    static let creativePack01UrbanPatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0.0028
-        values["bloomThreshold"] = 0.66
-        values["bloomStrength"] = 0.18
-        values["bloomRadius"] = 0.58
-        values["halationIntensity"] = 0.055
-        values["halationHue"] = 20
-        values["diffusion"] = 0.065
-        values["lensSoftness"] = 0.095
-        values["grainIntensity"] = 0.0045
-        values["grainSize"] = 0.13
-        values["vignette"] = 0.06
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
-
-    /// Noir — generated 65³ toned print monochrome cube plus a denser optical
-    /// baseline. The cube carries a visible olive print tone instead of
-    /// forcing RGB-equal grayscale.
-    static let creativePack01NoirPatch: FilmtonePhase0ParamsPatch = {
-        var values = creativePack01ColorOpNeutralEntries
-        values["rgbShift"] = 0
-        values["bloomThreshold"] = 0.56
-        values["bloomStrength"] = 0.2
-        values["bloomRadius"] = 0.64
-        values["halationIntensity"] = 0.028
-        values["halationHue"] = 36
-        values["diffusion"] = 0.13
-        values["lensSoftness"] = 0.16
-        values["grainRadialMix"] = 0.9
-        values["grainIntensity"] = 0.075
-        values["grainSize"] = 0.48
-        values["vignette"] = 0.16
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
+    static var creativePack01NoirPatch: FilmtonePhase0ParamsPatch {
+        FilmtoneCreativePack01Patches.noirPatch
+    }
 
     /// Returns the built-in Look matching a canonical UUID, or `nil` for
     /// a UUID that belongs to a user-saved entry. Used by the library
@@ -251,22 +189,6 @@ enum FilmtoneBuiltInCatalog {
             immutable: true,
             bundledSlug: builtIn.slug
         )
-    }
-}
-
-enum FilmtoneCreativePack01Adaptation {
-    struct Resolved {
-        let intensity: Double
-        let paramOverrides: FilmtonePhase0ParamsPatch
-    }
-
-    static func resolve(
-        slug: String,
-        descriptor: FilmtoneSourceToneDescriptor?
-    ) -> Resolved? {
-        // Material-adaptive adjustments stay disabled until the flagship LUT
-        // is visually signed off on device.
-        return nil
     }
 }
 
