@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "packId": "creative-pack-01",
-  "bakerVersion": "1.4.0-stone-urban-distinct",
+  "bakerVersion": "1.5.0-stone-palermo-signature",
   "cubeSize": 65,
-  "generatedAtIso": "2026-05-13T08:54:23.615Z",
+  "generatedAtIso": "2026-05-13T10:21:47.764Z",
   "generatedFromCommit": null,
   "bakeMode": "real",
   "looks": [
@@ -14,8 +14,8 @@
       "basePreset": "reset",
       "cubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-stone.cube",
       "cubeSize": 65,
-      "cubeSha256": "0214095c88056b2b8db83de8d01eb359603a6683a33dced7e77f94ac03d6016a",
-      "cubeBytes": 7415117,
+      "cubeSha256": "b533a08cdc7ad7f563865bce758ec589bad966860d539d39b9d08165ee6e37ad",
+      "cubeBytes": 7415120,
       "diagonalMaxDelta": 0.16218042373657227,
       "colorParams": {
         "exposure": 0,
@@ -32,14 +32,14 @@
         "yellow": 0
       },
       "paramOverrides": {
-        "rgbShift": 0.0016,
+        "rgbShift": 0.0021,
         "bloomThreshold": 0.72,
-        "bloomStrength": 0.1,
-        "bloomRadius": 0.52,
-        "halationIntensity": 0.045,
+        "bloomStrength": 0.135,
+        "bloomRadius": 0.6,
+        "halationIntensity": 0.065,
         "halationHue": 24,
         "diffusion": 0.015,
-        "lensSoftness": 0.07,
+        "lensSoftness": 0.082,
         "grainIntensity": 0.013,
         "grainSize": 0.16,
         "vignette": 0.1,
@@ -61,7 +61,7 @@
       "strength": 1,
       "bakeMode": "real",
       "sourceCubePath": "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube",
-      "sourceCubeTransform": "filmtone-stone-dlogm-palermo-display-v1"
+      "sourceCubeTransform": "filmtone-stone-dlogm-palermo-display-v2"
     },
     {
       "slug": "filmtone-creative-pack-01-urban",
@@ -70,8 +70,8 @@
       "basePreset": "reset",
       "cubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban.cube",
       "cubeSize": 65,
-      "cubeSha256": "fefd48a796ff724fb23b2741ac14ed0c4453b24215ca7535680ad4ca043aaa44",
-      "cubeBytes": 7415117,
+      "cubeSha256": "880737a9f73f2e171779328707daef92a98bce3c612fa83c9817fc0980105760",
+      "cubeBytes": 7415120,
       "diagonalMaxDelta": 0.16450530290603638,
       "colorParams": {
         "exposure": 0,
@@ -126,8 +126,8 @@
       "basePreset": "reset",
       "cubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir.cube",
       "cubeSize": 65,
-      "cubeSha256": "0c52cf12a0aba090f60c18f23d3712fb80016f436765acfdc99cf9ae93abed56",
-      "cubeBytes": 7415079,
+      "cubeSha256": "50f4d1d14b4cec964c6e100d86af5777a32c6dd976a13e9fc6b4b261bf7a72fa",
+      "cubeBytes": 7415082,
       "diagonalMaxDelta": 0.22212404012680054,
       "colorParams": {
         "exposure": -0.24,

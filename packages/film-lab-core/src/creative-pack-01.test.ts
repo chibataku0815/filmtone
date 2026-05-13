@@ -106,6 +106,22 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
       undefined,
     ]);
   });
+
+  test("Stone carries a stronger localized optical baseline without lowering the bloom threshold", () => {
+    const stone = CREATIVE_PACK_01_LOOKS.find(
+      (look) => look.slug === "filmtone-creative-pack-01-stone",
+    );
+    expect(stone?.paramOverrides.bloomThreshold).toBe(0.72);
+    expect(stone?.paramOverrides.bloomStrength).toBeGreaterThanOrEqual(0.13);
+    expect(stone?.paramOverrides.bloomStrength).toBeLessThanOrEqual(0.14);
+    expect(stone?.paramOverrides.bloomRadius).toBe(0.60);
+    expect(stone?.paramOverrides.halationIntensity).toBeGreaterThanOrEqual(0.06);
+    expect(stone?.paramOverrides.halationIntensity).toBeLessThanOrEqual(0.07);
+    expect(stone?.paramOverrides.rgbShift).toBeGreaterThanOrEqual(0.002);
+    expect(stone?.paramOverrides.lensSoftness).toBeGreaterThanOrEqual(0.08);
+    expect(stone?.paramOverrides.diffusion).toBe(0.015);
+    expect(stone?.paramOverrides.fade).toBe(0);
+  });
 });
 
 describe("Creative LUT Pack 01 — generated cubes", () => {
@@ -114,7 +130,7 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
       {
         cubePath: STONE_CUBE_PATH,
         sourcePath: PALERMO_DLOGM_SOURCE,
-        generator: "generator=filmtone-stone-dlogm-palermo-display-v1",
+        generator: "generator=filmtone-stone-dlogm-palermo-display-v2",
       },
       {
         cubePath: URBAN_CUBE_PATH,
@@ -133,16 +149,16 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     }
   });
 
-  test("Stone adapts D-Log M Palermo into a Palermo-primary display-domain cube with a protected black floor", () => {
+  test("Stone adapts D-Log M Palermo into an original dense display-domain cube with a protected black floor", () => {
     const stoneLook = CREATIVE_PACK_01_LOOKS.find(
       (look) => look.slug === "filmtone-creative-pack-01-stone",
     );
     expect(stoneLook?.sourceCubeTransform).toBe(
-      "filmtone-stone-dlogm-palermo-display-v1",
+      "filmtone-stone-dlogm-palermo-display-v2",
     );
     const stone = parseCube(readFileSync(STONE_CUBE_PATH, "utf8"));
     const stoneText = readFileSync(STONE_CUBE_PATH, "utf8");
-    expect(stoneText).toContain("generator=filmtone-stone-dlogm-palermo-display-v1");
+    expect(stoneText).toContain("generator=filmtone-stone-dlogm-palermo-display-v2");
     expect(stoneText).not.toContain("filmtone-stone-palermo-reference");
 
     const black = sampleCube(stone, [0.02, 0.02, 0.02]);
@@ -152,6 +168,8 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     const high = sampleCube(stone, [0.72, 0.72, 0.72]);
     const lanternRed = sampleCube(stone, [0.78, 0.08, 0.05]);
     const skin = sampleCube(stone, [0.62, 0.45, 0.36]);
+    const sky = sampleCube(stone, [0.35, 0.58, 0.82]);
+    const foliage = sampleCube(stone, [0.18, 0.42, 0.16]);
 
     expect(luma(black)).toBeLessThanOrEqual(0.022);
     expect(luma(shadow)).toBeLessThan(0.079);
@@ -166,6 +184,16 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     expect(lanternRed[0]).toBeGreaterThan(lanternRed[1] * 8);
     expect(lanternRed[2]).toBeLessThan(0.004);
     expect(Math.abs(luma(skin) - luma([0.62, 0.45, 0.36]))).toBeLessThan(0.09);
+    expect(skin[0]).toBeGreaterThan(skin[1] * 1.48);
+    expect(skin[1]).toBeGreaterThan(skin[2] * 1.55);
+    expect(skin[2]).toBeGreaterThan(0.18);
+    expect(skin[2]).toBeLessThan(0.24);
+    expect(sky[0]).toBeGreaterThan(0.07);
+    expect(sky[0]).toBeLessThan(0.13);
+    expect(sky[1]).toBeGreaterThan(0.50);
+    expect(sky[2]).toBeGreaterThan(0.66);
+    expect(foliage[1]).toBeGreaterThan(foliage[0] * 2.5);
+    expect(luma(foliage)).toBeLessThan(0.205);
   });
 
   test("source-derived Urban sample points stay aligned to Palermo within tolerance", () => {

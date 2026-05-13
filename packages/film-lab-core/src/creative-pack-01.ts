@@ -42,7 +42,7 @@ import type { FilmtoneIosPresetName } from "./ios-preset-overrides";
 import type { Phase0ParamKey } from "./phase0-schema";
 
 export const CREATIVE_PACK_01_ID = "creative-pack-01" as const;
-export const CREATIVE_PACK_01_BAKER_VERSION = "1.4.0-stone-urban-distinct" as const;
+export const CREATIVE_PACK_01_BAKER_VERSION = "1.5.0-stone-palermo-signature" as const;
 export const CREATIVE_PACK_01_CUBE_SIZE = 65 as const;
 
 export interface CreativePackLook {
@@ -107,14 +107,14 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
       yellow: 0,
     },
     paramOverrides: buildLookParamOverrides({
-      rgbShift: 0.0016,
+      rgbShift: 0.0021,
       bloomThreshold: 0.72,
-      bloomStrength: 0.1,
-      bloomRadius: 0.52,
-      halationIntensity: 0.045,
+      bloomStrength: 0.135,
+      bloomRadius: 0.60,
+      halationIntensity: 0.065,
       halationHue: 24,
       diffusion: 0.015,
-      lensSoftness: 0.07,
+      lensSoftness: 0.082,
       grainIntensity: 0.013,
       grainSize: 0.16,
       vignette: 0.1,
