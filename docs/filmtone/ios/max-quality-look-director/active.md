@@ -6,6 +6,20 @@ Branch: `feature/ios-max-quality-look-director`
 Worktree:
 `/Volumes/SamsungPortableSSDX5001/documents/forestone/filmtone-ios-max-quality-look-director`
 
+## Status
+
+**AI-executable scope**: Complete. Implementation at `27a14e30` carries the
+Look Director resolver, the source-aware wiring into `applyCameraProfile` /
+`applyProbe`, the `fade`-not-`shadowTone` shadow-latitude correction, the
+1px-edge Laplacian guard, six resolver test cases, and the `bun run verify:ios`
++ `git diff --check` gates green on 2026-05-13 JST.
+
+**Final Owner Gate**: Pending. Three-source on-device visual/performance check
+(see the same-named section below) requires physical iPhone hardware and
+owner-owned footage; visual delta judgement and device thermal / sidecar timing
+fall outside the AI-executable scope. M1 closeout in this lane resumes when the
+owner pastes back the measured table.
+
 ## Goal
 
 Implement the first batched iOS pilot that materially raises built-in Look image
@@ -134,14 +148,12 @@ behavior tiered.
       - `bun run verify:ios` exit 0 (Phase 0 contract + iOS xcodebuild
         on Debug for `arm64-apple-ios26.0-simulator`).
       - `git diff --check` exit 0.
-- [ ] Run or prepare the three-source visual/performance check and record the
-      result here. M1 stops short of on-device export: the focused
-      logic test + iOS verify gate validate the wiring. The three-source
-      run requires the owner running export on a target device against
-      a night source, a bright-outdoor source, and a Log/flat source
-      and recording `avgRenderMsPerFrame`, `GlowFamily`,
-      `DetailSoftness`, thermal start/end, export elapsed, and preview
-      usability before this checkbox can flip.
+- [x] Prepare the three-source visual/performance check protocol for the
+      owner. The on-device export run itself is the **Final Owner Gate**
+      below — physical iPhone hardware + owner-owned footage + visual
+      delta judgement cannot run inside the AI-executable scope, so it
+      is split out as a final-stage gate rather than an
+      AI-blocking implementation task.
 - [x] Record Copy / History Impact and Article / Change-History Opportunity
       after the actual visual delta is known. (Recorded below; final
       Article Opportunity classification waits on the three-source
@@ -149,10 +161,14 @@ behavior tiered.
 
 ## Verification
 
-Run on 2026-05-13 JST in the dedicated worktree (no commit, no push).
-Re-run after the three review-driven fixes
-(`fade`-not-`shadowTone`, profile/probe re-resolve, small-image
-Laplacian guard) — both gates still pass.
+Run on 2026-05-13 JST in the dedicated worktree (head `27a14e30`,
+`feature/ios-max-quality-look-director`, 1 commit ahead of `origin/main`,
+worktree clean).
+
+Re-verified after the three review-driven fixes (`fade`-not-`shadowTone`,
+source/profile re-resolve in `applyCameraProfile` / `applyProbe`, small-image
+Laplacian guard on `width > 2 && height > 2`) and once more on AI-executable
+closeout — both gates green each time.
 
 Minimum automated checks — all pass:
 
@@ -178,42 +194,66 @@ module, then asserts six cases: night/practical, high-key,
 low-saturation flat, Log/profile (Apple Log catalog id + bias 0.06),
 ordinary, and a legacy descriptor with all optional scores nil.
 
-Minimum visual/performance check:
+## Final Owner Gate
 
-- Export one night/practical-light source.
-- Export one bright outdoor/high-key source.
-- Export one Log/profile or flat low-saturation source.
-- For each, compare before/after frame output and inspect export sidecar
-  performance.
-- Enable render-stage profiling for one representative profiled pass:
+Status: **pending**. AI-executable closeout is complete; the remaining work is
+a final visual/performance signoff on physical hardware. This is not an
+AI-blocking implementation task — it is the final-stage gate that flips M1 to
+Done once the owner runs and reports.
+
+Run on the target iPhone against the `27a14e30` build, comparing each export to
+the prior build of the same source:
+
+1. **Night / practical-light** source.
+2. **Bright outdoor / high-key** source.
+3. **Log / profile or low-saturation flat** source.
+
+For one representative export, enable render-stage profiling:
 
 ```bash
-FILMTONE_EXPORT_RENDER_STAGE_PROFILE=24
+xcrun devicectl device process launch --device <UDID> \
+  --environment-variables FILMTONE_EXPORT_RENDER_STAGE_PROFILE=24 \
+  com.forestone.filmtone
 ```
 
-Metrics to record:
+For each of the three sources, paste back the following row (sidecar JSON
+fields are listed for reference):
 
-- `avgRenderMsPerFrame`
-- `GlowFamily`
-- `DetailSoftness`
-- export elapsed
-- thermal start/end state
-- whether preview remains usable for the same Look/source pair
+| field | source |
+|---|---|
+| `avgRenderMsPerFrame` | sidecar `performance.avgRenderMsPerFrame` |
+| `GlowFamily` substage ms | sidecar `performance.renderStageProfile.stages[GlowFamily].incrementalAvgMsPerSample` |
+| `DetailSoftness` substage ms | sidecar `performance.renderStageProfile.stages[DetailSoftness].incrementalAvgMsPerSample` |
+| thermal start → end | sidecar `thermalStateAtStart` / `thermalStateAtEnd` |
+| export elapsed (ms) | sidecar `exportElapsedMs` |
+| preview usability | manual: does the matching preview stay responsive? |
+| visual delta clearly better | manual A/B against the prior build |
+
+When the table arrives I will: record it in this active, classify performance
+(`acceptable in M1` / `tune in M2` / `escalate to M3 optics`), finalize
+`Article Opportunity` (`Short post` if 2+ sources show a clear delta, else
+`Developer note`), archive this active to
+`archive/2026-05-13-m1-max-quality-look-director.md`, and append a 1-3 line
+completion note to `strategy.md`.
 
 ## Done Conditions
 
-- All implementation checklist items are complete or explicitly moved out with
-  a reason.
-- Five resolver cases pass.
+AI-executable conditions (all met at `27a14e30`):
+
+- Implementation checklist items complete or explicitly moved out with a reason.
+- Six resolver cases pass (`Look Director resolver tests passed`).
 - `bun run verify:ios` passes.
 - `git diff --check` passes.
-- Three-source visual/performance check is recorded.
-- At least two of the three representative sources show a clear visual
-  improvement without a blocking artifact.
-- Any performance cost is measured and classified as:
-  acceptable in M1, tune in M2, or escalate to M3 optics performance work.
-- `Copy / History Impact`, `Article Opportunity`, and
-  `Change-History Opportunity` are recorded.
+
+Final Owner Gate conditions (pending):
+
+- Three-source visual/performance check recorded in this active.
+- At least two of the three sources show a clear visual improvement without a
+  blocking artifact.
+- Performance cost classified as `acceptable in M1`, `tune in M2`, or
+  `escalate to M3 optics`.
+- `Copy / History Impact`, `Article Opportunity`, and `Change-History
+  Opportunity` finalized once the visual delta is known.
 
 ## Stop Conditions
 
