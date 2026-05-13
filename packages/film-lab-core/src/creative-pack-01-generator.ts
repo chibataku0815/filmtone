@@ -1,7 +1,7 @@
 import type { CreativeCube } from "./creative-cube";
 
 export const CREATIVE_PACK_01_STONE_TRANSFORM =
-  "filmtone-stone-dlogm-palermo-display-v1" as const;
+  "filmtone-stone-dlogm-palermo-display-v2" as const;
 export const CREATIVE_PACK_01_URBAN_TRANSFORM =
   "filmtone-urban-palermo-green-density-v1" as const;
 
@@ -129,6 +129,85 @@ function protectShadowFloor(
   ];
 }
 
+function dominantGreenMask(r: number, g: number, b: number, inputLuma: number): number {
+  const dominance = g - Math.max(r, b);
+  const lumaGate = smoothstep(0.12, 0.32, inputLuma) * (1 - smoothstep(0.68, 0.9, inputLuma));
+  return smoothstep(0.035, 0.22, dominance) * lumaGate;
+}
+
+function cyanSkyMask(r: number, g: number, b: number, inputLuma: number): number {
+  const blueDominance = b - r;
+  const cyanBody = Math.min(b - g * 0.72, g - r * 0.58);
+  const lumaGate = smoothstep(0.22, 0.42, inputLuma) * (1 - smoothstep(0.88, 1.0, inputLuma));
+  return smoothstep(0.08, 0.36, blueDominance) * smoothstep(0.06, 0.28, cyanBody) * lumaGate;
+}
+
+function warmSkinMask(r: number, g: number, b: number, inputLuma: number): number {
+  const warmOrder =
+    smoothstep(0.035, 0.18, r - g) *
+    smoothstep(0.025, 0.16, g - b);
+  const lumaGate = smoothstep(0.20, 0.42, inputLuma) * (1 - smoothstep(0.76, 0.94, inputLuma));
+  const saturationGuard = 1 - smoothstep(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
+  return warmOrder * lumaGate * saturationGuard;
+}
+
+/**
+ * M3 Stone signature shaping.
+ *
+ * The Palermo PowerGrade analysis showed that the shippable signal is not the
+ * opaque DRX body. It is a set of visible behaviors: warm neutral blue
+ * suppression, dense skin, cyan/sky separation, green density, and a print
+ * ceiling. This function adds those behaviors as an original Filmtone pass on
+ * top of the display-domain Palermo sample rather than copying the vendor LUT
+ * endpoint shape.
+ */
+function applyStonePalermoSignature(
+  input: [number, number, number],
+  output: [number, number, number],
+): [number, number, number] {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const inputChroma = Math.max(input[0], input[1], input[2]) - Math.min(input[0], input[1], input[2]);
+  const neutralMask =
+    (1 - smoothstep(0.025, 0.20, inputChroma)) *
+    smoothstep(0.12, 0.42, inputLuma) *
+    (1 - smoothstep(0.88, 1.0, inputLuma));
+  const skinMask = warmSkinMask(input[0], input[1], input[2], inputLuma);
+  const skyMask = cyanSkyMask(input[0], input[1], input[2], inputLuma);
+  const greenMask = dominantGreenMask(input[0], input[1], input[2], inputLuma);
+
+  let r = output[0];
+  let g = output[1];
+  let b = output[2];
+
+  // Palermo-like neutral warmth is primarily a blue suppression move, not a
+  // red-gain wash. Keep the magnitude modest so grays stay plausible.
+  r *= 1 + 0.012 * neutralMask;
+  g *= 1 + 0.004 * neutralMask;
+  b *= 1 - 0.055 * neutralMask;
+
+  // Dense skin: restore the red/green-to-blue separation that M2.2 kept too
+  // thin, while deliberately stopping short of the vendor LUT's very deep blue
+  // collapse.
+  r *= 1 + 0.030 * skinMask;
+  g *= 1 - 0.030 * skinMask;
+  b *= 1 - 0.235 * skinMask;
+
+  // Cyan / sky separation: Palermo strips red hard from sky colors. Filmtone
+  // keeps more red than the source LUT but needs a stronger cyan lane than
+  // M2.2, otherwise the reference character disappears.
+  r *= 1 - 0.46 * skyMask;
+  g *= 1 + 0.018 * skyMask;
+  b *= 1 + 0.030 * skyMask;
+
+  // Green density without an overall mud wash. This is hue-targeted and
+  // luma-gated so low, neutral walls do not get crushed like foliage.
+  r *= 1 - 0.050 * greenMask;
+  g *= 1 - 0.045 * greenMask;
+  b *= 1 - 0.020 * greenMask;
+
+  return [clamp01(r), clamp01(g), clamp01(b)];
+}
+
 /**
  * Stone — display-referred adaptation of the DJI D-Log M Palermo source LUT.
  *
@@ -155,7 +234,8 @@ export function applyStoneDisplayPalermoTransform(sourceCube: CreativeCube): Cre
         const input: [number, number, number] = [r, g, b];
         const sourceInput = rec709DisplayToDlogMCode(r, g, b);
         const palermo = sampleCube(sourceCube, sourceInput[0], sourceInput[1], sourceInput[2]);
-        const safePalermo = protectShadowFloor(input, palermo);
+        const signedPalermo = applyStonePalermoSignature(input, palermo);
+        const safePalermo = protectShadowFloor(input, signedPalermo);
         const inputLuma = luma(r, g, b);
         // M2.2: Stone must be Palermo-primary. Earlier versions mixed the
         // sampled Palermo output back toward identity across the whole lattice,

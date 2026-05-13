@@ -357,11 +357,11 @@ struct TestLookDirector {
                 (values["printContrast"] ?? stonePrintBase) < stonePrintBase + 0.12,
                 "ordinary Stone print floor must stay below source-specific band, got \(values["printContrast"] ?? -1)"
             )
-            let stoneBloomBase = FilmtoneCreativePack01Patches.stonePatch.values["bloomStrength", default: 0]
-            try expect(
-                (values["bloomStrength"] ?? stoneBloomBase) < stoneBloomBase + 0.030,
+        let stoneBloomBase = FilmtoneCreativePack01Patches.stonePatch.values["bloomStrength", default: 0]
+        try expect(
+                (values["bloomStrength"] ?? stoneBloomBase) < stoneBloomBase + 0.035,
                 "ordinary Stone bloom floor must stay restrained, got \(values["bloomStrength"] ?? -1)"
-            )
+        )
             try expect(
                 values["fade"] == nil,
                 "ordinary Stone must not emit fade either"

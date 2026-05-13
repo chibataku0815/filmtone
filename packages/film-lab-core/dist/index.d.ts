@@ -2376,7 +2376,7 @@ interface SerializeCubeOptions {
  */
 declare function serializeCreativeCubeToText(cube: CreativeCube, options: SerializeCubeOptions): string;
 
-declare const CREATIVE_PACK_01_STONE_TRANSFORM: "filmtone-stone-dlogm-palermo-display-v1";
+declare const CREATIVE_PACK_01_STONE_TRANSFORM: "filmtone-stone-dlogm-palermo-display-v2";
 declare const CREATIVE_PACK_01_URBAN_TRANSFORM: "filmtone-urban-palermo-green-density-v1";
 type CreativePack01SourceTransform = typeof CREATIVE_PACK_01_STONE_TRANSFORM | typeof CREATIVE_PACK_01_URBAN_TRANSFORM;
 /**
@@ -2447,7 +2447,7 @@ declare function applyCreativePack01SourceTransform(sourceCube: CreativeCube, tr
  */
 
 declare const CREATIVE_PACK_01_ID: "creative-pack-01";
-declare const CREATIVE_PACK_01_BAKER_VERSION: "1.4.0-stone-urban-distinct";
+declare const CREATIVE_PACK_01_BAKER_VERSION: "1.5.0-stone-palermo-signature";
 declare const CREATIVE_PACK_01_CUBE_SIZE: 65;
 interface CreativePackLook {
     readonly slug: string;

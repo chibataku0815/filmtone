@@ -3210,7 +3210,7 @@ function serializeCreativeCubeToText(cube, options) {
 }
 
 // src/creative-pack-01-generator.ts
-var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-dlogm-palermo-display-v1";
+var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-dlogm-palermo-display-v2";
 var CREATIVE_PACK_01_URBAN_TRANSFORM = "filmtone-urban-palermo-green-density-v1";
 function clamp014(x) {
   if (x < 0) return 0;
@@ -3308,6 +3308,47 @@ function protectShadowFloor(input, output) {
     clamp014(output[2] * scale)
   ];
 }
+function dominantGreenMask(r, g, b, inputLuma) {
+  const dominance = g - Math.max(r, b);
+  const lumaGate = smoothstep2(0.12, 0.32, inputLuma) * (1 - smoothstep2(0.68, 0.9, inputLuma));
+  return smoothstep2(0.035, 0.22, dominance) * lumaGate;
+}
+function cyanSkyMask(r, g, b, inputLuma) {
+  const blueDominance = b - r;
+  const cyanBody = Math.min(b - g * 0.72, g - r * 0.58);
+  const lumaGate = smoothstep2(0.22, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
+  return smoothstep2(0.08, 0.36, blueDominance) * smoothstep2(0.06, 0.28, cyanBody) * lumaGate;
+}
+function warmSkinMask(r, g, b, inputLuma) {
+  const warmOrder = smoothstep2(0.035, 0.18, r - g) * smoothstep2(0.025, 0.16, g - b);
+  const lumaGate = smoothstep2(0.2, 0.42, inputLuma) * (1 - smoothstep2(0.76, 0.94, inputLuma));
+  const saturationGuard = 1 - smoothstep2(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
+  return warmOrder * lumaGate * saturationGuard;
+}
+function applyStonePalermoSignature(input, output) {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const inputChroma = Math.max(input[0], input[1], input[2]) - Math.min(input[0], input[1], input[2]);
+  const neutralMask = (1 - smoothstep2(0.025, 0.2, inputChroma)) * smoothstep2(0.12, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
+  const skinMask = warmSkinMask(input[0], input[1], input[2], inputLuma);
+  const skyMask = cyanSkyMask(input[0], input[1], input[2], inputLuma);
+  const greenMask = dominantGreenMask(input[0], input[1], input[2], inputLuma);
+  let r = output[0];
+  let g = output[1];
+  let b = output[2];
+  r *= 1 + 0.012 * neutralMask;
+  g *= 1 + 4e-3 * neutralMask;
+  b *= 1 - 0.055 * neutralMask;
+  r *= 1 + 0.03 * skinMask;
+  g *= 1 - 0.03 * skinMask;
+  b *= 1 - 0.235 * skinMask;
+  r *= 1 - 0.46 * skyMask;
+  g *= 1 + 0.018 * skyMask;
+  b *= 1 + 0.03 * skyMask;
+  r *= 1 - 0.05 * greenMask;
+  g *= 1 - 0.045 * greenMask;
+  b *= 1 - 0.02 * greenMask;
+  return [clamp014(r), clamp014(g), clamp014(b)];
+}
 function applyStoneDisplayPalermoTransform(sourceCube) {
   const { size } = sourceCube;
   const data = new Float32Array(sourceCube.data.length);
@@ -3322,7 +3363,8 @@ function applyStoneDisplayPalermoTransform(sourceCube) {
         const input = [r, g, b];
         const sourceInput = rec709DisplayToDlogMCode(r, g, b);
         const palermo = sampleCube(sourceCube, sourceInput[0], sourceInput[1], sourceInput[2]);
-        const safePalermo = protectShadowFloor(input, palermo);
+        const signedPalermo = applyStonePalermoSignature(input, palermo);
+        const safePalermo = protectShadowFloor(input, signedPalermo);
         const inputLuma = luma(r, g, b);
         const strength = smoothstep2(0.025, 0.12, inputLuma);
         data[idx + 0] = clamp014(mix3(r, safePalermo[0], strength));
@@ -3408,7 +3450,7 @@ function applyCreativePack01SourceTransform(sourceCube, transformName) {
 
 // src/creative-pack-01.ts
 var CREATIVE_PACK_01_ID = "creative-pack-01";
-var CREATIVE_PACK_01_BAKER_VERSION = "1.4.0-stone-urban-distinct";
+var CREATIVE_PACK_01_BAKER_VERSION = "1.5.0-stone-palermo-signature";
 var CREATIVE_PACK_01_CUBE_SIZE = 65;
 function buildLookParamOverrides(spatial) {
   const out = { ...spatial };
@@ -3440,14 +3482,14 @@ var CREATIVE_PACK_01_LOOKS = [
       yellow: 0
     },
     paramOverrides: buildLookParamOverrides({
-      rgbShift: 16e-4,
+      rgbShift: 21e-4,
       bloomThreshold: 0.72,
-      bloomStrength: 0.1,
-      bloomRadius: 0.52,
-      halationIntensity: 0.045,
+      bloomStrength: 0.135,
+      bloomRadius: 0.6,
+      halationIntensity: 0.065,
       halationHue: 24,
       diffusion: 0.015,
-      lensSoftness: 0.07,
+      lensSoftness: 0.082,
       grainIntensity: 0.013,
       grainSize: 0.16,
       vignette: 0.1

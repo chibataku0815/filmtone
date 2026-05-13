@@ -52,9 +52,9 @@ enum FilmtoneLookDirector {
         contrastGain: 0.17,
         saturationGain: 0.23,
         digitalSoftnessGain: 0.30,
-        practicalBloomGain: 0.86,
-        practicalHalationGain: 0.72,
-        practicalRgbShiftGain: 0.028,
+        practicalBloomGain: 1.05,
+        practicalHalationGain: 0.92,
+        practicalRgbShiftGain: 0.036,
         vignetteGain: 0.11
     )
 

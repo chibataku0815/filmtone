@@ -1,7 +1,7 @@
 TITLE "Filmtone Noir"
 # pack=creative-pack-01
 # slug=filmtone-creative-pack-01-noir
-# bakerVersion=1.4.0-stone-urban-distinct
+# bakerVersion=1.5.0-stone-palermo-signature
 # bakeMode=real
 LUT_3D_SIZE 65
 DOMAIN_MIN 0.0 0.0 0.0
