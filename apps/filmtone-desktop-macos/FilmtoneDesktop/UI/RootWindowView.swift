@@ -8,7 +8,6 @@ import UniformTypeIdentifiers
 struct RootWindowView: View {
     @State private var state = EditorState()
     @State private var library = LibraryViewModel()
-    @State private var importedGradeLibrary = ImportedGradeLibraryViewModel()
     @State private var hostingWindow: NSWindow?
     // M5-M follow-up: empty opening starts at a compact floor so the launch
     // window reads as a compact opening dialog rather than a 1080×720
@@ -107,7 +106,6 @@ struct RootWindowView: View {
         // once the actor returns.
         .task {
             await library.bootstrap()
-            await importedGradeLibrary.bootstrap()
         }
         .background(WindowAccessor { window in
             resolveWindow(window)
@@ -267,7 +265,6 @@ struct RootWindowView: View {
                 EditorSidebar(
                     state: state,
                     library: library,
-                    importedGradeLibrary: importedGradeLibrary,
                     exportCoordinator: exportCoordinator
                 )
                 .padding(.top, 72)
@@ -394,16 +391,13 @@ struct RootWindowView: View {
     private func presentOpenPanel() {
         guard !openPanelPresented else { return }
         let panel = NSOpenPanel()
-        var contentTypes: [UTType] = [.image, .movie, .quickTimeMovie, .mpeg4Movie, .json]
-        if let drxType = UTType(filenameExtension: "drx") {
-            contentTypes.append(drxType)
-        }
+        let contentTypes: [UTType] = [.image, .movie, .quickTimeMovie, .mpeg4Movie, .json]
         panel.allowedContentTypes = contentTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.prompt = "Open"
-        panel.message = "Choose a still, video, iOS capture package, or DaVinci grade"
+        panel.message = "Choose a still, video, or iOS capture package"
 
         openPanelPresented = true
         let targetWindow = hostingWindow ?? NSApp.keyWindow ?? NSApp.mainWindow
@@ -435,15 +429,6 @@ struct RootWindowView: View {
                 resizeWindowToSourceAspect(url: imported.sourceURL, kind: .video)
             } catch {
                 state.lastExportError = error.localizedDescription
-            }
-            return
-        }
-        if url.pathExtension.lowercased() == "drx" {
-            Task { @MainActor in
-                if let look = await importedGradeLibrary.importGrade(from: url) {
-                    let sidecarURL = await importedGradeLibrary.sidecarURL(id: look.id)
-                    state.applyImportedGrade(look, sidecarURL: sidecarURL)
-                }
             }
             return
         }

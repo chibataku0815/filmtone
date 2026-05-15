@@ -264,14 +264,10 @@ actor FilmtoneSavedLookStore {
             }
             return entry
         }
-        let presetOnlyBuiltInLooks: [SavedLookEntry] = FilmtoneCreativePackCatalog.presetOnlyLooks.map { preset in
-            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(preset)
-            if favorites.contains(entry.id) {
-                entry.favorite = true
-            }
-            return entry
-        }
-        let builtInLooks = cubeBuiltInLooks + presetOnlyBuiltInLooks
+        // Preset-only built-ins remain catalog-addressable for sidecar/runtime
+        // compatibility, but they are not part of the current Desktop picker
+        // surface.
+        let builtInLooks = cubeBuiltInLooks
         let sortedUserLooks = looks.values.sorted { lhs, rhs in
             if lhs.favorite != rhs.favorite {
                 return lhs.favorite && !rhs.favorite

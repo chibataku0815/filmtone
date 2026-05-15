@@ -93,6 +93,15 @@ truly needs them.
 - portfolio submodule bump / App Store / release notes copy.
 - Native preview orientation bug.
 
+## Unexpected / Follow-up
+
+- 2026-05-15 JST: Owner requested hiding the visible Desktop-only Imported
+  Grade / DaVinci PowerGrade import UI and the Twilight Look surface. Keep the
+  underlying runtime/catalog code available for internal compatibility, but
+  remove the current product entry points from Native Desktop UI.
+  Verification: `bash apps/filmtone-desktop-macos/Verify/run.sh` (144/144),
+  `bun run verify:desktop`, and `git diff --check` passed.
+
 ## Done
 
 Archive this file into `archive/2026-05-12-twilight-bundled-look.md` once

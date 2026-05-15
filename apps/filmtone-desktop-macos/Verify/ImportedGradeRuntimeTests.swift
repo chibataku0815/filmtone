@@ -212,6 +212,41 @@ func registerImportedGradeRuntimeTests() {
         }
     }
 
+    runner.test("Twilight stays catalog-addressable but hidden from Desktop library snapshot") {
+        let id = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000011")!
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("filmtone-verify-twilight-hidden-\(UUID().uuidString)", isDirectory: true)
+        let suiteName = "filmtone-verify-twilight-hidden-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let store = try FilmtoneSavedLookStore(rootURL: root, defaults: defaults)
+        let semaphore = DispatchSemaphore(value: 0)
+        var caught: Error?
+        var visibleNames: [String] = []
+        var materializedName: String?
+
+        Task {
+            do {
+                let snapshot = try await store.loadOrRebuild()
+                visibleNames = snapshot.looks.map(\.name)
+                materializedName = try await store.loadLook(id: id).name
+            } catch {
+                caught = error
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        if let caught { throw AssertionError(description: "store flow failed: \(caught)") }
+        if visibleNames.contains("Twilight") {
+            throw AssertionError(description: "Twilight must not be visible in the Desktop Look picker snapshot")
+        }
+        try assertEqual(materializedName, "Twilight", "runtime catalog lookup should remain compatible")
+    }
+
     runner.test("Twilight patch carries the representative vision3500t values") {
         guard let preset = FilmtoneCreativePackCatalog.findPresetOnly(slug: "filmtone-built-in-twilight") else {
             throw AssertionError(description: "Twilight preset missing")

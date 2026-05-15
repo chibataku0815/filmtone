@@ -25,7 +25,6 @@ import SwiftUI
 struct EditorSidebar: View {
     @Bindable var state: EditorState
     @Bindable var library: LibraryViewModel
-    @Bindable var importedGradeLibrary: ImportedGradeLibraryViewModel
     var exportCoordinator: ExportCoordinator
 
     var body: some View {
@@ -42,7 +41,6 @@ struct EditorSidebar: View {
             EditorPanelStack(
                 state: state,
                 library: library,
-                importedGradeLibrary: importedGradeLibrary,
                 exportCoordinator: exportCoordinator
             )
             .frame(maxWidth: .infinity)
@@ -55,7 +53,6 @@ struct EditorSidebar: View {
 struct EditorPanelStack: View {
     @Bindable var state: EditorState
     @Bindable var library: LibraryViewModel
-    @Bindable var importedGradeLibrary: ImportedGradeLibraryViewModel
     var exportCoordinator: ExportCoordinator
 
     var body: some View {
@@ -64,8 +61,6 @@ struct EditorPanelStack: View {
                 SourceProfileControls(state: state)
                     .modifier(EditorSidebarPanelGlass())
                 LookLibraryControls(state: state, library: library)
-                    .modifier(EditorSidebarPanelGlass())
-                ImportedGradeLibraryControls(state: state, library: importedGradeLibrary)
                     .modifier(EditorSidebarPanelGlass())
                 QuickAdjustControls(state: state)
                     .modifier(EditorSidebarPanelGlass())
