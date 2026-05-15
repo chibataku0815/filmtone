@@ -45,6 +45,8 @@ enum FilmtoneCreativePackCatalog {
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,

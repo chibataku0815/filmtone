@@ -45,7 +45,9 @@ final class GradeRenderPipeline {
             abs(params.tint) > epsilon ||
             abs(params.fade) > epsilon ||
             abs(params.shadowTone) > epsilon ||
-            abs(params.highlightTone) > epsilon
+            abs(params.highlightTone) > epsilon ||
+            abs(params.blackPoint) > epsilon ||
+            abs(params.toeContrast) > epsilon
         else {
             return image
         }
@@ -64,9 +66,11 @@ final class GradeRenderPipeline {
             return image
         }
 
-        // v1 kernel takes the original 7 args; v2 takes 11 (adds shadowTone /
+        // v1 kernel takes the original 7 args; v2 takes 13 (adds shadowTone /
         // highlightTone / shadowHue / highlightHue for density-dependent
-        // split-tone).
+        // split-tone, plus blackPoint / toeContrast for black floor & toe
+        // hardness shaping). v1 saved Looks ignore the new fields — appearance
+        // unchanged.
         let args: [Any]
         switch presetVersion {
         case "v1":
@@ -92,6 +96,8 @@ final class GradeRenderPipeline {
                 params.highlightTone,
                 params.shadowHue,
                 params.highlightHue,
+                params.blackPoint,
+                params.toeContrast,
             ]
         }
         return kernel.apply(extent: image.extent, arguments: args) ?? image

@@ -1077,6 +1077,8 @@ extension FilmtoneStrings {
             "temperature": filmtoneLocalized("filmtone.param.temperature", defaultValue: "Temperature", comment: "Advanced parameter label."),
             "tint": filmtoneLocalized("filmtone.param.tint", defaultValue: "Tint", comment: "Advanced parameter label."),
             "fade": filmtoneLocalized("filmtone.param.fade", defaultValue: "Fade", comment: "Advanced parameter label."),
+            "blackPoint": filmtoneLocalized("filmtone.param.black_point", defaultValue: "Black Point", comment: "Advanced parameter label."),
+            "toeContrast": filmtoneLocalized("filmtone.param.toe_contrast", defaultValue: "Toe Contrast", comment: "Advanced parameter label."),
             "rgbShift": filmtoneLocalized("filmtone.param.rgb_shift", defaultValue: "Color fringing", comment: "Advanced parameter label."),
             "lensSoftness": filmtoneLocalized("filmtone.param.lens_softness", defaultValue: "Lens softness", comment: "Advanced parameter label."),
             "detailSoftness": filmtoneLocalized("filmtone.param.detail_softness", defaultValue: "Texture softness", comment: "Advanced parameter label."),

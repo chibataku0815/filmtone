@@ -185,6 +185,8 @@ final class OpticsCompositor {
             fade: params.fade,
             shadowTone: params.shadowTone,
             shadowLatitude: params.shadowLatitude,
+            blackPoint: params.blackPoint,
+            toeContrast: params.toeContrast,
             highlightTone: params.highlightTone,
             shadowHue: params.shadowHue,
             highlightHue: params.highlightHue,

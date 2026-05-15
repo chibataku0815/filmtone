@@ -48,6 +48,10 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
           ? z.number().min(0).max(1).default(0)
           : key === "detailSoftness" || key === "shadowLatitude"
           ? z.number().min(0).max(1).default(0)
+          : key === "blackPoint"
+          ? z.number().min(-1).max(1).default(0)
+          : key === "toeContrast"
+          ? z.number().min(0).max(1).default(0)
           : key === "opticalDirectTransmission"
             ? z.number().min(0).max(1).default(1)
           : key === "opticalBlackRetention"

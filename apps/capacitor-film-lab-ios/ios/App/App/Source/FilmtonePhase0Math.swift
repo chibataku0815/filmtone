@@ -42,6 +42,8 @@ extension FilmtonePhase0Params {
             fade: fade,
             shadowTone: shadowTone,
             shadowLatitude: shadowLatitude,
+            blackPoint: blackPoint,
+            toeContrast: toeContrast,
             highlightTone: highlightTone,
             shadowHue: shadowHue,
             highlightHue: highlightHue,
@@ -516,7 +518,7 @@ enum FilmtonePhase0Math {
             return max(0, min(2, value))
         case "temperature", "tint":
             return max(-1, min(1, value))
-        case "cyan", "magenta", "yellow":
+        case "cyan", "magenta", "yellow", "blackPoint":
             return max(-1, min(1, value))
         case "halationSpread":
             return max(0, min(40, value))
@@ -551,6 +553,7 @@ enum FilmtonePhase0Math {
              "compressionRange",
              "printContrast",
              "fade",
+             "toeContrast",
              "vignette":
             return max(0, min(1, value))
         default:

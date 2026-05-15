@@ -76,6 +76,8 @@ enum AdvancedAdjustCatalog {
                     .init(key: "temperature", label: strings.paramLabel(for: "temperature"), range: -1...1, digits: 2),
                     .init(key: "tint",        label: strings.paramLabel(for: "tint"),        range: -1...1, digits: 2),
                     .init(key: "fade",        label: strings.paramLabel(for: "fade"),        range: 0...1,  digits: 2),
+                    .init(key: "blackPoint",  label: strings.paramLabel(for: "blackPoint"),  range: -1...1, digits: 2),
+                    .init(key: "toeContrast", label: strings.paramLabel(for: "toeContrast"), range: 0...1,  digits: 2),
                 ],
                 videoOnly: false,
                 // iOS canonical: basic group ships with no recipe chips.
@@ -327,7 +329,7 @@ enum AdvancedAdjustCatalog {
             return max(-2, min(2, value))
         case "contrast", "saturation":
             return max(0, min(2, value))
-        case "temperature", "tint", "cyan", "magenta", "yellow":
+        case "temperature", "tint", "cyan", "magenta", "yellow", "blackPoint":
             return max(-1, min(1, value))
         case "halationSpread":
             return max(0, min(40, value))
@@ -360,6 +362,7 @@ enum AdvancedAdjustCatalog {
              "printContrast",
              "fade",
              "vignette",
+             "toeContrast",
              "filmBreathAmount":
             return max(0, min(1, value))
         default:

@@ -31,9 +31,14 @@ describe("bakeColorOnly — identity contract", () => {
     }
   });
 
-  test("BAKE_COLOR_PARAM_KEYS contains exactly 12 ops", () => {
-    expect(BAKE_COLOR_PARAM_KEYS.length).toBe(12);
-    expect(new Set(BAKE_COLOR_PARAM_KEYS).size).toBe(12);
+  test("BAKE_COLOR_PARAM_KEYS contains exactly 14 ops", () => {
+    expect(BAKE_COLOR_PARAM_KEYS.length).toBe(14);
+    expect(new Set(BAKE_COLOR_PARAM_KEYS).size).toBe(14);
+  });
+
+  test("BAKE_COLOR_PARAM_KEYS includes blackPoint and toeContrast", () => {
+    expect(BAKE_COLOR_PARAM_KEYS).toContain("blackPoint");
+    expect(BAKE_COLOR_PARAM_KEYS).toContain("toeContrast");
   });
 });
 
@@ -81,6 +86,50 @@ describe("bakeColorOnly — Stage 2 (baseGrade) directional checks", () => {
     const params: BakeColorParams = { ...BAKE_COLOR_IDENTITY, fade: 0.5 };
     const out = bakeColorOnly({ r: 0, g: 0, b: 0 }, params);
     expect(out.r).toBeCloseTo(0.5, 6);
+  });
+
+  test("blackPoint > 0 lifts black via shadow-masked addition", () => {
+    const params: BakeColorParams = { ...BAKE_COLOR_IDENTITY, blackPoint: 1 };
+    const black = bakeColorOnly({ r: 0, g: 0, b: 0 }, params);
+    // bp=+1 → max lift 0.18 at luma=0
+    expect(black.r).toBeCloseTo(0.18, 4);
+    // highlights untouched (mask falls off by luma=0.35)
+    const white = bakeColorOnly({ r: 1, g: 1, b: 1 }, params);
+    expect(white.r).toBeCloseTo(1, 4);
+  });
+
+  test("blackPoint < 0 applies Baselight Flare: 0 anchor preserved, x=1 unchanged", () => {
+    const params: BakeColorParams = { ...BAKE_COLOR_IDENTITY, blackPoint: -1 };
+    const black = bakeColorOnly({ r: 0, g: 0, b: 0 }, params);
+    expect(black.r).toBeCloseTo(0, 8);
+    const white = bakeColorOnly({ r: 1, g: 1, b: 1 }, params);
+    expect(white.r).toBeCloseTo(1, 6);
+    // intermediate value should be lower than input (crush)
+    const mid = bakeColorOnly({ r: 0.5, g: 0.5, b: 0.5 }, params);
+    expect(mid.r).toBeLessThan(0.5);
+  });
+
+  test("toeContrast > 0 hardens toe near black but preserves 0 anchor", () => {
+    const params: BakeColorParams = { ...BAKE_COLOR_IDENTITY, toeContrast: 1 };
+    const black = bakeColorOnly({ r: 0, g: 0, b: 0 }, params);
+    expect(black.r).toBeCloseTo(0, 8);
+    // value within toe range should be compressed
+    const nearBlack = bakeColorOnly({ r: 0.05, g: 0.05, b: 0.05 }, params);
+    expect(nearBlack.r).toBeLessThan(0.05);
+    // value above toe range (>0.15) should be untouched
+    const above = bakeColorOnly({ r: 0.5, g: 0.5, b: 0.5 }, params);
+    expect(above.r).toBeCloseTo(0.5, 6);
+  });
+
+  test("blackPoint=+1 and toeContrast=1 combined are non-cancelling", () => {
+    const params: BakeColorParams = {
+      ...BAKE_COLOR_IDENTITY,
+      toeContrast: 1,
+      blackPoint: 1,
+    };
+    const black = bakeColorOnly({ r: 0, g: 0, b: 0 }, params);
+    // toe at 0 returns 0, then blackPoint lifts to ~0.18
+    expect(black.r).toBeGreaterThan(0.1);
   });
 });
 
@@ -152,6 +201,8 @@ describe("bakeColorOnly — output bounds", () => {
       saturation: 1.5,
       temperature: 0.8,
       tint: -0.5,
+      toeContrast: 0.5,
+      blackPoint: -0.5,
       fade: 0.3,
       compressionAmount: 0.7,
       compressionRange: 0.5,

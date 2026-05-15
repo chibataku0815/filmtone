@@ -173,6 +173,8 @@ enum FilmtoneGradePipeline {
             || abs(p.fade) > epsilon
             || abs(p.shadowTone) > epsilon
             || abs(p.highlightTone) > epsilon
+            || abs(p.blackPoint) > epsilon
+            || abs(p.toeContrast) > epsilon
     }
 
     private static func shouldApplyPrintStage(_ p: FilmtonePhase0Params) -> Bool {
@@ -197,6 +199,8 @@ enum FilmtoneGradePipeline {
             params.highlightTone,
             params.shadowHue,
             params.highlightHue,
+            params.blackPoint,
+            params.toeContrast,
         ]) ?? image
     }
 

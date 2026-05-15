@@ -1035,6 +1035,11 @@ enum FilmtoneConnectCubeWriter {
         return current
     }
 
+    // NOTE: this baker is an APPROXIMATION of baseGradeV2 — it lacks the 3-piece
+    // contrast curve, crosstalk split-tone, and shadow-only fade mask of the
+    // CIKL kernel. New 2 ops (toeContrast / blackPoint) are inserted at the
+    // CIKL-canonical position (fade 直前) but the surrounding stages remain
+    // approximate. Full parity is tracked in a separate lane.
     private static func applyBaseGrade(_ rgb: RGB, params: Phase0ParamsDTO) -> RGB {
         var out = rgb
         let exposureScale = pow(2.0, params.exposure)
@@ -1056,6 +1061,40 @@ enum FilmtoneConnectCubeWriter {
         out.r += params.tint * 0.05
         out.g -= params.tint * 0.08
         out.b += params.tint * 0.05
+
+        // toeContrast → blackPoint (fade 直前位置)
+        let lumaTB = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b
+        if params.toeContrast > 0.0001 {
+            let toeMaskAmt = (1.0 - smoothstep(edge0: 0.0, edge1: 0.15, x: lumaTB)) * params.toeContrast
+            if toeMaskAmt > 0 {
+                let exponent = 1.0 + toeMaskAmt * 1.5
+                let tR = pow(max(out.r, 0.0), exponent)
+                let tG = pow(max(out.g, 0.0), exponent)
+                let tB = pow(max(out.b, 0.0), exponent)
+                out.r = mix(out.r, tR, toeMaskAmt)
+                out.g = mix(out.g, tG, toeMaskAmt)
+                out.b = mix(out.b, tB, toeMaskAmt)
+            }
+        }
+        let bpPos = max(params.blackPoint, 0.0)
+        let bpNeg = max(-params.blackPoint, 0.0)
+        if bpPos > 0.0001 {
+            let luma2 = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b
+            let shadowMaskBp = 1.0 - smoothstep(edge0: 0.0, edge1: 0.35, x: luma2)
+            let lift = bpPos * 0.18 * shadowMaskBp
+            out.r += lift
+            out.g += lift
+            out.b += lift
+        }
+        if bpNeg > 0.0001 {
+            let f = bpNeg * 0.15
+            let xR = max(out.r, 0.0)
+            let xG = max(out.g, 0.0)
+            let xB = max(out.b, 0.0)
+            out.r = xR * xR * (1.0 + f) / (xR + f)
+            out.g = xG * xG * (1.0 + f) / (xG + f)
+            out.b = xB * xB * (1.0 + f) / (xB + f)
+        }
 
         out.r = out.r + params.fade * (1.0 - out.r)
         out.g = out.g + params.fade * (1.0 - out.g)

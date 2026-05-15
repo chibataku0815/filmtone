@@ -15,9 +15,9 @@ func registerCoreCatalogStoreStringTests() {
     runner.test("AdvancedAdjustCatalog group + control counts match the spec") {
         let allKeys = AdvancedAdjustCatalog.allGroups.flatMap { $0.controls.map(\.key) }
         try assertEqual(AdvancedAdjustCatalog.allGroups.count, 6, "expected 6 groups")
-        try assertEqual(allKeys.count, 33, "expected 33 controls total")
+        try assertEqual(allKeys.count, 35, "expected 35 controls total (32 base + filmBreathAmount + blackPoint + toeContrast)")
         try assertEqual(
-            Set(allKeys).count, 33,
+            Set(allKeys).count, 35,
             "control key collision — every key must appear exactly once"
         )
     }
@@ -27,8 +27,8 @@ func registerCoreCatalogStoreStringTests() {
             .flatMap { $0.controls.map(\.key) }
         let videoKeys = AdvancedAdjustCatalog.groups(forVideo: true)
             .flatMap { $0.controls.map(\.key) }
-        try assertEqual(stillKeys.count, 30, "still mode = 33 - 3 motion")
-        try assertEqual(videoKeys.count, 33, "video mode exposes all 33")
+        try assertEqual(stillKeys.count, 32, "still mode = 35 - 3 motion (shutterAngle + trailIntensity + filmBreathAmount)")
+        try assertEqual(videoKeys.count, 35, "video mode exposes all 35")
         if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") || stillKeys.contains("filmBreathAmount") {
             throw AssertionError(description: "still mode must not surface motion params")
         }
@@ -129,6 +129,8 @@ func registerCoreCatalogStoreStringTests() {
         "temperature": "Temperature",
         "tint": "Tint",
         "fade": "Fade",
+        "blackPoint": "Black Point",
+        "toeContrast": "Toe Contrast",
         "rgbShift": "Color fringing",
         "lensSoftness": "Lens softness",
         "detailSoftness": "Texture softness",

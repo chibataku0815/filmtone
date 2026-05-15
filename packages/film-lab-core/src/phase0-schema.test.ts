@@ -77,6 +77,44 @@ describe("phase0 schema", () => {
     }
   });
 
+  test("blackPoint defaults to 0 when omitted from a phase0 patch", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { blackPoint: _omit, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    expect(parsed.blackPoint).toBe(0);
+  });
+
+  test("blackPoint accepts -1/+1 boundaries and rejects out-of-range values", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    for (const val of [-1, -0.5, 0, 0.5, 1]) {
+      expect(phase0ParamsSchema.parse({ ...reset, blackPoint: val }).blackPoint).toBe(val);
+    }
+    for (const val of [-1.01, 1.01]) {
+      expect(
+        phase0ParamsSchema.safeParse({ ...reset, blackPoint: val }).success,
+      ).toBe(false);
+    }
+  });
+
+  test("toeContrast defaults to 0 when omitted from a phase0 patch", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { toeContrast: _omit, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    expect(parsed.toeContrast).toBe(0);
+  });
+
+  test("toeContrast accepts 0/1 boundaries and rejects out-of-range values", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    for (const val of [0, 0.5, 1]) {
+      expect(phase0ParamsSchema.parse({ ...reset, toeContrast: val }).toeContrast).toBe(val);
+    }
+    for (const val of [-0.01, 1.01]) {
+      expect(
+        phase0ParamsSchema.safeParse({ ...reset, toeContrast: val }).success,
+      ).toBe(false);
+    }
+  });
+
   test("mergePhase0Params preserves detailSoftness and still strips unknown keys", () => {
     const merged = mergePhase0Params(pickPhase0Params(PRESETS.reset), {
       detailSoftness: 0.42,

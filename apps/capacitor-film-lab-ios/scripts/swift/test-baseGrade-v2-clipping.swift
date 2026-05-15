@@ -65,7 +65,8 @@ private func bakeBaseGradeV2(
     exposure: Double, contrast: Double, saturation: Double,
     temperature: Double, tint: Double, fade: Double,
     shadowTone: Double = 0.0, highlightTone: Double = 0.0,
-    shadowHue: Double = 225.0, highlightHue: Double = 30.0
+    shadowHue: Double = 225.0, highlightHue: Double = 30.0,
+    blackPoint: Double = 0.0, toeContrast: Double = 0.0
 ) -> (r: Double, g: Double, b: Double) {
     // 1. Exposure
     var rr = r * pow(2.0, exposure)
@@ -118,6 +119,40 @@ private func bakeBaseGradeV2(
     rr += shadowMaskCT * shadowTone * sc.r + highlightMaskCT * highlightTone * hc.r
     gg += shadowMaskCT * shadowTone * sc.g + highlightMaskCT * highlightTone * hc.g
     bb += shadowMaskCT * shadowTone * sc.b + highlightMaskCT * highlightTone * hc.b
+
+    // 5.5 toeContrast → blackPoint (fade 直前位置、CIKL baseGradeV2 と同位置)
+    let lumaTB = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
+    if toeContrast > 0.0001 {
+        let toeMaskAmt = (1.0 - smoothstep(0.0, 0.15, lumaTB)) * toeContrast
+        if toeMaskAmt > 0 {
+            let exponent = 1.0 + toeMaskAmt * 1.5
+            let tR = pow(max(rr, 0.0), exponent)
+            let tG = pow(max(gg, 0.0), exponent)
+            let tB = pow(max(bb, 0.0), exponent)
+            rr = rr + (tR - rr) * toeMaskAmt
+            gg = gg + (tG - gg) * toeMaskAmt
+            bb = bb + (tB - bb) * toeMaskAmt
+        }
+    }
+    let bpPos = max(blackPoint, 0.0)
+    let bpNeg = max(-blackPoint, 0.0)
+    if bpPos > 0.0001 {
+        let luma2 = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
+        let shadowMaskBp = 1.0 - smoothstep(0.0, 0.35, luma2)
+        let lift = bpPos * 0.18 * shadowMaskBp
+        rr += lift
+        gg += lift
+        bb += lift
+    }
+    if bpNeg > 0.0001 {
+        let f = bpNeg * 0.15
+        let xR = max(rr, 0.0)
+        let xG = max(gg, 0.0)
+        let xB = max(bb, 0.0)
+        rr = xR * xR * (1.0 + f) / (xR + f)
+        gg = xG * xG * (1.0 + f) / (xG + f)
+        bb = xB * xB * (1.0 + f) / (xB + f)
+    }
 
     // 6. Fade — shadow-only mask (no highlight bleed)
     let lumaFade = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb
@@ -364,13 +399,105 @@ func runProbes() throws {
     )
     try expect(abs(darkUnderHighlight.r - 0.05) < 0.01,
                "highlightTone leaked into shadow: r=\(darkUnderHighlight.r)")
+
+    // Probe 10 (NEW): blackPoint = 0 / toeContrast = 0 is no-op (identity)
+    let bpNoop = bakeBaseGradeV2(
+        r: 0.42, g: 0.42, b: 0.42,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 0.0, toeContrast: 0.0
+    )
+    try expect(abs(bpNoop.r - 0.42) < 1e-12 && abs(bpNoop.g - 0.42) < 1e-12 && abs(bpNoop.b - 0.42) < 1e-12,
+               "blackPoint=0 / toeContrast=0 must be identity: got \(bpNoop)")
+
+    // Probe 11 (NEW): blackPoint = +1 lifts deep black to ~0.18, highlights untouched
+    let bpLift = bakeBaseGradeV2(
+        r: 0.0, g: 0.0, b: 0.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 1.0, toeContrast: 0.0
+    )
+    try expect(abs(bpLift.r - 0.18) < 1e-6 && abs(bpLift.g - 0.18) < 1e-6 && abs(bpLift.b - 0.18) < 1e-6,
+               "blackPoint=+1 must lift black to 0.18: got \(bpLift)")
+    let bpHighlight = bakeBaseGradeV2(
+        r: 1.0, g: 1.0, b: 1.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 1.0, toeContrast: 0.0
+    )
+    try expect(abs(bpHighlight.r - 1.0) < 1e-6,
+               "blackPoint=+1 must leave highlights untouched: r=\(bpHighlight.r)")
+
+    // Probe 12 (NEW): blackPoint = -1 applies Baselight Flare. 0 anchor stays at 0,
+    // x=1 stays at 1, intermediate values are smoothly crushed.
+    let bpCrushBlack = bakeBaseGradeV2(
+        r: 0.0, g: 0.0, b: 0.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: -1.0, toeContrast: 0.0
+    )
+    try expect(abs(bpCrushBlack.r) < 1e-9,
+               "blackPoint=-1 must preserve 0 anchor: r=\(bpCrushBlack.r)")
+    let bpCrushWhite = bakeBaseGradeV2(
+        r: 1.0, g: 1.0, b: 1.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: -1.0, toeContrast: 0.0
+    )
+    try expect(abs(bpCrushWhite.r - 1.0) < 1e-6,
+               "blackPoint=-1 must leave x=1 unchanged (renormalized flare): r=\(bpCrushWhite.r)")
+    let bpCrushMid = bakeBaseGradeV2(
+        r: 0.5, g: 0.5, b: 0.5,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: -1.0, toeContrast: 0.0
+    )
+    try expect(bpCrushMid.r < 0.5,
+               "blackPoint=-1 must crush midtones: r=\(bpCrushMid.r)")
+
+    // Probe 13 (NEW): toeContrast = 1 hardens toe near black, preserves 0 anchor and values above 0.15
+    let toeBlack = bakeBaseGradeV2(
+        r: 0.0, g: 0.0, b: 0.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 0.0, toeContrast: 1.0
+    )
+    try expect(abs(toeBlack.r) < 1e-9,
+               "toeContrast=1 must preserve 0 anchor: r=\(toeBlack.r)")
+    let toeAbove = bakeBaseGradeV2(
+        r: 0.5, g: 0.5, b: 0.5,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 0.0, toeContrast: 1.0
+    )
+    try expect(abs(toeAbove.r - 0.5) < 1e-9,
+               "toeContrast=1 must not affect values above 0.15: r=\(toeAbove.r)")
+    let toeNear = bakeBaseGradeV2(
+        r: 0.05, g: 0.05, b: 0.05,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 0.0, toeContrast: 1.0
+    )
+    try expect(toeNear.r < 0.05,
+               "toeContrast=1 must compress near-black: r=\(toeNear.r)")
+
+    // Probe 14 (NEW): blackPoint=+1 and toeContrast=1 combined are non-cancelling
+    // (toe applied first, then blackPoint lift)
+    let bpToeCombined = bakeBaseGradeV2(
+        r: 0.0, g: 0.0, b: 0.0,
+        exposure: 0.0, contrast: 1.0, saturation: 1.0,
+        temperature: 0.0, tint: 0.0, fade: 0.0,
+        blackPoint: 1.0, toeContrast: 1.0
+    )
+    try expect(bpToeCombined.r > 0.1,
+               "blackPoint=+1 / toeContrast=1 must NOT cancel: black should still lift, got r=\(bpToeCombined.r)")
 }
 
 // MARK: - main
 
 do {
     try runProbes()
-    print("[baseGrade-v2-clipping] all 9 probes green")
+    print("[baseGrade-v2-clipping] all 14 probes green")
     exit(0)
 } catch let error as V2ProbeError {
     print("[baseGrade-v2-clipping] FAIL: \(error.message)")
