@@ -33,6 +33,7 @@ PKG_OBJECTS=(
   "$PKG_OBJ_DIR/FilmtonePhase0Params.swift.o"
   "$PKG_OBJ_DIR/FilmtonePhase0ParamsPatch.swift.o"
   "$PKG_OBJ_DIR/FilmtoneHighlightMarkers.swift.o"
+  "$PKG_OBJ_DIR/FilmtoneVideoTiming.swift.o"
   "$PKG_OBJ_DIR/Phase0OutputProfileDTO.swift.o"
 )
 

@@ -1,4 +1,5 @@
 import Foundation
+import FilmLabSwiftCore
 
 // M5-C.4: persisted result snapshot for the Export Inspector finished
 // state. Stored on `EditorState.lastExportResult` and reset by either
@@ -19,6 +20,8 @@ struct ExportResultSnapshot: Equatable {
     let fileSizeBytes: Int64
     let elapsedSeconds: Double
     let sourceKind: FilmtoneSourceKind
+    let videoTimingMode: FilmtoneVideoTimingMode?
+    let outputFrameRate: Int?
 }
 
 enum FilmtoneFormatters {

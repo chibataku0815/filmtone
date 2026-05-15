@@ -293,7 +293,7 @@ struct RootWindowView: View {
             // Both surfaces remain fully usable simultaneously and the
             // rail no longer needs vertical clearance above the scrub bar.
             if state.sourceKind == .video,
-               let duration = state.videoDurationSeconds,
+               let duration = state.videoDisplayDurationSeconds,
                duration > 0 {
                 videoScrubOverlay(duration: duration)
                     .zIndex(1)
@@ -819,11 +819,10 @@ private struct VideoScrubBar: View {
 
     private var seconds: Binding<Double> {
         Binding(
-            get: { state.videoPreviewSeconds ?? 0 },
+            get: { state.videoDisplayPreviewSeconds ?? 0 },
             set: { newValue in
                 let clamped = max(0, min(newValue, duration))
-                state.videoPreviewSeconds = clamped
-                state.seekVideo(toSeconds: clamped)
+                state.seekVideo(toDisplaySeconds: clamped)
             }
         )
     }
@@ -834,7 +833,7 @@ private struct VideoScrubBar: View {
     private var activeThumbnailFraction: Double? {
         if let hoverFraction { return hoverFraction }
         if state.isScrubbing, duration > 0,
-           let secs = state.videoPreviewSeconds {
+           let secs = state.videoDisplayPreviewSeconds {
             return min(1.0, max(0.0, secs / duration))
         }
         return nil
@@ -950,7 +949,7 @@ private struct VideoScrubBar: View {
     private var markersRow: some View {
         HStack(spacing: 12) {
             Button {
-                state.addHighlightMarker(at: seconds.wrappedValue)
+                state.addHighlightMarker(at: state.videoTimingPolicy.sourceTime(forDisplayTime: seconds.wrappedValue))
             } label: {
                 Image(systemName: "bookmark.fill")
                     .frame(width: 14, height: 14)
@@ -1074,7 +1073,8 @@ private struct VideoScrubBar: View {
         }
         let knob: CGFloat = 18
         let usable = max(width - knob, 1)
-        let ratio = min(1.0, max(0.0, sourceTimeSec / duration))
+        let displayTimeSec = state.videoTimingPolicy.displayTime(forSourceTime: sourceTimeSec)
+        let ratio = min(1.0, max(0.0, displayTimeSec / duration))
         return knob / 2 + CGFloat(ratio) * usable
     }
 
@@ -1138,7 +1138,8 @@ private struct VideoScrubBar: View {
         guard let frac = activeThumbnailFraction,
               let session = state.videoSession,
               duration > 0 else { return }
-        let secs = duration * frac
+        let displaySecs = duration * frac
+        let secs = state.videoTimingPolicy.sourceTime(forDisplayTime: displaySecs)
         session.thumbnailProvider.requestThumbnail(
             atSeconds: secs
         ) { image, atSeconds in

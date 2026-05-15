@@ -476,6 +476,32 @@ struct Phase0ExportRequestDTO: Codable {
     /// Kept in the render request so preview, export, and sidecar construction
     /// consume the same Look + Veil state snapshot.
     var opticalFilterProfileId: String? = nil
+    /// v1.5 video timing — nil / absent means normal timing. `.slow24` is
+    /// honored only for video sources whose probed frame rate is above 24fps.
+    var videoTimingMode: FilmtoneVideoTimingMode? = nil
+}
+
+extension Phase0ExportRequestDTO {
+    var sourceVideoFPS: Double? {
+        FilmtoneVideoTimingPolicy.validFPS(
+            sourceProbe?.frameRate ?? sourceProbe?.sourceVideoMetadata?.timing?.nominalFrameRate
+        )
+    }
+
+    var videoTimingPolicy: FilmtoneVideoTimingPolicy {
+        FilmtoneVideoTimingPolicy(
+            mode: videoTimingMode ?? .normal,
+            sourceFPS: sourceVideoFPS
+        )
+    }
+
+    var effectiveOutputFPS: Int {
+        videoTimingPolicy.isSlow24 ? videoTimingPolicy.targetFPS : output.fps
+    }
+
+    var effectivePreserveAudio: Bool {
+        videoTimingPolicy.isSlow24 ? false : output.preserveAudio
+    }
 }
 
 struct Phase0ExportProgressDTO: Encodable {
@@ -536,6 +562,8 @@ struct Phase0ExportResultDTO: Encodable {
     let fileSizeBytes: Int?
     let realtimeRatio: Double?
     let audioPreserved: Bool?
+    let videoTimingMode: String?
+    let audioPolicy: String?
     let benchmarkRecord: Phase0ExportBenchmarkRecordDTO?
     // v1.1: filmtone-ios-export-session-v1 sidecar JSON URI (app container temp URL).
     //       nil when sidecar write failed or disabled.
@@ -558,6 +586,8 @@ struct Phase0ExportResultDTO: Encodable {
         fileSizeBytes: Int?,
         realtimeRatio: Double?,
         audioPreserved: Bool?,
+        videoTimingMode: String? = nil,
+        audioPolicy: String? = nil,
         benchmarkRecord: Phase0ExportBenchmarkRecordDTO?,
         sidecarUri: String? = nil,
         audioDiagnosticsUri: String? = nil,
@@ -572,6 +602,8 @@ struct Phase0ExportResultDTO: Encodable {
         self.fileSizeBytes = fileSizeBytes
         self.realtimeRatio = realtimeRatio
         self.audioPreserved = audioPreserved
+        self.videoTimingMode = videoTimingMode
+        self.audioPolicy = audioPolicy
         self.benchmarkRecord = benchmarkRecord
         self.sidecarUri = sidecarUri
         self.audioDiagnosticsUri = audioDiagnosticsUri

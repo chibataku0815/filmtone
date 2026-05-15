@@ -95,13 +95,13 @@ final class ExportConnectPackageAssembler {
                 cubeFilename: cubeURL.lastPathComponent,
                 preOpticalColorFilename: preOpticalCubeURL.lastPathComponent,
                 postOpticalColorFilename: postOpticalCubeURL.lastPathComponent,
-                outputFps: request.output.fps,
+                outputFps: request.effectiveOutputFPS,
                 sourceSeed: sourceSeed,
                 to: dctlURL
             )
             let referenceAfterTimeSec = try writeReferenceAfterImage(
                 referenceURL,
-                result.sourceDurationSec
+                result.outputDurationSec
             )
             return Companions(
                 sourceMediaURL: sourcePackageURL,

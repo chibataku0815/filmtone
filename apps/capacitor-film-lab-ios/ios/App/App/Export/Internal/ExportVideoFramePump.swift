@@ -83,6 +83,31 @@ final class ExportVideoFramePump {
 
                 do {
                     try checkCancelled()
+                    if timeline.timingPolicy.isSlow24 {
+                        let decodedSample = performanceMetrics.measure(.decode) {
+                            signposter.withIntervalSignpost("decode") {
+                                videoOutput.copyNextSampleBuffer()
+                            }
+                        }
+                        guard let sampleBuffer = decodedSample else {
+                            if reader.status == .failed {
+                                throw FilmtoneMediaError.exportFailed(reader.error?.localizedDescription ?? "Video read failed.")
+                            }
+                            completion.finishVideoInput(markAsFinished: true)
+                            return
+                        }
+                        let timedSample = timeline.makeTimedSample(sampleBuffer)
+                        let outputTime = timeline.outputPresentationTime(for: nextOutputFrameIndex)
+                        try appendFrame(AppendRequest(
+                            sample: timedSample,
+                            outputPresentationTime: outputTime,
+                            sourceLookupTime: timedSample.timelineTime,
+                            sourceSegmentIndex: nil
+                        ))
+                        recordAppendedFrame(at: outputTime, progress: progress)
+                        continue
+                    }
+
                     guard nextOutputFrameIndex < timeline.outputFrameCount else {
                         completion.finishVideoInput(markAsFinished: true)
                         return

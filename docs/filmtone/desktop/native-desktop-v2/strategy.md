@@ -95,6 +95,15 @@ content layer stays glass-free so color judgment is not compromised.
   `cb23f1f0b1f37c17f4eaf547975a88bc48d6ae28b720256950ffcf821ede2045`.
   Prep log archived at
   `archive/2026-05-12-native-desktop-v1-7-release-prep.md`.
+- 2026-05-15 JST: 24fps Slow Mode (iOS + macOS) shipped to native lanes. Adds
+  user-selected `slow24` video timing for sources above 24fps; additive sidecar
+  / result timing metadata; no `Phase0OutputProfileDTO` schema change. iOS
+  embeds timing fields in `output` while macOS writes a top-level `videoTiming`
+  — cross-platform sidecar shape unification is a follow-up. Active archived
+  at `archive/2026-05-15-24fps-slow-mode-active.md`.
+- 2026-05-16 JST: 24fps Slow Mode review fixes landed (F1 image timing gate +
+  F2 `CompletedExport` source/output duration split). VFR `estimatedFrameRate`
+  fallback deferred. Archived at `archive/2026-05-16-24fps-slow-mode-review-fixes.md`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G

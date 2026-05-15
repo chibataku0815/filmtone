@@ -25,6 +25,8 @@ final class EditorState {
     var videoDurationSeconds: Double?
     /// Nominal source fps used to derive Resolve-friendly marker frame ids.
     var videoNominalFrameRate: Double?
+    /// Explicit video timing mode for preview + normal video export.
+    var videoTimingMode: FilmtoneVideoTimingMode = .normal
     /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
     /// pushed via the session's `onPlayingChange` callback so the
     /// Play/Pause button glyph stays in sync with the AVPlayer rather
@@ -208,6 +210,30 @@ final class EditorState {
         )
     }
 
+    var videoTimingPolicy: FilmtoneVideoTimingPolicy {
+        FilmtoneVideoTimingPolicy(
+            mode: videoTimingMode,
+            sourceFPS: videoNominalFrameRate
+        )
+    }
+
+    var resolvedVideoTimingMode: FilmtoneVideoTimingMode {
+        videoTimingPolicy.resolvedMode
+    }
+
+    var canUseSlow24VideoTiming: Bool {
+        sourceKind == .video && FilmtoneVideoTimingPolicy.isSlow24Eligible(sourceFPS: videoNominalFrameRate)
+    }
+
+    var videoDisplayDurationSeconds: Double? {
+        videoTimingPolicy.displayDuration(sourceDuration: videoDurationSeconds)
+    }
+
+    var videoDisplayPreviewSeconds: Double? {
+        guard let videoPreviewSeconds else { return nil }
+        return videoTimingPolicy.displayTime(forSourceTime: videoPreviewSeconds)
+    }
+
     var presetParams: FilmtonePhase0Params {
         FilmtoneGradeResolution.resolve(recipe: currentGradeRecipe).params
     }
@@ -284,6 +310,7 @@ final class EditorState {
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
         videoNominalFrameRate = nil
+        videoTimingMode = .normal
         if let url, kind == .video {
             highlightMarkers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: url)
         } else {
@@ -350,6 +377,7 @@ final class EditorState {
             self.applyProbedSourceColorClass(session.probedColorClass, for: url)
             // Apply the playback rate the user previously selected before
             // a new source replaced the prior session.
+            session.setTimingPolicy(self.videoTimingPolicy)
             session.setRate(self.playbackRate)
             session.onTimeUpdate = { [weak self] seconds in
                 guard let self else { return }
@@ -456,11 +484,29 @@ final class EditorState {
         videoSession?.seek(toSeconds: seconds)
     }
 
+    func seekVideo(toDisplaySeconds seconds: Double) {
+        let sourceSeconds = videoTimingPolicy.sourceTime(forDisplayTime: seconds)
+        videoPreviewSeconds = sourceSeconds
+        videoSession?.seek(toSeconds: sourceSeconds)
+    }
+
     /// Update playback rate (1×/2×/3×). Stored on EditorState so the
     /// rate menu binding is stable across session rebuilds.
     func setPlaybackRate(_ rate: Double) {
         playbackRate = rate
         videoSession?.setRate(rate)
+    }
+
+    func setVideoTimingMode(_ mode: FilmtoneVideoTimingMode) {
+        let nextMode: FilmtoneVideoTimingMode = mode == .slow24 && canUseSlow24VideoTiming
+            ? .slow24
+            : .normal
+        guard videoTimingMode != nextMode else { return }
+        videoTimingMode = nextMode
+        videoSession?.setTimingPolicy(videoTimingPolicy)
+        videoSession?.setRate(playbackRate)
+        lastExportResult = nil
+        lastExportError = nil
     }
 
     /// Push the current edit state snapshot into the live video

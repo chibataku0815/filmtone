@@ -322,4 +322,28 @@ struct Phase0ExportRequestDTO: Codable {
     let depthRenderer: String?
     var connectPackage: Bool? = nil
     var opticalFilterProfileId: String? = nil
+    var videoTimingMode: FilmtoneVideoTimingMode? = nil
+}
+
+extension Phase0ExportRequestDTO {
+    var sourceVideoFPS: Double? {
+        FilmtoneVideoTimingPolicy.validFPS(
+            sourceProbe?.frameRate ?? sourceProbe?.sourceVideoMetadata?.timing?.nominalFrameRate
+        )
+    }
+
+    var videoTimingPolicy: FilmtoneVideoTimingPolicy {
+        FilmtoneVideoTimingPolicy(
+            mode: videoTimingMode ?? .normal,
+            sourceFPS: sourceVideoFPS
+        )
+    }
+
+    var effectiveOutputFPS: Int {
+        videoTimingPolicy.isSlow24 ? videoTimingPolicy.targetFPS : output.fps
+    }
+
+    var effectivePreserveAudio: Bool {
+        output.preserveAudio && !videoTimingPolicy.isSlow24
+    }
 }

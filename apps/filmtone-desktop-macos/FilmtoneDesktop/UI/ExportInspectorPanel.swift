@@ -1,4 +1,5 @@
 import AppKit
+import FilmLabSwiftCore
 import SwiftUI
 
 // M5-C.4: Mac-native Export Inspector. Mirrors iOS canonical
@@ -44,6 +45,10 @@ struct ExportInspectorPanel: View {
     private var readyState: some View {
         VStack(alignment: .leading, spacing: 10) {
             formatSelector
+
+            if state.canUseSlow24VideoTiming {
+                videoTimingSelector
+            }
 
             if state.exportFormat == .jpeg && state.sourceKind == .still {
                 VStack(alignment: .leading, spacing: 8) {
@@ -127,6 +132,45 @@ struct ExportInspectorPanel: View {
         .disabled(state.sourceKind == .video)
     }
 
+    private var videoTimingSelector: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                videoTimingButton(.normal, label: "Normal")
+                videoTimingButton(.slow24, label: "24 fps Slow")
+            }
+            .padding(4)
+            .frame(width: 220)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.16))
+            )
+            .glassEffect(
+                .clear.tint(Color.white.opacity(0.07)),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+
+            Text("Uses each source frame at 24 fps. Audio is not included.")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func videoTimingButton(_ mode: FilmtoneVideoTimingMode, label: String) -> some View {
+        Button {
+            state.setVideoTimingMode(mode)
+        } label: {
+            Text(label)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: state.resolvedVideoTimingMode == mode))
+        .filmtonePointingHandCursor()
+    }
+
     private func exportFormatButton(_ format: StillExportFormat, label: String) -> some View {
         Button {
             state.exportFormat = format
@@ -184,6 +228,12 @@ struct ExportInspectorPanel: View {
                     value: "\(result.pixelWidth)×\(result.pixelHeight)"
                         + (result.processedFrames.map { " · \($0)f" } ?? "")
                 )
+                if result.videoTimingMode == .slow24 {
+                    MetricRow(
+                        label: "Timing",
+                        value: "24 fps Slow · no audio"
+                    )
+                }
                 MetricRow(
                     label: "File size",
                     value: FilmtoneFormatters.formattedFileSize(result.fileSizeBytes)

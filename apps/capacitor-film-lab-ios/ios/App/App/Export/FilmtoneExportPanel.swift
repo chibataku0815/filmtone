@@ -1,3 +1,4 @@
+import FilmLabSwiftCore
 import SwiftUI
 
 struct FilmtoneExportPanel: View {
@@ -102,6 +103,10 @@ struct FilmtoneExportPanel: View {
             }
 
             if store.source != nil {
+                if store.canUseSlow24VideoTiming {
+                    videoTimingSelector
+                }
+
                 HStack(spacing: 12) {
                     MetricCard(label: store.strings.strengthLabel, value: percentLabel(store.project.strength))
                     MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
@@ -116,6 +121,40 @@ struct FilmtoneExportPanel: View {
         }
         .padding(.vertical, 16)
         .overlay(alignment: .top) { divider }
+    }
+
+    private var videoTimingSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                videoTimingButton(.normal, label: store.strings.usesJapaneseTypography ? "通常" : "Normal")
+                videoTimingButton(.slow24, label: store.strings.usesJapaneseTypography ? "24fpsスロー" : "24 fps Slow")
+            }
+            Text(store.strings.usesJapaneseTypography
+                ? "素材の各フレームを24fpsで並べます。音声は含めません。"
+                : "Uses each source frame at 24 fps. Audio is not included.")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func videoTimingButton(_ mode: FilmtoneVideoTimingMode, label: String) -> some View {
+        let isSelected = store.resolvedVideoTimingMode == mode
+        return Button {
+            store.setVideoTimingMode(mode)
+        } label: {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.black : .white.opacity(0.82))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .fill(isSelected ? Color.filmtoneAmber : Color.white.opacity(0.06))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("filmtone.export.videoTiming.\(mode.rawValue)")
     }
 
     private var blockedState: some View {
@@ -233,6 +272,12 @@ struct FilmtoneExportPanel: View {
                     )
                 )
                 MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
+                if result.videoTimingMode == FilmtoneVideoTimingMode.slow24.rawValue {
+                    MetricCard(
+                        label: store.strings.usesJapaneseTypography ? "タイミング" : "Timing",
+                        value: store.strings.usesJapaneseTypography ? "24fpsスロー・音声なし" : "24 fps Slow · no audio"
+                    )
+                }
                     MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
                 MetricCard(label: store.strings.metricsSaveToPhotos, value: store.strings.saveStateLabel(store.saveToPhotosState))
                 #if DEBUG

@@ -106,7 +106,9 @@ final class ExportCoordinator {
                         processedFrames: nil,
                         fileSizeBytes: fileSize,
                         elapsedSeconds: elapsed,
-                        sourceKind: .still
+                        sourceKind: .still,
+                        videoTimingMode: nil,
+                        outputFrameRate: nil
                     )
                     state.currentExportTask = nil
                 }
@@ -148,7 +150,8 @@ final class ExportCoordinator {
             capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId,
-            opticalFilterIntensity: state.opticalFilterIntensity
+            opticalFilterIntensity: state.opticalFilterIntensity,
+            videoTimingMode: state.resolvedVideoTimingMode
         )
 
         let startedAt = Date()
@@ -184,7 +187,9 @@ final class ExportCoordinator {
                         processedFrames: result.processedFrames,
                         fileSizeBytes: fileSize,
                         elapsedSeconds: elapsed,
-                        sourceKind: .video
+                        sourceKind: .video,
+                        videoTimingMode: result.videoTimingMode,
+                        outputFrameRate: result.outputFrameRate
                     )
                     state.currentExportTask = nil
                 }
@@ -268,7 +273,9 @@ final class ExportCoordinator {
                         processedFrames: result.processedFrames,
                         fileSizeBytes: fileSize,
                         elapsedSeconds: elapsed,
-                        sourceKind: .video
+                        sourceKind: .video,
+                        videoTimingMode: result.videoTimingMode,
+                        outputFrameRate: result.outputFrameRate
                     )
                     state.currentExportTask = nil
                 }

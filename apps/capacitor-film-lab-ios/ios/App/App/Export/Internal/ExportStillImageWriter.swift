@@ -118,7 +118,8 @@ final class ExportStillImageWriter {
         return CompletedExport(
             outputSize: outputSize,
             frameCount: frameCount,
-            sourceDurationSec: Double(frameCount) / Double(outputFPS),
+            sourceDurationSec: nil,
+            outputDurationSec: Double(frameCount) / Double(outputFPS),
             audioPreserved: false
         )
     }

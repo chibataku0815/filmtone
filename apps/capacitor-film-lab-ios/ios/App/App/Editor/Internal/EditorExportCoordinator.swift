@@ -332,7 +332,8 @@ final class EditorExportCoordinator: ObservableObject {
             let request = try FilmtonePhase0Math.buildExportRequest(
                 source: resolved.source,
                 probe: resolved.probe,
-                project: store.project
+                project: store.project,
+                videoTimingMode: store.resolvedVideoTimingMode
             )
 
             // v1.3 Item 2 Phase E: resolve the active Saved Look (if any) so
@@ -409,7 +410,8 @@ final class EditorExportCoordinator: ObservableObject {
             let request = try FilmtonePhase0Math.buildExportRequest(
                 source: resolved.source,
                 probe: resolved.probe,
-                project: store.project
+                project: store.project,
+                videoTimingMode: store.resolvedVideoTimingMode
             )
 
             // v1.3 Item 2 Phase E + Camera Profiles Phase E: see `export()`

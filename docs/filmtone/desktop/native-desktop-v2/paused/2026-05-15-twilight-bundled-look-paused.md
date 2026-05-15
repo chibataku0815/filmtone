@@ -108,3 +108,9 @@ both verification commands return clean:
 xcodebuild and Simulator visual confirmation are the user's call before
 the lane is fully closed (commit / push remains user-driven per
 CLAUDE.md §9).
+
+## Paused 2026-05-15 JST
+
+Paused to open the user-approved 24fps slow-mode implementation lane across
+iOS and macOS. Completed Twilight edits remain documented above, but the
+verification/user-confirmation gates are not closed in this task file.

@@ -51,6 +51,8 @@ protocol FilmtoneSidecarRequest: Sendable {
     /// (0…1). Default 1.0 → M5-L3 chip-only behavior. Omitted from sidecar
     /// when 1.0 for backward compatibility.
     var opticalFilterIntensity: Double { get }
+    /// Explicit video timing mode for video exports. Stills default to normal.
+    var videoTimingMode: FilmtoneVideoTimingMode { get }
 }
 
 extension FilmtoneSidecarRequest {
@@ -88,4 +90,5 @@ extension FilmtoneSidecarRequest {
     var highlightMarkers: FilmtoneHighlightMarkers? { nil }
     var opticalFilterProfileId: String? { nil }
     var opticalFilterIntensity: Double { 1.0 }
+    var videoTimingMode: FilmtoneVideoTimingMode { .normal }
 }

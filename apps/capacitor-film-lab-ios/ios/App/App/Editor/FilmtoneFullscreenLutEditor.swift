@@ -45,11 +45,13 @@ final class FullscreenVideoController: ObservableObject {
 
     private weak var attachedPlayer: AVPlayer?
     private var timeObserverToken: Any?
+    private var timingPolicy = FilmtoneVideoTimingPolicy(mode: .normal, sourceFPS: nil)
 
     func attach(_ player: AVPlayer) {
         if attachedPlayer === player { return }
         detach()
         attachedPlayer = player
+        player.defaultRate = Float(timingPolicy.speedMultiplier)
         let interval = CMTime(value: 1, timescale: 4)
         timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             // The .main queue guarantees main-thread execution; assumeIsolated
@@ -58,13 +60,34 @@ final class FullscreenVideoController: ObservableObject {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if !self.isScrubbing {
-                    self.currentTime = time.seconds
+                    self.currentTime = self.timingPolicy.displayTime(forSourceTime: time.seconds)
                 }
                 if let item = player.currentItem {
                     let raw = item.duration.seconds
-                    self.duration = raw.isFinite && raw > 0 ? raw : self.duration
+                    let displayDuration = self.timingPolicy.displayDuration(sourceDuration: raw)
+                    self.duration = displayDuration?.isFinite == true && (displayDuration ?? 0) > 0
+                        ? displayDuration ?? self.duration
+                        : self.duration
                 }
                 self.isPlaying = player.timeControlStatus == .playing || player.rate > 0
+            }
+        }
+    }
+
+    func setTimingPolicy(_ policy: FilmtoneVideoTimingPolicy) {
+        timingPolicy = policy
+        if let player = attachedPlayer {
+            player.defaultRate = Float(policy.speedMultiplier)
+            if player.timeControlStatus == .playing || player.rate > 0 {
+                player.rate = Float(policy.speedMultiplier)
+            }
+            let sourceSeconds = CMTimeGetSeconds(player.currentTime())
+            currentTime = policy.displayTime(forSourceTime: sourceSeconds)
+            let rawDuration = player.currentItem?.duration.seconds
+            if let displayDuration = policy.displayDuration(sourceDuration: rawDuration),
+               displayDuration.isFinite,
+               displayDuration > 0 {
+                duration = displayDuration
             }
         }
     }
@@ -75,9 +98,10 @@ final class FullscreenVideoController: ObservableObject {
         // FilmtoneVideoPreviewSession, so a stale 2x would carry over to
         // inline preview after the fullscreen editor closes.
         if let player = attachedPlayer {
-            player.defaultRate = Self.normalRate
-            if player.rate > Self.normalRate {
-                player.rate = Self.normalRate
+            let normalRate = Float(timingPolicy.speedMultiplier)
+            player.defaultRate = normalRate
+            if player.rate > normalRate {
+                player.rate = normalRate
             }
         }
         if let token = timeObserverToken, let attachedPlayer {
@@ -100,11 +124,20 @@ final class FullscreenVideoController: ObservableObject {
     func seek(to seconds: Double) {
         guard let player = attachedPlayer else { return }
         let clamped = max(0, min(duration > 0 ? duration : seconds, seconds))
+        let sourceSeconds = timingPolicy.sourceTime(forDisplayTime: clamped)
         player.seek(
-            to: CMTime(seconds: clamped, preferredTimescale: 600),
+            to: CMTime(seconds: sourceSeconds, preferredTimescale: 600),
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
+    }
+
+    func sourceTime(forDisplayTime displayTime: Double) -> Double {
+        timingPolicy.sourceTime(forDisplayTime: displayTime)
+    }
+
+    func displayTime(forSourceTime sourceTime: Double) -> Double {
+        timingPolicy.displayTime(forSourceTime: sourceTime)
     }
 
     // MARK: - Boost (TikTok-style 2x)
@@ -132,8 +165,9 @@ final class FullscreenVideoController: ObservableObject {
         // does pause → replaceCurrentItem → play() during graded↔original
         // compare, and play() resumes at defaultRate — without setting it,
         // a compare swap mid-2x would silently drop back to 1x.
-        player.defaultRate = Self.boostRate
-        player.rate = Self.boostRate
+        let rate = Self.boostRate * Float(timingPolicy.speedMultiplier)
+        player.defaultRate = rate
+        player.rate = rate
         boostState = .boosting
     }
 
@@ -148,10 +182,11 @@ final class FullscreenVideoController: ObservableObject {
             boostState = .idle
             return
         }
-        player.defaultRate = Self.normalRate
-        if player.rate > Self.normalRate {
-            player.rate = Self.normalRate
+        let normalRate = Float(timingPolicy.speedMultiplier)
+        if player.rate > normalRate {
+            player.rate = normalRate
         }
+        player.defaultRate = normalRate
         boostState = .idle
     }
 }
@@ -311,14 +346,22 @@ struct FilmtoneFullscreenLutEditor: View {
         .onAppear {
             if let player = store.videoPreviewState?.player {
                 videoController.attach(player)
+                videoController.setTimingPolicy(store.videoTimingPolicy)
             }
         }
         .onChange(of: store.videoPreviewState?.player) { _, newPlayer in
             if let newPlayer {
                 videoController.attach(newPlayer)
+                videoController.setTimingPolicy(store.videoTimingPolicy)
             } else {
                 videoController.detach()
             }
+        }
+        .onChange(of: store.videoTimingMode) { _, _ in
+            videoController.setTimingPolicy(store.videoTimingPolicy)
+        }
+        .onChange(of: store.sourceVideoFPS) { _, _ in
+            videoController.setTimingPolicy(store.videoTimingPolicy)
         }
         .onDisappear {
             videoController.detach()
@@ -898,7 +941,8 @@ struct FilmtoneFullscreenLutEditor: View {
         }
         let knob: CGFloat = 28
         let usable = max(width - knob, 1)
-        let ratio = min(1.0, max(0.0, sourceTimeSec / videoController.duration))
+        let displayTimeSec = videoController.displayTime(forSourceTime: sourceTimeSec)
+        let ratio = min(1.0, max(0.0, displayTimeSec / videoController.duration))
         return knob / 2 + CGFloat(ratio) * usable
     }
 
@@ -915,7 +959,7 @@ struct FilmtoneFullscreenLutEditor: View {
                         } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "bookmark.fill")
-                                Text(verbatim: fullscreenFormatTime(marker.sourceTimeSec))
+                                Text(verbatim: fullscreenFormatTime(videoController.displayTime(forSourceTime: marker.sourceTimeSec)))
                                     .font(.caption.monospacedDigit().weight(.semibold))
                             }
                         }
@@ -950,7 +994,7 @@ struct FilmtoneFullscreenLutEditor: View {
                 systemName: "bookmark.fill",
                 isProminent: isAtExistingHighlightMarker
             ) {
-                store.addHighlightMarker(at: videoController.currentTime)
+                store.addHighlightMarker(at: videoController.sourceTime(forDisplayTime: videoController.currentTime))
             }
             .keyboardShortcut("m", modifiers: [])
             .accessibilityLabel(Text(verbatim: "Add highlight marker"))
@@ -981,7 +1025,7 @@ struct FilmtoneFullscreenLutEditor: View {
 
     private var isAtExistingHighlightMarker: Bool {
         store.highlightMarkerList.contains {
-            abs($0.sourceTimeSec - videoController.currentTime) <= FilmtoneHighlightMarker.duplicateToleranceSec
+            abs($0.sourceTimeSec - videoController.sourceTime(forDisplayTime: videoController.currentTime)) <= FilmtoneHighlightMarker.duplicateToleranceSec
         }
     }
 
@@ -1010,7 +1054,8 @@ struct FilmtoneFullscreenLutEditor: View {
     }
 
     private func jumpToHighlightMarker(_ marker: FilmtoneHighlightMarker) {
-        let target = max(0, min(marker.sourceTimeSec, max(videoController.duration, marker.sourceTimeSec)))
+        let displayTarget = videoController.displayTime(forSourceTime: marker.sourceTimeSec)
+        let target = max(0, min(displayTarget, max(videoController.duration, displayTarget)))
         videoController.currentTime = target
         videoController.seek(to: target)
     }
@@ -1018,7 +1063,7 @@ struct FilmtoneFullscreenLutEditor: View {
     private func jumpToNextHighlightMarker() {
         let markers = sortedHighlightMarkerList()
         guard !markers.isEmpty else { return }
-        let nextThreshold = videoController.currentTime + 0.01
+        let nextThreshold = videoController.sourceTime(forDisplayTime: videoController.currentTime) + 0.01
         let target = markers.first { $0.sourceTimeSec > nextThreshold } ?? markers[0]
         jumpToHighlightMarker(target)
     }
@@ -1026,7 +1071,7 @@ struct FilmtoneFullscreenLutEditor: View {
     private func jumpToPreviousHighlightMarker() {
         let markers = sortedHighlightMarkerList()
         guard let lastMarker = markers.last else { return }
-        let previousThreshold = videoController.currentTime - 0.01
+        let previousThreshold = videoController.sourceTime(forDisplayTime: videoController.currentTime) - 0.01
         let target = markers.last { $0.sourceTimeSec < previousThreshold } ?? lastMarker
         jumpToHighlightMarker(target)
     }

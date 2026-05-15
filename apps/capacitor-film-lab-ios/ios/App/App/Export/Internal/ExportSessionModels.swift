@@ -5,7 +5,10 @@ import Foundation
 struct CompletedExport {
     let outputSize: CGSize
     let frameCount: Int
+    // Real source asset duration (nil for still exports). slow24 callers must read
+    // `outputDurationSec` for output timeline; both fields differ in slow24 video.
     let sourceDurationSec: Double?
+    let outputDurationSec: Double?
     let audioPreserved: Bool
 }
 

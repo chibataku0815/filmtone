@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMedia
+import FilmLabSwiftCore
 import Foundation
 
 /// Phase 2B-10B: pure video timeline / timing helpers lifted out of
@@ -27,6 +28,7 @@ final class ExportVideoTimeline {
 
     private let highlightTimeline: FilmtoneHighlightReelFrameTimeline?
     private let outputFPS: Int
+    let timingPolicy: FilmtoneVideoTimingPolicy
     let outputFrameCount: Int
     let outputDurationSec: Double
     private(set) var sourceTimeOffset: CMTime?
@@ -34,16 +36,23 @@ final class ExportVideoTimeline {
     init(
         highlightTimeline: FilmtoneHighlightReelFrameTimeline?,
         outputFPS: Int,
-        sourceDurationSec: Double
+        sourceDurationSec: Double,
+        timingPolicy: FilmtoneVideoTimingPolicy = .init(mode: .normal, sourceFPS: nil)
     ) {
         self.highlightTimeline = highlightTimeline
         self.outputFPS = outputFPS
-        self.outputFrameCount = highlightTimeline?.totalFrameCount ?? max(
-            1,
-            Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * Double(outputFPS) + 1e-6))
-        )
+        self.timingPolicy = timingPolicy
+        let sourceFrameCount = timingPolicy.isSlow24
+            ? Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * (timingPolicy.sourceFPS ?? 0) + 1e-6))
+            : 0
+        self.outputFrameCount = highlightTimeline?.totalFrameCount
+            ?? (timingPolicy.isSlow24
+                ? max(1, sourceFrameCount)
+                : max(1, Int(floor((sourceDurationSec.isFinite ? sourceDurationSec : 0) * Double(outputFPS) + 1e-6))))
         self.outputDurationSec = highlightTimeline?.durationSec
-            ?? (sourceDurationSec.isFinite ? sourceDurationSec : 0)
+            ?? (timingPolicy.isSlow24
+                ? Double(max(1, sourceFrameCount)) / Double(max(1, outputFPS))
+                : (sourceDurationSec.isFinite ? sourceDurationSec : 0))
         self.sourceTimeOffset = nil
     }
 

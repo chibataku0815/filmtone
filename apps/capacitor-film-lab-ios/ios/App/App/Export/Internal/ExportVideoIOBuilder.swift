@@ -88,7 +88,7 @@ final class ExportVideoIOBuilder {
         }
         writer.add(videoInput)
 
-        let audioTrack = highlightTimeline == nil && request.output.preserveAudio
+        let audioTrack = highlightTimeline == nil && request.effectivePreserveAudio
             ? audioAsset.tracks(withMediaType: .audio).first
             : nil
         let audioInput: AVAssetWriterInput?
