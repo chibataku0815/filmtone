@@ -7,6 +7,11 @@ export {
   cloneParams,
 } from "./params";
 export {
+  FILM_BREATH_ZERO_OFFSETS,
+  deriveFilmBreathOffsets,
+  type FilmBreathOffsets,
+} from "./film-breath";
+export {
   PRESETS,
   PRESET_BUTTONS,
   FILMTONE_DEFAULT_BASE_PRESET,

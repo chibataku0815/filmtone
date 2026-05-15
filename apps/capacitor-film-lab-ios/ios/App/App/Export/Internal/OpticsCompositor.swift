@@ -181,6 +181,7 @@ final class OpticsCompositor {
             yellow: params.yellow,
             shutterAngle: params.shutterAngle,
             trailIntensity: params.trailIntensity,
+            filmBreathAmount: params.filmBreathAmount,
             fade: params.fade,
             shadowTone: params.shadowTone,
             shadowLatitude: params.shadowLatitude,

@@ -64,23 +64,28 @@ enum FilmtoneGradePipeline {
         opticalFilterIntensity: Double = 1.0,
         sourceDetailBias: Double = 0
     ) -> CIImage {
+        let renderParams = FilmtoneFilmBreath.applying(
+            to: params,
+            timeSeconds: frameTimeSeconds,
+            sourceSeed: sourceSeed
+        )
         var current = image
 
-        if shouldApplyBaseGrade(params) {
-            current = applyBaseGradeV2(to: current, params: params)
+        if shouldApplyBaseGrade(renderParams) {
+            current = applyBaseGradeV2(to: current, params: renderParams)
         }
-        if params.compressionAmount > 0.0001 {
-            current = applyFilmCompressionV3(to: current, params: params)
+        if renderParams.compressionAmount > 0.0001 {
+            current = applyFilmCompressionV3(to: current, params: renderParams)
         }
-        if params.shadowLatitude > 0.0001 {
-            current = applyShadowLatitude(to: current, params: params)
+        if renderParams.shadowLatitude > 0.0001 {
+            current = applyShadowLatitude(to: current, params: renderParams)
         }
         current = applyDetailSoftnessStage(
             to: current,
-            params: params,
+            params: renderParams,
             sourceDetailBias: sourceDetailBias
         )
-        current = applyEdgeOpticsStage(to: current, params: params)
+        current = applyEdgeOpticsStage(to: current, params: renderParams)
         // M5-M (CC-B): Backlight Veil profiles route through a CIKernel
         // composite that uses the six iOS-canonical optical scatter
         // coefficients (direct loss, black retention, scatter strength,
@@ -95,18 +100,18 @@ enum FilmtoneGradePipeline {
         )
         current = applyGlowFamilyStage(
             to: current,
-            params: params,
+            params: renderParams,
             opticalScatter: opticalScatter
         )
-        if params.vignette > 0.0001 {
-            current = applyVignette(to: current, params: params, cameraOptics: cameraOptics)
+        if renderParams.vignette > 0.0001 {
+            current = applyVignette(to: current, params: renderParams, cameraOptics: cameraOptics)
         }
-        let clampedGrain = Swift.max(0, Swift.min(FilmtonePhase0Generated.grainIntensityMax, params.grainIntensity))
+        let clampedGrain = Swift.max(0, Swift.min(FilmtonePhase0Generated.grainIntensityMax, renderParams.grainIntensity))
         if clampedGrain > 0.0001 {
             current = applyGrain(
                 to: current,
                 intensity: clampedGrain,
-                params: params,
+                params: renderParams,
                 timeSeconds: frameTimeSeconds,
                 sourceSeed: sourceSeed
             )
@@ -118,8 +123,8 @@ enum FilmtoneGradePipeline {
                 intensity: lutIntensity
             )
         }
-        if shouldApplyPrintStage(params) {
-            current = applyPrintStage(to: current, params: params)
+        if shouldApplyPrintStage(renderParams) {
+            current = applyPrintStage(to: current, params: renderParams)
         }
 
         return current

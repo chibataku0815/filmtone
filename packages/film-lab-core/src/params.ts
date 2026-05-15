@@ -100,6 +100,8 @@ export const PARAM_KEYS = [
   "shutterAngle",
   /** 残像フィードバック強度（0=なし、0.95=最大）。リングバッファに前フレームを畳み込んで長い残像を生成。range: 0–0.95 */
   "trailIntensity",
+  /** Film Breath amount（0=off、1=max）。動画時のみ露出・コントラスト・色を時間方向に微変調する。range: 0–1 */
+  "filmBreathAmount",
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
@@ -266,6 +268,8 @@ export interface Params {
   shutterAngle: number;
   /** Trail feedback intensity (0=none, 0.95=max). Extends afterimage beyond ring buffer depth. */
   trailIntensity: number;
+  /** Film Breath amount (0=off, 1=max). Video-only temporal exposure/contrast/color variation. */
+  filmBreathAmount: number;
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */
   dustAmount: number;
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。post-composite chain に適用。 */

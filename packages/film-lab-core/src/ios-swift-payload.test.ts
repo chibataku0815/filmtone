@@ -143,6 +143,7 @@ test("iOS preset map exposes the four mobile looks without mutating shared prese
   expect(renderFilmtoneIosSwiftPayload()).toContain('static let rgbShiftMax = 0.005');
   expect(renderFilmtoneIosSwiftPayload()).toContain('"shutterAngle"');
   expect(renderFilmtoneIosSwiftPayload()).toContain("trailIntensity: 0.0");
+  expect(renderFilmtoneIosSwiftPayload()).toContain("filmBreathAmount: 0.0");
   expect(renderFilmtoneIosSwiftPayload()).toContain('"iphone": .init(');
   expect(renderFilmtoneIosSwiftPayload()).not.toContain('"cinematic": .init(');
 });
@@ -152,6 +153,7 @@ test("iOS Swift payload keeps pure reset separate from the default reset target"
 
   expect(payload.presetDefault).toBe("reset");
   expect(payload.resetParams).toEqual(pickPhase0Params(PRESETS.reset));
+  expect(payload.resetParams.filmBreathAmount).toBe(0);
   expect(payload.presets.reset).toEqual({
     ...createFilmtoneDefaultPhase0Params(),
     halationIntensity: 0,

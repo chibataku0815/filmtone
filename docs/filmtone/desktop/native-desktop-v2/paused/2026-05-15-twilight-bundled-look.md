@@ -111,6 +111,7 @@ CLAUDE.md §9).
 
 ## Paused 2026-05-15 JST
 
-Paused to open the user-approved 24fps slow-mode implementation lane across
-iOS and macOS. Completed Twilight edits remain documented above, but the
-verification/user-confirmation gates are not closed in this task file.
+Paused while later owner-directed native lanes took priority, including 24fps
+Slow Mode and Film Breath. This file remains historical evidence for the
+Twilight lane only; current product state later removed the visible Twilight
+entry point and retired this built-in from active implementation.

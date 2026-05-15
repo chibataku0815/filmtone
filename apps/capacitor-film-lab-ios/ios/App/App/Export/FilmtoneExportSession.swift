@@ -970,7 +970,10 @@ final class FilmtoneExportSession {
         // math has the canonical plate inputs. Color-grade params (exposure
         // / contrast / LUT etc.) stay untouched, so the user's Look color
         // is preserved and the Veil layers on top as a lens veil.
-        let params = opticsCompositor.paramsApplyingBacklightVeil(to: request.grade.params)
+        let params = paramsApplyingFilmBreath(
+            to: opticsCompositor.paramsApplyingBacklightVeil(to: request.grade.params),
+            timeSeconds: timeSeconds
+        )
         let presetVersion = request.grade.presetVersion
         var current = image
 
@@ -1105,6 +1108,60 @@ final class FilmtoneExportSession {
             OpticsResampling.extentOriginVector(for: image.extent),
             OpticsResampling.extentSizeVector(for: image.extent),
         ]) ?? image
+    }
+
+    private func paramsApplyingFilmBreath(
+        to params: Phase0ParamsDTO,
+        timeSeconds: Double
+    ) -> Phase0ParamsDTO {
+        let offsets = FilmtoneFilmBreath.deriveOffsets(
+            amount: params.filmBreathAmount,
+            timeSeconds: timeSeconds,
+            sourceSeed: sourceSeed
+        )
+        guard !offsets.isIdentity else {
+            return params
+        }
+        return Phase0ParamsDTO(
+            exposure: max(-2, min(2, params.exposure + offsets.exposure)),
+            contrast: max(0, min(2, params.contrast + offsets.contrast)),
+            saturation: params.saturation,
+            temperature: max(-1, min(1, params.temperature + offsets.temperature)),
+            tint: max(-1, min(1, params.tint + offsets.tint)),
+            rgbShift: params.rgbShift,
+            lensSoftness: params.lensSoftness,
+            detailSoftness: params.detailSoftness,
+            grainRadialMix: params.grainRadialMix,
+            grainSize: params.grainSize,
+            bloomThreshold: params.bloomThreshold,
+            bloomStrength: params.bloomStrength,
+            bloomRadius: params.bloomRadius,
+            diffusion: params.diffusion,
+            halationIntensity: params.halationIntensity,
+            halationSpread: params.halationSpread,
+            halationHue: params.halationHue,
+            halationThreshold: params.halationThreshold,
+            halationRadius: params.halationRadius,
+            bloomSoftKnee: params.bloomSoftKnee,
+            halationSoftKnee: params.halationSoftKnee,
+            compressionAmount: params.compressionAmount,
+            compressionRange: params.compressionRange,
+            printContrast: params.printContrast,
+            cyan: params.cyan,
+            magenta: params.magenta,
+            yellow: params.yellow,
+            shutterAngle: params.shutterAngle,
+            trailIntensity: params.trailIntensity,
+            filmBreathAmount: params.filmBreathAmount,
+            fade: params.fade,
+            shadowTone: params.shadowTone,
+            shadowLatitude: params.shadowLatitude,
+            highlightTone: params.highlightTone,
+            shadowHue: params.shadowHue,
+            highlightHue: params.highlightHue,
+            vignette: params.vignette,
+            grainIntensity: params.grainIntensity
+        )
     }
 
     private static func makeStableSourceSeed(from string: String) -> Double {

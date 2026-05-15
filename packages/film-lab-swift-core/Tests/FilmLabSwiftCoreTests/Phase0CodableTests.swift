@@ -54,6 +54,7 @@ final class Phase0CodableTests: XCTestCase {
         // detailSoftness was added in Phase 1 of the detail-softness lane; it
         // must round-trip with its default 0 like every other listed key.
         XCTAssertEqual(decoded.detailSoftness, original.detailSoftness)
+        XCTAssertEqual(decoded.filmBreathAmount, original.filmBreathAmount)
     }
 
     func testParamsValueAndSetByKey() {
@@ -96,6 +97,7 @@ final class Phase0CodableTests: XCTestCase {
             "exposure": 0.18,
             "fade": 0.3,
             "detailSoftness": 0.12,
+            "filmBreathAmount": 0.28,
             "madeUpKey": 9.9
         ])
 
@@ -105,8 +107,9 @@ final class Phase0CodableTests: XCTestCase {
         XCTAssertEqual(decoded.values["exposure"], 0.18)
         XCTAssertEqual(decoded.values["fade"], 0.3)
         XCTAssertEqual(decoded.values["detailSoftness"], 0.12)
+        XCTAssertEqual(decoded.values["filmBreathAmount"], 0.28)
         XCTAssertNil(decoded.values["madeUpKey"])
-        XCTAssertEqual(decoded.values.count, 3)
+        XCTAssertEqual(decoded.values.count, 4)
     }
 
     func testEmptyPatchRoundTrip() throws {

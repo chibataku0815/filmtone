@@ -387,6 +387,12 @@ final class EditorState {
             session.onPlayingChange = { [weak self] playing in
                 self?.isPlaying = playing
             }
+            if let previewSeconds = self.videoPreviewSeconds,
+               previewSeconds.isFinite,
+               previewSeconds > 0,
+               !session.isPlaying {
+                session.seek(toSeconds: previewSeconds)
+            }
         }
     }
 
@@ -455,7 +461,13 @@ final class EditorState {
                 return
             }
             self.videoDurationSeconds = probedDuration
-            self.videoPreviewSeconds = probedDuration * 0.5
+            let initialPreviewSeconds = probedDuration * 0.5
+            self.videoPreviewSeconds = initialPreviewSeconds
+            if let session = self.videoSession,
+               !session.isPlaying,
+               !self.isScrubbing {
+                session.seek(toSeconds: initialPreviewSeconds)
+            }
             if let frameRate = videoProbe?.nominalFrameRate,
                frameRate.isFinite,
                frameRate > 0 {
