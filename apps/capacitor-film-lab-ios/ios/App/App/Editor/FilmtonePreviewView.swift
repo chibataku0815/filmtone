@@ -135,7 +135,10 @@ struct FilmtonePreviewView: View {
     @ViewBuilder
     private var mediaBody: some View {
         if let videoPreview {
-            FilmtonePreviewPlayerView(player: videoPreview.player)
+            FilmtonePreviewPlayerView(
+                player: videoPreview.player,
+                showsPlaybackControls: !videoPreview.videoTimingPolicy.isSlow24
+            )
                 .clipShape(RoundedRectangle(cornerRadius: filmtonePreviewCornerRadius, style: .continuous))
         } else if let source, let displayURI, let image = filmtonePreviewImage(from: displayURI) {
             GeometryReader { geometry in

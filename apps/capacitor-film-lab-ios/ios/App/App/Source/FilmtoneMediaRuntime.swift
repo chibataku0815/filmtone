@@ -642,6 +642,8 @@ final class FilmtoneMediaRuntime {
             fileSizeBytes: result.fileSizeBytes,
             realtimeRatio: result.realtimeRatio,
             audioPreserved: result.audioPreserved,
+            videoTimingMode: result.videoTimingMode,
+            audioPolicy: result.audioPolicy,
             benchmarkRecord: benchmarkRecord,
             // T2 (v1.1): carry the sidecar URI through benchmark reconstruction —
             // without this rebuild preserving it, the UI share chain would lose the JSON URL.

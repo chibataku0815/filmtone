@@ -26,13 +26,15 @@ enum FilmtoneSidecarWriter {
     static func writeSidecar(
         for request: any FilmtoneSidecarRequest,
         sourceInterpretation: String? = nil,
-        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil,
+        videoTimingMetadata: FilmtoneVideoTimingMetadataDTO? = nil
     ) throws -> URL {
         let sidecarURL = sidecarURL(for: request.outputURL)
         let payload = sidecarPayload(
             for: request,
             sourceInterpretation: sourceInterpretation,
-            resolvedSourceProfile: resolvedSourceProfile
+            resolvedSourceProfile: resolvedSourceProfile,
+            videoTimingMetadata: videoTimingMetadata
         )
         let json = try JSONSerialization.data(
             withJSONObject: payload,
@@ -51,7 +53,8 @@ enum FilmtoneSidecarWriter {
     static func sidecarPayload(
         for request: any FilmtoneSidecarRequest,
         sourceInterpretation: String? = nil,
-        resolvedSourceProfile: CameraProfileCatalogEntry? = nil
+        resolvedSourceProfile: CameraProfileCatalogEntry? = nil,
+        videoTimingMetadata: FilmtoneVideoTimingMetadataDTO? = nil
     ) -> [String: Any] {
         let gradeRecipe = request.gradeRecipe
         let strength = gradeRecipe.presetStrength
@@ -113,6 +116,24 @@ enum FilmtoneSidecarWriter {
         }
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
+        }
+        if let videoTimingMetadata {
+            var timing: [String: Any] = [
+                "videoTimingMode": videoTimingMetadata.videoTimingMode,
+                "targetFps": videoTimingMetadata.targetFps,
+                "speedMultiplier": videoTimingMetadata.speedMultiplier,
+                "audioPolicy": videoTimingMetadata.audioPolicy,
+            ]
+            if let sourceFps = videoTimingMetadata.sourceFps {
+                timing["sourceFps"] = sourceFps
+            }
+            if let sourceDurationSec = videoTimingMetadata.sourceDurationSec {
+                timing["sourceDurationSec"] = sourceDurationSec
+            }
+            if let outputDurationSec = videoTimingMetadata.outputDurationSec {
+                timing["outputDurationSec"] = outputDurationSec
+            }
+            payload["videoTiming"] = timing
         }
         if let highlightMarkers = request.highlightMarkers,
            !highlightMarkers.isEmpty,

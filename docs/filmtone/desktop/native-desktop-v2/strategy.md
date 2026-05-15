@@ -100,6 +100,12 @@ content layer stays glass-free so color judgment is not compromised.
 - 2026-05-15 JST: Codex headless batch/Q&A MVP completed and archived at
   `archive/2026-05-15-codex-headless-batch-qa-mvp.md`. The integration boundary
   is MCP STDIO + native automation CLI, not in-app chat or live window control.
+- 2026-05-15 JST: 24fps Slow Mode (iOS + macOS) shipped to native lanes. Adds
+  user-selected `slow24` video timing for sources above 24fps; additive sidecar
+  / result timing metadata; no `Phase0OutputProfileDTO` schema change. iOS
+  embeds timing fields in `output` while macOS writes a top-level `videoTiming`
+  — cross-platform sidecar shape unification is a follow-up. Active archived
+  at `archive/2026-05-15-24fps-slow-mode-active.md`.
 - 2026-05-16 JST: Retired preset-only built-in Look cleanup completed and
   archived at `archive/2026-05-16-retired-built-in-look-removal.md`; current
   app sources now expose only Stone / Urban / Noir as bundled built-ins.
@@ -107,6 +113,9 @@ content layer stays glass-free so color judgment is not compromised.
   and archived at `archive/2026-05-16-codex-mcp-unsupported-profile-ux.md`;
   unsupported ProRes / HEVC-style requests now return a v1 unsupported message
   instead of a Swift decode error.
+- 2026-05-16 JST: 24fps Slow Mode review fixes landed (F1 image timing gate +
+  F2 `CompletedExport` source/output duration split). VFR `estimatedFrameRate`
+  fallback deferred. Archived at `archive/2026-05-16-24fps-slow-mode-review-fixes.md`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G

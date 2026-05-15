@@ -138,6 +138,9 @@ final class FilmtoneEditorStore: ObservableObject {
     /// `project.opticalFilterProfileId` for SwiftUI observation; render paths
     /// consume the persisted project value through `Phase0ExportRequestDTO`.
     @Published private(set) var selectedOpticalFilterId: String?
+    /// Explicit video timing mode. Normal is the default; slow24 is enabled
+    /// only for video sources with a probed frame rate above 24fps.
+    @Published var videoTimingMode: FilmtoneVideoTimingMode = .normal
 
     let strings: FilmtoneStrings
     private let facade: FilmtoneEditorFacade
@@ -403,6 +406,27 @@ final class FilmtoneEditorStore: ObservableObject {
 
     var videoPreviewState: FilmtoneVideoPreviewState? {
         previewOrchestrator.videoPreviewState
+    }
+
+    var sourceVideoFPS: Double? {
+        FilmtoneVideoTimingPolicy.validFPS(
+            probe?.frameRate ?? probe?.sourceVideoMetadata?.timing?.nominalFrameRate
+        )
+    }
+
+    var videoTimingPolicy: FilmtoneVideoTimingPolicy {
+        FilmtoneVideoTimingPolicy(
+            mode: videoTimingMode,
+            sourceFPS: sourceVideoFPS
+        )
+    }
+
+    var resolvedVideoTimingMode: FilmtoneVideoTimingMode {
+        videoTimingPolicy.resolvedMode
+    }
+
+    var canUseSlow24VideoTiming: Bool {
+        source?.kind == .video && FilmtoneVideoTimingPolicy.isSlow24Eligible(sourceFPS: sourceVideoFPS)
     }
 
     var highlightMarkerList: [FilmtoneHighlightMarker] {
@@ -1732,6 +1756,9 @@ final class FilmtoneEditorStore: ObservableObject {
         // this after the orchestrator reset so the scheduled render is
         // not immediately canceled.
         refreshCreativePack01AdaptationIfApplicable()
+        if isSourceReplacement || !canUseSlow24VideoTiming {
+            videoTimingMode = .normal
+        }
         self.error = nil
         self.notice = nil
         self.sourceLoadState = nil
@@ -1742,6 +1769,18 @@ final class FilmtoneEditorStore: ObservableObject {
     func invalidateRenderedOutputState() {
         previewOrchestrator.invalidateForProjectChange()
         exportCoordinator.invalidateForProjectChange()
+    }
+
+    func setVideoTimingMode(_ mode: FilmtoneVideoTimingMode) {
+        let nextMode: FilmtoneVideoTimingMode = mode == .slow24 && canUseSlow24VideoTiming
+            ? .slow24
+            : .normal
+        guard videoTimingMode != nextMode else {
+            return
+        }
+        videoTimingMode = nextMode
+        previewOrchestrator.applyVideoTimingPolicy(videoTimingPolicy)
+        exportCoordinator.invalidateExportPackageState()
     }
 
     private func invalidateExportPackageState() {

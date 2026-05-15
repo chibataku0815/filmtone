@@ -212,7 +212,7 @@ final class FilmtoneExportSession {
     private lazy var exportMotionBlurAccumulator = FilmtoneMotionBlurAccumulator(
         ciContext: ciContext,
         colorSpace: outputColorSpace,
-        outputFrameRate: request.output.fps
+        outputFrameRate: request.effectiveOutputFPS
     )
 
     /// v1.3 (D3.4): read-only accessor for the originating request. Used by
@@ -302,7 +302,7 @@ final class FilmtoneExportSession {
         )
         let mediaWriter = ExportMediaWriter(
             outputURL: outputURL,
-            outputFPS: request.output.fps,
+            outputFPS: request.effectiveOutputFPS,
             colorPipeline: colorPipeline
         )
         self.mediaWriter = mediaWriter
@@ -342,7 +342,7 @@ final class FilmtoneExportSession {
             outputColorSpace: outputColorSpace,
             colorPipeline: colorPipeline,
             mediaWriter: mediaWriter,
-            outputFPS: request.output.fps
+            outputFPS: request.effectiveOutputFPS
         )
         let mezzanineRouter = ExportMezzanineRouter(
             request: request,
@@ -471,7 +471,9 @@ final class FilmtoneExportSession {
         }
         let fileSizeBytes = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize
         let realtimeRatio: Double?
-        if let duration = result.sourceDurationSec, duration > 0 {
+        // Stills (sourceDurationSec=nil) fall back to outputDurationSec so wall-clock
+        // ratio against the 3s filler timeline is preserved.
+        if let duration = result.sourceDurationSec ?? result.outputDurationSec, duration > 0 {
             realtimeRatio = Double(elapsedMs) / (duration * 1000.0)
         } else {
             realtimeRatio = nil
@@ -487,10 +489,10 @@ final class FilmtoneExportSession {
         if request.connectPackage == true {
             packageCompanions = connectPackageAssembler.makeCompanions(
                 result: result,
-                writeReferenceAfterImage: { [previewRenderer] url, sourceDurationSec in
+                writeReferenceAfterImage: { [previewRenderer] url, outputDurationSec in
                     try previewRenderer.writeReferenceAfterImage(
                         to: url,
-                        sourceDurationSec: sourceDurationSec
+                        sourceDurationSec: outputDurationSec
                     )
                 }
             )
@@ -526,6 +528,13 @@ final class FilmtoneExportSession {
             sidecarUri: sidecarUri,
             companions: packageCompanions
         )
+        let timingMetadata: FilmtoneVideoTimingMetadataDTO? = request.sourceKind == .video
+            ? FilmtoneVideoTimingMetadataDTO.make(
+                policy: request.videoTimingPolicy,
+                sourceDurationSec: request.sourceProbe?.durationSec,
+                sourceFrameCount: result.frameCount
+            )
+            : nil
 
         progress(.init(stage: .completed, progress: 1.0, currentFrame: result.frameCount, totalFrames: result.frameCount, message: "Export complete"))
 
@@ -534,10 +543,12 @@ final class FilmtoneExportSession {
             elapsedMs: elapsedMs,
             outputWidth: Int(result.outputSize.width.rounded()),
             outputHeight: Int(result.outputSize.height.rounded()),
-            outputFps: request.output.fps,
+            outputFps: request.effectiveOutputFPS,
             fileSizeBytes: fileSizeBytes,
             realtimeRatio: realtimeRatio,
             audioPreserved: result.audioPreserved,
+            videoTimingMode: timingMetadata?.videoTimingMode,
+            audioPolicy: timingMetadata?.audioPolicy,
             benchmarkRecord: nil,
             sidecarUri: sidecarUri,
             audioDiagnosticsUri: lastAudioDiagnosticsURI,
@@ -568,7 +579,7 @@ final class FilmtoneExportSession {
         let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000.0)
         let fileSizeBytes = try outputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize
         let realtimeRatio: Double?
-        if let duration = result.sourceDurationSec, duration > 0 {
+        if let duration = result.sourceDurationSec ?? result.outputDurationSec, duration > 0 {
             realtimeRatio = Double(elapsedMs) / (duration * 1000.0)
         } else {
             realtimeRatio = nil
@@ -581,7 +592,7 @@ final class FilmtoneExportSession {
             elapsedMs: elapsedMs,
             outputWidth: Int(result.outputSize.width.rounded()),
             outputHeight: Int(result.outputSize.height.rounded()),
-            outputFps: request.output.fps,
+            outputFps: request.effectiveOutputFPS,
             fileSizeBytes: fileSizeBytes,
             realtimeRatio: realtimeRatio,
             audioPreserved: false,
@@ -634,7 +645,7 @@ final class FilmtoneExportSession {
         let highlightTimeline = highlightSegments.flatMap {
             FilmtoneHighlightReelFrameTimeline(
                 segments: $0,
-                outputFps: request.output.fps
+                outputFps: request.effectiveOutputFPS
             )
         }
         // Phase 2B-10B: output frame count / duration, source lookup mapping,
@@ -645,8 +656,9 @@ final class FilmtoneExportSession {
         // completion / failure locks, and depth matcher orchestration.
         let videoTimeline = ExportVideoTimeline(
             highlightTimeline: highlightTimeline,
-            outputFPS: request.output.fps,
-            sourceDurationSec: sourceDurationSec
+            outputFPS: request.effectiveOutputFPS,
+            sourceDurationSec: sourceDurationSec,
+            timingPolicy: highlightTimeline == nil ? request.videoTimingPolicy : .init(mode: .normal, sourceFPS: request.sourceVideoFPS)
         )
         let io = try videoIOBuilder.makeContext(
             asset: asset,
@@ -797,14 +809,14 @@ final class FilmtoneExportSession {
             sourceAsset: audioSourceAsset,
             effectiveVideoAsset: asset,
             outputURL: outputURL,
-            preserveAudioRequested: request.output.preserveAudio,
+            preserveAudioRequested: request.effectivePreserveAudio,
             highlightTimelinePresent: highlightTimeline != nil
         )
         let diagnostics = ExportAudioDiagnostics(
             sourceURL: sourceURL,
             effectiveVideoURL: effectiveSourceURL,
             outputURL: outputURL,
-            preserveAudioRequested: request.output.preserveAudio,
+            preserveAudioRequested: request.effectivePreserveAudio,
             highlightTimelinePresent: highlightTimeline != nil,
             mezzanineVariant: didUseMezzanineVariant,
             validation: audioValidation,
@@ -830,7 +842,8 @@ final class FilmtoneExportSession {
         return CompletedExport(
             outputSize: outputSize,
             frameCount: videoFramePump.renderedFrames,
-            sourceDurationSec: videoTimeline.outputDurationSec.isFinite ? videoTimeline.outputDurationSec : nil,
+            sourceDurationSec: sourceDurationSec.isFinite ? sourceDurationSec : nil,
+            outputDurationSec: videoTimeline.outputDurationSec.isFinite ? videoTimeline.outputDurationSec : nil,
             audioPreserved: audioValidation.audioPreserved
         )
     }
@@ -1030,14 +1043,14 @@ final class FilmtoneExportSession {
     }
 
     var outputFrameRate: Int {
-        request.output.fps
+        request.effectiveOutputFPS
     }
 
     func makeMotionBlurAccumulator() -> FilmtoneMotionBlurAccumulator {
         FilmtoneMotionBlurAccumulator(
             ciContext: ciContext,
             colorSpace: outputColorSpace,
-            outputFrameRate: request.output.fps
+            outputFrameRate: request.effectiveOutputFPS
         )
     }
 

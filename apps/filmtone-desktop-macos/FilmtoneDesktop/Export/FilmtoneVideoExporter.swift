@@ -34,6 +34,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     /// Optional headless automation output cap. Nil preserves the app's
     /// current full-display-size export behavior.
     let outputLongEdgeLimit: Double?
+    let videoTimingMode: FilmtoneVideoTimingMode
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -54,7 +55,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
         opticalFilterProfileId: String? = nil,
         opticalFilterIntensity: Double = 1.0,
-        outputLongEdgeLimit: Double? = nil
+        outputLongEdgeLimit: Double? = nil,
+        videoTimingMode: FilmtoneVideoTimingMode = .normal
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -107,6 +109,7 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         } else {
             self.outputLongEdgeLimit = nil
         }
+        self.videoTimingMode = videoTimingMode
     }
 }
 
@@ -123,6 +126,8 @@ struct FilmtoneVideoExportResult: Sendable {
     let outputWidth: Int
     let outputHeight: Int
     let audioPreserved: Bool
+    let videoTimingMode: FilmtoneVideoTimingMode
+    let outputFrameRate: Int
 }
 
 enum FilmtoneVideoExportError: Error, LocalizedError {
@@ -267,7 +272,9 @@ enum FilmtoneVideoExporter {
             processedFrames: processed,
             outputWidth: Int(outputSize.width.rounded()),
             outputHeight: Int(outputSize.height.rounded()),
-            audioPreserved: false
+            audioPreserved: false,
+            videoTimingMode: .normal,
+            outputFrameRate: frameRate
         )
     }
 
@@ -294,10 +301,14 @@ enum FilmtoneVideoExporter {
             probedColorClass: probe.colorClass
         )
         _ = FilmtoneSourceInputTransform.prepareCube(for: resolvedProfile?.curve)
+        let timingPolicy = FilmtoneVideoTimingPolicy(
+            mode: request.videoTimingMode,
+            sourceFPS: Double(probe.nominalFrameRate)
+        )
         let reader = try FilmtoneVideoReader(
             probe: probe,
             contract: contract,
-            preserveAudio: true
+            preserveAudio: !timingPolicy.isSlow24
         )
 
         // Display orientation (portrait capture etc. swaps width/height).
@@ -308,7 +319,9 @@ enum FilmtoneVideoExporter {
                 : reader.naturalSize,
             maxLongEdge: request.outputLongEdgeLimit
         )
-        let frameRate = max(1, Int(Double(reader.nominalFrameRate).rounded()))
+        let frameRate = timingPolicy.isSlow24
+            ? timingPolicy.targetFPS
+            : max(1, Int(Double(reader.nominalFrameRate).rounded()))
         let estimatedTotal = max(1, reader.estimatedFrameCount)
 
         let writer = try FilmtoneVideoWriter(
@@ -316,7 +329,7 @@ enum FilmtoneVideoExporter {
             outputSize: outputSize,
             frameRate: frameRate,
             contract: contract,
-            preserveAudio: reader.hasAudioOutput
+            preserveAudio: reader.hasAudioOutput && !timingPolicy.isSlow24
         )
 
         try writer.start()
@@ -353,7 +366,7 @@ enum FilmtoneVideoExporter {
         )
 
         var processed = 0
-        let audioTask = reader.hasAudioOutput
+        let audioTask = reader.hasAudioOutput && !timingPolicy.isSlow24
             ? Task.detached(priority: .userInitiated) {
                 try await appendAudioSamples(from: reader, to: writer)
             }
@@ -376,7 +389,10 @@ enum FilmtoneVideoExporter {
                     renderContext: renderContext
                 )
 
-                try await writer.append(buffer: outputBuffer, presentationTime: validTime)
+                let outputTime = timingPolicy.isSlow24
+                    ? CMTime(value: CMTimeValue(processed), timescale: CMTimeScale(max(1, frameRate)))
+                    : validTime
+                try await writer.append(buffer: outputBuffer, presentationTime: outputTime)
                 processed += 1
 
                 if processed == 1 || processed % 12 == 0 {
@@ -400,17 +416,25 @@ enum FilmtoneVideoExporter {
             throw error
         }
 
-        let audioPreserved = try await validateCompletedAudioPreservation(
-            sourceHasAudio: probe.audioTrack != nil,
-            outputURL: request.outputURL
-        )
+        let audioPreserved = timingPolicy.isSlow24
+            ? false
+            : try await validateCompletedAudioPreservation(
+                sourceHasAudio: probe.audioTrack != nil,
+                outputURL: request.outputURL
+            )
 
         var sidecarURL: URL? = nil
         if writeSidecar {
+            let timingMetadata = FilmtoneVideoTimingMetadataDTO.make(
+                policy: timingPolicy,
+                sourceDurationSec: reader.durationSeconds,
+                sourceFrameCount: processed
+            )
             sidecarURL = try FilmtoneSidecarWriter.writeSidecar(
                 for: request,
                 sourceInterpretation: contract.sourceInterpretationID,
-                resolvedSourceProfile: resolvedProfile
+                resolvedSourceProfile: resolvedProfile,
+                videoTimingMetadata: timingMetadata
             )
         }
 
@@ -426,7 +450,9 @@ enum FilmtoneVideoExporter {
             processedFrames: processed,
             outputWidth: Int(outputSize.width.rounded()),
             outputHeight: Int(outputSize.height.rounded()),
-            audioPreserved: audioPreserved
+            audioPreserved: audioPreserved,
+            videoTimingMode: timingPolicy.resolvedMode,
+            outputFrameRate: frameRate
         )
     }
 

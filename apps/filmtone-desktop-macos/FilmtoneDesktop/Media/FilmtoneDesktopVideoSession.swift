@@ -38,6 +38,8 @@ final class FilmtoneDesktopVideoSession {
     private var refreshTask: Task<Void, Never>?
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
+    private var playbackRate: Double = 1.0
+    private var timingPolicy = FilmtoneVideoTimingPolicy(mode: .normal, sourceFPS: nil)
 
     /// M5-K4: graded scrub-bar thumbnail provider. Built lazily on first
     /// access so still preview / non-hovering video sessions don't pay
@@ -216,7 +218,9 @@ final class FilmtoneDesktopVideoSession {
                 player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
             }
         }
-        player.play()
+        let rate = effectivePlaybackRate(for: playbackRate)
+        player.defaultRate = Float(rate)
+        player.rate = Float(rate)
     }
 
     func pause() {
@@ -224,7 +228,8 @@ final class FilmtoneDesktopVideoSession {
     }
 
     func setRate(_ rate: Double) {
-        let clamped = max(0.5, min(rate, 4.0))
+        playbackRate = max(0.5, min(rate, 4.0))
+        let clamped = effectivePlaybackRate(for: playbackRate)
         if isPlaying {
             player.rate = Float(clamped)
         } else {
@@ -240,10 +245,24 @@ final class FilmtoneDesktopVideoSession {
         }
     }
 
+    func setTimingPolicy(_ policy: FilmtoneVideoTimingPolicy) {
+        timingPolicy = policy
+        setRate(playbackRate)
+        rebuildCompositionAndReseek()
+    }
+
     func seek(toSeconds seconds: Double) {
         let clamped = max(0, min(seconds, durationSeconds))
         let target = CMTime(seconds: clamped, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    private func effectivePlaybackRate(for rate: Double) -> Double {
+        max(0.01, rate * timingPolicy.speedMultiplier)
+    }
+
+    private var compositionFrameRate: Float {
+        timingPolicy.isSlow24 ? Float(FilmtoneVideoTimingPolicy.slowTargetFPS) : nominalFrameRate
     }
 
     // MARK: - Composition refresh
@@ -270,7 +289,7 @@ final class FilmtoneDesktopVideoSession {
             videoTrack: videoTrack,
             naturalSize: naturalSize,
             preferredTransform: preferredTransform,
-            nominalFrameRate: nominalFrameRate,
+            nominalFrameRate: compositionFrameRate,
             inputs: currentInputs
         ) else { return }
         item.videoComposition = composition

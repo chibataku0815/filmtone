@@ -237,6 +237,13 @@ struct SidecarOutput: Encodable {
     let container: String
     let preserveAudio: Bool
     let audioPreserved: Bool?
+    let videoTimingMode: String?
+    let sourceFps: Double?
+    let targetFps: Int?
+    let speedMultiplier: Double?
+    let sourceDurationSec: Double?
+    let outputDurationSec: Double?
+    let audioPolicy: String?
     let degradedDecodePath: Bool
     let outputUri: String
     let outputWidth: Int
@@ -719,13 +726,26 @@ enum FilmtoneExportSidecarBuilder {
             creativeLut: resolveCreativeLutRef(request)
         )
 
+        let timingMetadata: FilmtoneVideoTimingMetadataDTO? = request.sourceKind == .video
+            ? FilmtoneVideoTimingMetadataDTO.make(
+                policy: request.videoTimingPolicy,
+                sourceDurationSec: request.sourceProbe?.durationSec
+            )
+            : nil
         let output = SidecarOutput(
             longEdge: request.output.longEdge,
-            fps: request.output.fps,
+            fps: request.effectiveOutputFPS,
             codec: request.output.codec,
             container: request.output.container,
-            preserveAudio: request.output.preserveAudio,
+            preserveAudio: request.effectivePreserveAudio,
             audioPreserved: inputs.audioPreserved,
+            videoTimingMode: timingMetadata?.videoTimingMode,
+            sourceFps: timingMetadata?.sourceFps,
+            targetFps: timingMetadata?.targetFps,
+            speedMultiplier: timingMetadata?.speedMultiplier,
+            sourceDurationSec: timingMetadata?.sourceDurationSec,
+            outputDurationSec: timingMetadata?.outputDurationSec,
+            audioPolicy: timingMetadata?.audioPolicy,
             degradedDecodePath: inputs.degradedDecodePath,
             outputUri: inputs.outputURL.absoluteString,
             outputWidth: Int(inputs.outputSize.width.rounded()),

@@ -442,7 +442,8 @@ enum FilmtonePhase0Math {
     static func buildExportRequest(
         source: SourceInfoDTO?,
         probe: SourceProbeDTO?,
-        project: FilmtoneProjectState
+        project: FilmtoneProjectState,
+        videoTimingMode: FilmtoneVideoTimingMode = .normal
     ) throws -> Phase0ExportRequestDTO {
         guard let source else {
             throw FilmtoneRequestBuildError.missingSource
@@ -478,7 +479,8 @@ enum FilmtonePhase0Math {
             // identical depth-off path.
             depthEnabled: nil,
             depthRenderer: nil,
-            opticalFilterProfileId: project.opticalFilterProfileId
+            opticalFilterProfileId: project.opticalFilterProfileId,
+            videoTimingMode: videoTimingMode
             // v1.3 Camera Profiles Phase E: cameraProfile travels OUTSIDE
             // the wire DTO (separate parameter on facade.runExport(...))
             // because it's iOS-internal state — not a value the JS bridge

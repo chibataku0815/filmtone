@@ -50,6 +50,7 @@ struct FilmtoneVideoPreviewState {
     let width: Int?
     let height: Int?
     let durationSec: Double?
+    let videoTimingPolicy: FilmtoneVideoTimingPolicy
     let isPreparing: Bool
     let error: String?
 }
@@ -174,6 +175,7 @@ final class FilmtoneVideoPreviewSession {
     private(set) var width: Int
     private(set) var height: Int
     private(set) var durationSec: Double?
+    private(set) var videoTimingPolicy: FilmtoneVideoTimingPolicy
 
     private var timeObserver: Any?
     private var transitionGeneration: UInt64 = 0
@@ -195,6 +197,7 @@ final class FilmtoneVideoPreviewSession {
         self.width = graded.width
         self.height = graded.height
         self.durationSec = graded.durationSec ?? original.durationSec
+        self.videoTimingPolicy = .init(mode: .normal, sourceFPS: nil)
         self.player.actionAtItemEnd = .pause
         attachTimeObserver()
     }
@@ -211,10 +214,19 @@ final class FilmtoneVideoPreviewSession {
             compareMode: compareMode,
             width: width,
             height: height,
-            durationSec: durationSec,
+            durationSec: videoTimingPolicy.displayDuration(sourceDuration: durationSec),
+            videoTimingPolicy: videoTimingPolicy,
             isPreparing: isPreparing,
             error: lastError
         )
+    }
+
+    func applyVideoTimingPolicy(_ policy: FilmtoneVideoTimingPolicy) {
+        videoTimingPolicy = policy
+        player.defaultRate = Float(policy.speedMultiplier)
+        if player.timeControlStatus == .playing || player.rate > 0 {
+            player.rate = Float(policy.speedMultiplier)
+        }
     }
 
     func beginPreparing() {
@@ -350,7 +362,8 @@ final class FilmtoneVideoPreviewSession {
         currentTimeSec = CMTimeGetSeconds(playbackState.time).filmtoneSanitizedSeconds
         pendingPlaybackState = nil
         if playbackState.shouldPlay {
-            player.play()
+            player.defaultRate = Float(videoTimingPolicy.speedMultiplier)
+            player.rate = Float(videoTimingPolicy.speedMultiplier)
         }
     }
 
@@ -456,6 +469,11 @@ final class EditorPreviewOrchestrator: ObservableObject {
         syncPreviewFromVideoSession()
     }
 
+    func applyVideoTimingPolicy(_ policy: FilmtoneVideoTimingPolicy) {
+        videoPreviewSession?.applyVideoTimingPolicy(policy)
+        syncPreviewFromVideoSession()
+    }
+
     func reset() {
         previewTask?.cancel()
         previewTask = nil
@@ -494,6 +512,7 @@ final class EditorPreviewOrchestrator: ObservableObject {
         let source = store.source
         let probe = store.probe
         let project = store.project
+        let videoTimingMode = store.resolvedVideoTimingMode
 
         guard let source else {
             videoPreviewSession = nil
@@ -528,7 +547,8 @@ final class EditorPreviewOrchestrator: ObservableObject {
                 let request = try FilmtonePhase0Math.buildExportRequest(
                     source: source,
                     probe: probe,
-                    project: project
+                    project: project,
+                    videoTimingMode: videoTimingMode
                 )
 
                 switch source.kind {
@@ -598,6 +618,7 @@ final class EditorPreviewOrchestrator: ObservableObject {
             original: original,
             graded: graded
         )
+        session.applyVideoTimingPolicy(request.videoTimingPolicy)
         videoPreviewSession = session
         syncPreviewFromVideoSession()
         try await renderComparePreviewFrame(request: request)
@@ -622,6 +643,7 @@ final class EditorPreviewOrchestrator: ObservableObject {
             asset: videoPreviewSession.gradedItem.asset
         )
         try Task.checkCancellation()
+        videoPreviewSession.applyVideoTimingPolicy(request.videoTimingPolicy)
         await videoPreviewSession.refreshPreparedGradedComposition(composition)
         syncPreviewFromVideoSession()
         try await renderComparePreviewFrame(request: request)
