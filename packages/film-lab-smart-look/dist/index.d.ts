@@ -100,6 +100,7 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         highlights: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -153,6 +154,7 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         ektar100: "ektar100";
         superia400: "superia400";
         cinestill800t: "cinestill800t";
+        vision3500t: "vision3500t";
         velvia50: "velvia50";
     }>>>;
     intensity: z.ZodOptional<z.ZodNumber>;

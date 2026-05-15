@@ -9,7 +9,7 @@ import Foundation
 //
 // All disk I/O routes through this actor. UI never touches FileManager
 // directly. Atomic per-entry writes, a rebuildable index, and built-in
-// catalog dispatch (Stone / Urban materialized at read time, never
+// catalog dispatch (Stone / Urban / Noir materialized at read time, never
 // persisted to disk) keep the on-disk state self-healing.
 
 actor FilmtoneSavedLookStore {
@@ -173,8 +173,8 @@ actor FilmtoneSavedLookStore {
 
     @discardableResult
     func deleteLook(id: UUID) throws -> LibrarySnapshot {
-        if let slug = FilmtoneCreativePackCatalog.builtInSlug(canonicalUUID: id) {
-            throw StoreError.immutableEntry(slug: slug)
+        if let builtIn = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+            throw StoreError.immutableEntry(slug: builtIn.slug)
         }
         guard looks[id] != nil else {
             throw StoreError.lookNotFound(id)
@@ -191,8 +191,8 @@ actor FilmtoneSavedLookStore {
     /// rename does not leave the on-disk JSON half-written.
     @discardableResult
     func renameLook(id: UUID, newName: String) throws -> SavedLookEntry {
-        if let slug = FilmtoneCreativePackCatalog.builtInSlug(canonicalUUID: id) {
-            throw StoreError.immutableEntry(slug: slug)
+        if let builtIn = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+            throw StoreError.immutableEntry(slug: builtIn.slug)
         }
         if !didLoad {
             _ = try loadOrRebuild()
@@ -216,7 +216,8 @@ actor FilmtoneSavedLookStore {
     /// favorite. iOS canonical does the same split.
     @discardableResult
     func setFavorite(id: UUID, favorite: Bool) throws -> SavedLookEntry {
-        if var entry = FilmtoneCreativePackCatalog.materializeAnyBuiltIn(canonicalUUID: id) {
+        if let builtIn = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+            var entry = FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(builtIn)
             setBuiltInFavorite(id, favorite: favorite)
             entry.favorite = favorite
             return entry
@@ -238,8 +239,8 @@ actor FilmtoneSavedLookStore {
     /// `FilmtoneCreativePackCatalog` (no disk I/O); user-saved ids
     /// return the in-memory entry.
     func loadLook(id: UUID) throws -> SavedLookEntry {
-        if let entry = FilmtoneCreativePackCatalog.materializeAnyBuiltIn(canonicalUUID: id) {
-            return entry
+        if let builtIn = FilmtoneCreativePackCatalog.find(canonicalUUID: id) {
+            return FilmtoneCreativePackCatalog.materializeAsSavedLookEntry(builtIn)
         }
         guard let entry = looks[id] else {
             throw StoreError.lookNotFound(id)
@@ -250,7 +251,7 @@ actor FilmtoneSavedLookStore {
     // MARK: - Internal helpers
 
     private func currentSnapshot() -> LibrarySnapshot {
-        // Built-in Stone / Urban prepended (mirrors iOS
+        // Built-in Stone / Urban / Noir prepended (mirrors iOS
         // `LibraryStoreActor.currentSnapshot`). User looks sorted by
         // favorite, then updatedAt desc, then name.
         // M5-H.2: built-in favorite is read from the UserDefaults map at
@@ -264,9 +265,6 @@ actor FilmtoneSavedLookStore {
             }
             return entry
         }
-        // Preset-only built-ins remain catalog-addressable for sidecar/runtime
-        // compatibility, but they are not part of the current Desktop picker
-        // surface.
         let builtInLooks = cubeBuiltInLooks
         let sortedUserLooks = looks.values.sorted { lhs, rhs in
             if lhs.favorite != rhs.favorite {

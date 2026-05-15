@@ -95,6 +95,18 @@ content layer stays glass-free so color judgment is not compromised.
   `cb23f1f0b1f37c17f4eaf547975a88bc48d6ae28b720256950ffcf821ede2045`.
   Prep log archived at
   `archive/2026-05-12-native-desktop-v1-7-release-prep.md`.
+- 2026-05-15 JST: Owner-directed AI-native interrupt opened for a Codex-only
+  headless batch/Q&A MVP.
+- 2026-05-15 JST: Codex headless batch/Q&A MVP completed and archived at
+  `archive/2026-05-15-codex-headless-batch-qa-mvp.md`. The integration boundary
+  is MCP STDIO + native automation CLI, not in-app chat or live window control.
+- 2026-05-16 JST: Retired preset-only built-in Look cleanup completed and
+  archived at `archive/2026-05-16-retired-built-in-look-removal.md`; current
+  app sources now expose only Stone / Urban / Noir as bundled built-ins.
+- 2026-05-16 JST: Codex MCP unsupported export profile UX follow-up completed
+  and archived at `archive/2026-05-16-codex-mcp-unsupported-profile-ux.md`;
+  unsupported ProRes / HEVC-style requests now return a v1 unsupported message
+  instead of a Swift decode error.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -457,13 +469,6 @@ without schema or sidecar churn.
 Native Desktop opens iOS `capture-package.json`/package dirs, preserves
 master/proxy provenance, restores Stone/Urban/Noir, and imports package-local
 custom LUT payloads with explicit metadata-only failure state.
-
-2026-05-12: Inserted Twilight bundled built-in Look (preset-only, no cube,
-sourced from `presets.ts:vision3500t`) into Native Desktop and iOS Look
-libraries simultaneously. Catalog UUID `…0011` mirrored across both Swift
-catalogs; macOS adds a parallel `BuiltInPresetLook` struct + `presetOnlyLooks`
-array so cube-bound code paths stay untouched. UI surface stays under the
-existing Look library — no "Preset" UI label per CLAUDE.md §6 term lock.
 
 ## Constraints
 

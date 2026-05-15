@@ -52,10 +52,7 @@ enum FilmtoneCreativeLutLoader {
         // at build time. Resolve by name + extension only — `subdirectory:`
         // would return nil because the folder structure is not preserved
         // inside the .app bundle.
-        guard let url = Bundle.main.url(
-            forResource: (look.bundledFilename as NSString).deletingPathExtension,
-            withExtension: "cube"
-        ) else {
+        guard let url = bundledCubeURL(for: look) else {
             print("[FilmtoneCreativeLutLoader] missing bundle resource for slug=\(look.slug)")
             return nil
         }
@@ -101,6 +98,27 @@ enum FilmtoneCreativeLutLoader {
         )
         cache.setObject(CachedEntry(prepared), forKey: look.slug as NSString)
         return prepared
+    }
+
+    private static func bundledCubeURL(for look: FilmtoneCreativePackCatalog.BuiltInLook) -> URL? {
+        let resourceName = (look.bundledFilename as NSString).deletingPathExtension
+        if let bundleURL = Bundle.main.url(forResource: resourceName, withExtension: "cube") {
+            return bundleURL
+        }
+
+        guard let root = ProcessInfo.processInfo.environment["FILMTONE_CREATIVE_LUT_ROOT"],
+              !root.isEmpty else {
+            return nil
+        }
+        let rootURL = URL(fileURLWithPath: root, isDirectory: true)
+        let directURL = rootURL.appendingPathComponent(look.bundledFilename)
+        if FileManager.default.fileExists(atPath: directURL.path) {
+            return directURL
+        }
+        let nestedURL = rootURL
+            .appendingPathComponent("CreativeLuts", isDirectory: true)
+            .appendingPathComponent(look.bundledFilename)
+        return FileManager.default.fileExists(atPath: nestedURL.path) ? nestedURL : nil
     }
 
     static func preparePackageLocal(

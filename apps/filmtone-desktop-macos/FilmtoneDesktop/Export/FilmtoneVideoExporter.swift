@@ -31,6 +31,9 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let opticalFilterProfileId: String?
     /// M5-M (CC-B): intensity scalar for the optical filter profile (0…1).
     let opticalFilterIntensity: Double
+    /// Optional headless automation output cap. Nil preserves the app's
+    /// current full-display-size export behavior.
+    let outputLongEdgeLimit: Double?
     var sourceKind: FilmtoneSourceKind { .video }
 
     init(
@@ -50,7 +53,8 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         capturePackageProvenance: FilmtoneCapturePackageProvenance? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
         opticalFilterProfileId: String? = nil,
-        opticalFilterIntensity: Double = 1.0
+        opticalFilterIntensity: Double = 1.0,
+        outputLongEdgeLimit: Double? = nil
     ) {
         self.sourceURL = sourceURL
         self.outputURL = outputURL
@@ -96,6 +100,13 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
         self.opticalFilterIntensity = max(0, min(1, opticalFilterIntensity))
+        if let outputLongEdgeLimit,
+           outputLongEdgeLimit.isFinite,
+           outputLongEdgeLimit > 0 {
+            self.outputLongEdgeLimit = outputLongEdgeLimit
+        } else {
+            self.outputLongEdgeLimit = nil
+        }
     }
 }
 
@@ -157,9 +168,12 @@ enum FilmtoneVideoExporter {
         let reader = try FilmtoneVideoReader(probe: probe, contract: contract)
 
         let displaySize = reader.displaySize
-        let outputSize = displaySize.width > 0 && displaySize.height > 0
-            ? displaySize
-            : reader.naturalSize
+        let outputSize = constrainedOutputSize(
+            displaySize.width > 0 && displaySize.height > 0
+                ? displaySize
+                : reader.naturalSize,
+            maxLongEdge: request.outputLongEdgeLimit
+        )
         let frameRate = max(1, Int(Double(reader.nominalFrameRate).rounded()))
         let timeline = FilmtoneHighlightReelFrameTimeline(segments: segments, outputFps: frameRate)
         guard timeline.totalFrameCount > 0 else {
@@ -288,9 +302,12 @@ enum FilmtoneVideoExporter {
 
         // Display orientation (portrait capture etc. swaps width/height).
         let displaySize = reader.displaySize
-        let outputSize = displaySize.width > 0 && displaySize.height > 0
-            ? displaySize
-            : reader.naturalSize
+        let outputSize = constrainedOutputSize(
+            displaySize.width > 0 && displaySize.height > 0
+                ? displaySize
+                : reader.naturalSize,
+            maxLongEdge: request.outputLongEdgeLimit
+        )
         let frameRate = max(1, Int(Double(reader.nominalFrameRate).rounded()))
         let estimatedTotal = max(1, reader.estimatedFrameCount)
 
@@ -421,6 +438,37 @@ enum FilmtoneVideoExporter {
             try Task.checkCancellation()
             try await writer.appendAudio(sampleBuffer: sampleBuffer)
         }
+    }
+
+    private static func constrainedOutputSize(
+        _ size: CGSize,
+        maxLongEdge: Double?
+    ) -> CGSize {
+        let width = max(2, size.width)
+        let height = max(2, size.height)
+        guard let maxLongEdge,
+              maxLongEdge.isFinite,
+              maxLongEdge > 0 else {
+            return evenSize(width: width, height: height)
+        }
+        let longEdge = max(width, height)
+        guard longEdge > maxLongEdge else {
+            return evenSize(width: width, height: height)
+        }
+        let scale = maxLongEdge / longEdge
+        return evenSize(width: width * scale, height: height * scale)
+    }
+
+    private static func evenSize(width: Double, height: Double) -> CGSize {
+        CGSize(
+            width: evenDimension(width),
+            height: evenDimension(height)
+        )
+    }
+
+    private static func evenDimension(_ value: Double) -> Int {
+        let rounded = max(2, Int(value.rounded()))
+        return rounded % 2 == 0 ? rounded : max(2, rounded - 1)
     }
 
     private static func validateCompletedAudioPreservation(

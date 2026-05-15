@@ -61,14 +61,9 @@ enum FilmtoneBuiltInCatalog {
     /// `...000001` – `...000004` are deprecated and intentionally not reused
     /// (see `BuiltInLookUUID`).
     ///
-    /// Active catalog: three Creative LUTs plus one preset-only Look. Stone
-    /// adapts DJI D-Log M Palermo into a display-referred Filmtone cube; Urban
-    /// is the Palermo Green Density derivative; Noir is a toned print
-    /// monochrome recipe. Twilight is a preset-only built-in (no cube) sourced
-    /// from `packages/film-lab-core/src/presets.ts` `vision3500t` — a tungsten
-    /// 500T blue-hour recipe expressed entirely through `paramOverrides`.
-    /// Twilight carries `creativeLut: nil` and `packId: nil` because it does
-    /// not belong to Creative LUT Pack 01.
+    /// Active catalog: three Creative LUTs. Stone adapts DJI D-Log M Palermo
+    /// into a display-referred Filmtone cube; Urban is the Palermo Green
+    /// Density derivative; Noir is a toned print monochrome recipe.
     static let allLooks: [BuiltInLook] = [
         // MARK: - Creative LUT Pack 01
         //
@@ -135,27 +130,6 @@ enum FilmtoneBuiltInCatalog {
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
         ),
-
-        // MARK: - Preset-only built-in
-        //
-        // Twilight ports `vision3500t` from
-        // `packages/film-lab-core/src/presets.ts` — a tungsten 500T blue-hour
-        // recipe. No bundled cube; the patch carries the full color
-        // expression because there is no SSOT cube to be neutralized
-        // against. `creativeLut: nil` keeps `EditorState.applySavedLook`
-        // on the preset path (`lookSlug` stays nil), so Twilight does not
-        // pass through Creative LUT pipeline at all.
-        BuiltInLook(
-            slug: "filmtone-built-in-twilight",
-            canonicalUUID: BuiltInLookUUID.twilight,
-            englishName: "Twilight",
-            presetName: "reset",
-            strength: 1.0,
-            quickState: .zero,
-            paramOverrides: FilmtoneBuiltInCatalog.twilightPatch,
-            creativeLut: nil,
-            packId: nil
-        ),
     ]
 
     /// Baseline patches live in `FilmtoneCreativePack01Patches` so the
@@ -173,56 +147,6 @@ enum FilmtoneBuiltInCatalog {
     static var creativePack01NoirPatch: FilmtonePhase0ParamsPatch {
         FilmtoneCreativePack01Patches.noirPatch
     }
-
-    /// Twilight — preset-only Look (no cube). Patch ports the
-    /// native-supported subset of `vision3500t` Phase0 from
-    /// `presets.ts:632-689` on top of `presetName: "reset"`. The
-    /// web preset's `highlights` / `shadows` legs are intentionally
-    /// dropped because they are not declared in
-    /// `FilmtonePhase0Generated.paramKeys` — adding them would expand
-    /// the Phase0 schema and is out of scope for this bundled-Look
-    /// lane. The native tone is reproduced through `shadowTone` /
-    /// `highlightTone` / `compressionAmount` / `printContrast`
-    /// instead. rgbShift `0.0015` sits just below Stone (`0.0016`) and
-    /// below Urban (`0.0032`) / Adjust-sheet default (`0.0038`),
-    /// consistent with `docs/builtin-catalog.md` "rgbShift signature ordering".
-    static let twilightPatch: FilmtonePhase0ParamsPatch = {
-        var values: [String: Double] = [:]
-        values["exposure"] = -0.04
-        values["contrast"] = 1.22
-        values["saturation"] = 1.02
-        values["temperature"] = -0.40
-        values["tint"] = 0.04
-        values["rgbShift"] = 0.0015
-        values["lensSoftness"] = 0.12
-        values["detailSoftness"] = 0.18
-        values["grainIntensity"] = 0.10
-        values["grainSize"] = 0.52
-        values["vignette"] = 0.36
-        values["bloomThreshold"] = 0.72
-        values["bloomStrength"] = 0.16
-        values["bloomRadius"] = 0.56
-        values["diffusion"] = 0.12
-        values["halationIntensity"] = 0.06
-        values["halationSpread"] = 24
-        values["halationHue"] = 16
-        values["halationThreshold"] = 0.72
-        values["halationRadius"] = 0.44
-        values["bloomSoftKnee"] = 0.62
-        values["halationSoftKnee"] = 0.42
-        values["fade"] = 0.012
-        values["shadowTone"] = 0.18
-        values["highlightTone"] = 0.12
-        values["shadowHue"] = 225
-        values["highlightHue"] = 214
-        values["compressionAmount"] = 0.34
-        values["compressionRange"] = 0.62
-        values["printContrast"] = 0.16
-        values["cyan"] = 0.06
-        values["magenta"] = 0.04
-        values["yellow"] = -0.08
-        return FilmtonePhase0ParamsPatch(values: values)
-    }()
 
     /// Returns the built-in Look matching a canonical UUID, or `nil` for
     /// a UUID that belongs to a user-saved entry. Used by the library
@@ -298,6 +222,4 @@ private enum BuiltInLookUUID {
     static let creativePack01Urban = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000007")!
     static let creativePack01Noir = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000010")!
 
-    // Preset-only built-in (no Creative Pack 01 membership).
-    static let twilight = UUID(uuidString: "FB1A0001-0000-4000-8000-000000000011")!
 }
