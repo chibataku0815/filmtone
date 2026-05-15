@@ -81,19 +81,19 @@ enum FilmtoneAutomationCLI {
                 guard let request = envelope.inspectSources else {
                     throw CLIError.missingPayload("inspectSources")
                 }
-                let result = await FilmtoneAutomationCore.inspectSources(request)
+                let result = try await FilmtoneAutomationCore.inspectSources(request)
                 try writeJSON(FilmtoneAutomationSuccess(result))
             case .answerContext:
                 guard let request = envelope.answerContext else {
                     throw CLIError.missingPayload("answerContext")
                 }
-                let result = await FilmtoneAutomationCore.answerContext(request)
+                let result = try await FilmtoneAutomationCore.answerContext(request)
                 try writeJSON(FilmtoneAutomationSuccess(result))
             case .previewBatch:
                 guard let request = envelope.previewBatch else {
                     throw CLIError.missingPayload("previewBatch")
                 }
-                let result = await FilmtoneAutomationCore.previewBatch(request)
+                let result = try await FilmtoneAutomationCore.previewBatch(request)
                 try writeJSON(FilmtoneAutomationSuccess(result))
             case .runBatch:
                 guard let request = envelope.runBatch else {
@@ -109,6 +109,7 @@ enum FilmtoneAutomationCLI {
     }
 
     private static func runBatch(_ request: FilmtoneAutomationRunBatchRequest) async throws {
+        try FilmtoneAutomationSecurityPolicy.validateRunBatchPlan(request.plan)
         let overwrite = request.overwrite ?? request.plan.options.overwrite
         let continueOnError = request.continueOnError ?? request.plan.options.continueOnError
         let runnableItems = request.plan.items.enumerated().filter { _, item in

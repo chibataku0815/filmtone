@@ -65,8 +65,8 @@ func registerAutomationRuntimeTests() {
         try Data().write(to: still)
         let missing = root.appendingPathComponent("missing.mov")
 
-        let result = waitForAsync {
-            await FilmtoneAutomationCore.inspectSources(
+        let result = try waitForAsync {
+            try await FilmtoneAutomationCore.inspectSources(
                 FilmtoneAutomationInspectSourcesRequest(
                     paths: [still.path, missing.path],
                     recursive: false
@@ -90,8 +90,8 @@ func registerAutomationRuntimeTests() {
         try Data().write(to: still)
         let missing = root.appendingPathComponent("missing.mov")
 
-        let result = waitForAsync {
-            await FilmtoneAutomationCore.previewBatch(
+        let result = try waitForAsync {
+            try await FilmtoneAutomationCore.previewBatch(
                 FilmtoneAutomationBatchPlanRequest(
                     paths: [still.path, missing.path],
                     recursive: false,
@@ -115,19 +115,82 @@ func registerAutomationRuntimeTests() {
             throw AssertionError(description: "Expected missing path warning")
         }
     }
+
+    runner.test("automation security rejects source paths outside allowed roots") {
+        do {
+            _ = try waitForAsync {
+                try await FilmtoneAutomationCore.inspectSources(
+                    FilmtoneAutomationInspectSourcesRequest(
+                        paths: ["/etc/passwd"],
+                        recursive: false
+                    )
+                )
+            }
+            throw AssertionError(description: "Expected sensitive path rejection")
+        } catch let error as FilmtoneAutomationSecurityError {
+            if !String(describing: error).contains("sensitive path") {
+                throw AssertionError(description: "Expected sensitive path error, got \(error)")
+            }
+        }
+    }
+
+    runner.test("automation security rejects unsigned runBatch plans") {
+        let item = FilmtoneAutomationBatchItem(
+            sourcePath: FileManager.default.temporaryDirectory.appendingPathComponent("in.mov").path,
+            outputPath: FileManager.default.temporaryDirectory.appendingPathComponent("out.mp4").path,
+            profile: .social1080,
+            status: .ready,
+            reason: nil,
+            sourceDisplaySize: nil,
+            outputSize: nil,
+            durationSeconds: nil,
+            nominalFrameRate: nil,
+            hasAudio: nil,
+            warnings: []
+        )
+        let plan = FilmtoneAutomationBatchPlan(
+            createdAtIso: "2026-05-15T00:00:00.000Z",
+            look: FilmtoneAutomationLookPlan(
+                requested: "Stone",
+                label: "Stone",
+                presetName: FilmtonePresetCatalog.defaultName,
+                presetStrength: 1,
+                lookSlug: "filmtone-creative-pack-01-stone"
+            ),
+            profiles: [.social1080],
+            options: FilmtoneAutomationBatchOptions(
+                overwrite: false,
+                continueOnError: true,
+                recursive: false
+            ),
+            items: [item],
+            warnings: [],
+            security: nil
+        )
+        do {
+            try FilmtoneAutomationSecurityPolicy.validateRunBatchPlan(plan)
+            throw AssertionError(description: "Expected unsigned plan rejection")
+        } catch FilmtoneAutomationSecurityError.missingPlanSignature {
+            return
+        }
+    }
 }
 
 private final class AutomationAsyncBox<T>: @unchecked Sendable {
     var value: T?
 }
 
-private func waitForAsync<T>(_ body: @escaping () async -> T) -> T {
+private func waitForAsync<T>(_ body: @escaping () async throws -> T) throws -> T {
     let semaphore = DispatchSemaphore(value: 0)
-    let box = AutomationAsyncBox<T>()
+    let box = AutomationAsyncBox<Result<T, Error>>()
     Task {
-        box.value = await body()
+        do {
+            box.value = .success(try await body())
+        } catch {
+            box.value = .failure(error)
+        }
         semaphore.signal()
     }
     semaphore.wait()
-    return box.value!
+    return try box.value!.get()
 }

@@ -116,6 +116,10 @@ content layer stays glass-free so color judgment is not compromised.
 - 2026-05-16 JST: 24fps Slow Mode review fixes landed (F1 image timing gate +
   F2 `CompletedExport` source/output duration split). VFR `estimatedFrameRate`
   fallback deferred. Archived at `archive/2026-05-16-24fps-slow-mode-review-fixes.md`.
+- 2026-05-16 JST: Codex MCP security hardening completed and archived at
+  `archive/2026-05-16-mcp-security-hardening.md`; public-runtime auto-build is
+  disabled by default, MCP/CLI path access is bounded, and `runBatch` requires
+  signed preview plans.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -492,6 +496,11 @@ Dehancer-max benchmark (`exposure ±0.50 EV`, `contrast ±0.15`,
 typical magnitudes reach the visible band. Strong recipe (`0.28`) stays subtle
 through unchanged `drive = amount^1.35`. Archive
 `archive/2026-05-16-film-breath-visible-qa-fix.md`.
+
+2026-05-16: Codex Plugin Marketplace Publication (Phase A) shipped. Public
+marketplace: `chibataku0815/filmtone-codex-marketplace`; clean Codex
+app-server verification installed `filmtone-codex@filmtone` and listed the 7
+MCP tools. Helper distribution/signing remains a follow-up lane.
 
 ## Constraints
 

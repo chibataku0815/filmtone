@@ -9,10 +9,10 @@ import {
 import {
   AutomationClient,
   BatchJobManager,
-  type AnswerContextRequest,
-  type BatchPlanRequest,
-  type InspectSourcesRequest,
+  validateJobIdRequest,
+  validateStartBatchJobRequest,
 } from "./automation-client.js";
+import { MCP_LIMITS } from "./security.js";
 
 const jsonObjectSchema = {
   type: "object",
@@ -27,7 +27,12 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["paths"],
       properties: {
-        paths: { type: "array", items: { type: "string" } },
+        paths: {
+          type: "array",
+          minItems: 1,
+          maxItems: MCP_LIMITS.maxPaths,
+          items: { type: "string", maxLength: MCP_LIMITS.maxPathLength },
+        },
         recursive: { type: "boolean" },
       },
       additionalProperties: false,
@@ -40,8 +45,13 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["question"],
       properties: {
-        question: { type: "string" },
-        paths: { type: "array", items: { type: "string" } },
+        question: { type: "string", minLength: 1, maxLength: MCP_LIMITS.maxQuestionLength },
+        paths: {
+          type: "array",
+          minItems: 1,
+          maxItems: MCP_LIMITS.maxPaths,
+          items: { type: "string", maxLength: MCP_LIMITS.maxPathLength },
+        },
         recursive: { type: "boolean" },
       },
       additionalProperties: false,
@@ -54,14 +64,20 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["paths"],
       properties: {
-        paths: { type: "array", items: { type: "string" } },
+        paths: {
+          type: "array",
+          minItems: 1,
+          maxItems: MCP_LIMITS.maxPaths,
+          items: { type: "string", maxLength: MCP_LIMITS.maxPathLength },
+        },
         recursive: { type: "boolean" },
-        outputDirectory: { type: "string" },
-        look: { type: "string" },
+        outputDirectory: { type: "string", maxLength: MCP_LIMITS.maxPathLength },
+        look: { type: "string", maxLength: MCP_LIMITS.maxLookLength },
         strength: { type: "number", minimum: 0, maximum: 1 },
         profiles: {
           description: "v1 supports social1080 and archiveH264 only. ProRes, HEVC, and cloud upload are not supported yet.",
           type: "array",
+          maxItems: MCP_LIMITS.maxProfiles,
           items: { type: "string", enum: ["social1080", "archiveH264"] },
         },
         overwrite: { type: "boolean" },
@@ -77,7 +93,7 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["previewId"],
       properties: {
-        previewId: { type: "string" },
+        previewId: { type: "string", maxLength: MCP_LIMITS.maxIdLength },
         overwrite: { type: "boolean" },
       },
       additionalProperties: false,
@@ -90,7 +106,7 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["jobId"],
       properties: {
-        jobId: { type: "string" },
+        jobId: { type: "string", maxLength: MCP_LIMITS.maxIdLength },
       },
       additionalProperties: false,
     },
@@ -102,7 +118,7 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["jobId"],
       properties: {
-        jobId: { type: "string" },
+        jobId: { type: "string", maxLength: MCP_LIMITS.maxIdLength },
       },
       additionalProperties: false,
     },
@@ -114,7 +130,7 @@ export const filmtoneTools: Tool[] = [
       type: "object",
       required: ["jobId"],
       properties: {
-        jobId: { type: "string" },
+        jobId: { type: "string", maxLength: MCP_LIMITS.maxIdLength },
       },
       additionalProperties: false,
     },
@@ -145,30 +161,23 @@ export function createFilmtoneMcpServer(
     try {
       switch (name) {
         case "inspect_sources":
-          return jsonResult(manager.client.inspectSources(args as InspectSourcesRequest));
+          return jsonResult(manager.client.inspectSources(args));
         case "prepare_filmtone_answer_context":
-          return jsonResult(manager.client.answerContext(args as AnswerContextRequest));
+          return jsonResult(manager.client.answerContext(args));
         case "preview_batch_job":
-          return jsonResult(manager.createPreview(args as BatchPlanRequest));
+          return jsonResult(manager.createPreview(args));
         case "start_batch_job": {
-          const payload = args as { previewId?: string; overwrite?: boolean };
-          if (!payload.previewId) throw new Error("previewId is required.");
+          const payload = validateStartBatchJobRequest(args);
           return jsonResult(manager.start(payload.previewId, payload.overwrite));
         }
         case "get_batch_job_status": {
-          const payload = args as { jobId?: string };
-          if (!payload.jobId) throw new Error("jobId is required.");
-          return jsonResult(manager.status(payload.jobId));
+          return jsonResult(manager.status(validateJobIdRequest(args, "jobId")));
         }
         case "cancel_batch_job": {
-          const payload = args as { jobId?: string };
-          if (!payload.jobId) throw new Error("jobId is required.");
-          return jsonResult(manager.cancel(payload.jobId));
+          return jsonResult(manager.cancel(validateJobIdRequest(args, "jobId")));
         }
         case "summarize_batch_job": {
-          const payload = args as { jobId?: string };
-          if (!payload.jobId) throw new Error("jobId is required.");
-          return jsonResult(manager.summarize(payload.jobId));
+          return jsonResult(manager.summarize(validateJobIdRequest(args, "jobId")));
         }
         default:
           throw new Error(`Unknown Filmtone MCP tool: ${name}`);

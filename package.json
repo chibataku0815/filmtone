@@ -11,6 +11,10 @@
     "apps/capacitor-film-lab-ios",
     "apps/desktop-film-lab-batch"
   ],
+  "overrides": {
+    "fast-uri": "3.1.2",
+    "ip-address": "10.2.0"
+  },
   "scripts": {
     "dev:desktop": "open apps/filmtone-desktop-macos/FilmtoneDesktop.xcodeproj",
     "dev:legacy-desktop": "bun run --cwd apps/desktop-film-lab-batch dev",

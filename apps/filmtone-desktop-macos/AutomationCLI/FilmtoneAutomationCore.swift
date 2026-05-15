@@ -1,4 +1,5 @@
 import AVFoundation
+import CryptoKit
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -124,6 +125,14 @@ struct FilmtoneAutomationBatchPlan: Codable, Equatable {
     var options: FilmtoneAutomationBatchOptions
     var items: [FilmtoneAutomationBatchItem]
     var warnings: [String]
+    var security: FilmtoneAutomationBatchPlanSecurity?
+}
+
+struct FilmtoneAutomationBatchPlanSecurity: Codable, Equatable {
+    var schemaVersion: Int
+    var issuer: String
+    var expiresAtIso: String
+    var signature: String
 }
 
 struct FilmtoneAutomationBatchOptions: Codable, Equatable {
@@ -175,13 +184,328 @@ struct FilmtoneAutomationAnswerContext: Codable, Equatable {
     var guidance: [String]
 }
 
+enum FilmtoneAutomationSecurityError: Error, CustomStringConvertible {
+    case tooManyPaths(Int, limit: Int)
+    case invalidPath(String)
+    case sensitivePath(String)
+    case outsideAllowedRoots(String, kind: String, allowedRoots: [String])
+    case missingPlanSignature
+    case missingPlanSecret
+    case expiredPlanSignature
+    case invalidPlanSignature
+
+    var description: String {
+        switch self {
+        case .tooManyPaths(let count, let limit):
+            return "Too many paths: \(count). The Filmtone MCP limit is \(limit)."
+        case .invalidPath(let label):
+            return "\(label) must be a non-empty local file path."
+        case .sensitivePath(let path):
+            return "Filmtone MCP will not access sensitive path: \(path)"
+        case .outsideAllowedRoots(let path, let kind, let allowedRoots):
+            return "\(kind) path is outside Filmtone MCP allowed roots: \(path). Allowed roots: \(allowedRoots.joined(separator: ", "))"
+        case .missingPlanSignature:
+            return "runBatch requires a signed preview plan from Filmtone MCP. Run preview_batch_job again."
+        case .missingPlanSecret:
+            return "runBatch requires FILMTONE_AUTOMATION_PLAN_SECRET from the MCP runner."
+        case .expiredPlanSignature:
+            return "Batch plan security signature expired. Run preview_batch_job again."
+        case .invalidPlanSignature:
+            return "Batch plan security signature is invalid. Run preview_batch_job again."
+        }
+    }
+}
+
+enum FilmtoneAutomationSecurityPolicy {
+    static let maxPathCount = 128
+    static let maxPathLength = 4096
+    static let defaultMaxScanFiles = 500
+
+    static var maxScanFiles: Int {
+        guard let raw = ProcessInfo.processInfo.environment["FILMTONE_MCP_MAX_SCAN_FILES"],
+              let parsed = Int(raw),
+              parsed > 0 else {
+            return defaultMaxScanFiles
+        }
+        return parsed
+    }
+
+    static func validateSourcePaths(_ paths: [String]) throws {
+        if paths.count > maxPathCount {
+            throw FilmtoneAutomationSecurityError.tooManyPaths(paths.count, limit: maxPathCount)
+        }
+        for (index, path) in paths.enumerated() {
+            _ = try validatePath(path, kind: "source", label: "paths[\(index)]")
+        }
+    }
+
+    static func validateOutputPath(_ path: String, label: String) throws {
+        _ = try validatePath(path, kind: "output", label: label)
+    }
+
+    static func validateOutputFilePath(_ path: String, label: String) throws {
+        let canonical = try validatePath(path, kind: "output", label: label)
+        guard canonical.lowercased().hasSuffix(".mp4") else {
+            throw FilmtoneAutomationSecurityError.invalidPath(label)
+        }
+    }
+
+    static func validateRunBatchPlan(_ plan: FilmtoneAutomationBatchPlan) throws {
+        guard let security = plan.security else {
+            throw FilmtoneAutomationSecurityError.missingPlanSignature
+        }
+        guard let secret = ProcessInfo.processInfo.environment["FILMTONE_AUTOMATION_PLAN_SECRET"],
+              !secret.isEmpty else {
+            throw FilmtoneAutomationSecurityError.missingPlanSecret
+        }
+        guard let expiresAt = parseIsoDate(security.expiresAtIso),
+              expiresAt > Date() else {
+            throw FilmtoneAutomationSecurityError.expiredPlanSignature
+        }
+        let expected = sign(plan: plan, security: security.withoutSignature, secret: secret)
+        guard expected == security.signature else {
+            throw FilmtoneAutomationSecurityError.invalidPlanSignature
+        }
+        for (index, item) in plan.items.enumerated() {
+            try validateSourcePaths([item.sourcePath])
+            try validateOutputFilePath(item.outputPath, label: "plan.items[\(index)].outputPath")
+        }
+    }
+
+    private static func validatePath(_ path: String, kind: String, label: String) throws -> String {
+        guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              path.utf8.count <= maxPathLength,
+              !path.contains("\0") else {
+            throw FilmtoneAutomationSecurityError.invalidPath(label)
+        }
+        let canonical = canonicalPath(path)
+        if isSensitivePath(canonical) {
+            throw FilmtoneAutomationSecurityError.sensitivePath(redactHome(canonical))
+        }
+        let roots = kind == "source" ? allowedSourceRoots : allowedOutputRoots
+        guard roots.contains(where: { isWithin(root: $0, path: canonical) }) else {
+            throw FilmtoneAutomationSecurityError.outsideAllowedRoots(
+                redactHome(canonical),
+                kind: kind,
+                allowedRoots: roots.map(redactHome)
+            )
+        }
+        return canonical
+    }
+
+    private static var allowedSourceRoots: [String] {
+        if let roots = parseRoots(ProcessInfo.processInfo.environment["FILMTONE_MCP_ALLOWED_SOURCE_ROOTS"]) {
+            return roots
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            FileManager.default.currentDirectoryPath,
+            FileManager.default.temporaryDirectory.path,
+            "/tmp",
+            "\(home)/Movies",
+            "\(home)/Pictures",
+            "\(home)/Desktop",
+            "\(home)/Downloads",
+            "/Volumes",
+        ].map(canonicalPath)
+    }
+
+    private static var allowedOutputRoots: [String] {
+        if let roots = parseRoots(ProcessInfo.processInfo.environment["FILMTONE_MCP_ALLOWED_OUTPUT_ROOTS"]) {
+            return roots
+        }
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            FileManager.default.currentDirectoryPath,
+            FileManager.default.temporaryDirectory.path,
+            "/tmp",
+            "\(home)/Movies",
+            "\(home)/Pictures",
+            "\(home)/Desktop",
+            "\(home)/Downloads",
+            "/Volumes",
+        ].map(canonicalPath)
+    }
+
+    private static func parseRoots(_ raw: String?) -> [String]? {
+        guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        let separators = CharacterSet(charactersIn: ":\n")
+        let roots = raw
+            .components(separatedBy: separators)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map(canonicalPath)
+        return roots.isEmpty ? nil : Array(Set(roots)).sorted()
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        let expanded: String
+        if path == "~" {
+            expanded = FileManager.default.homeDirectoryForCurrentUser.path
+        } else if path.hasPrefix("~/") {
+            expanded = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(String(path.dropFirst(2))).path
+        } else {
+            expanded = path
+        }
+        var probe = URL(fileURLWithPath: expanded).standardizedFileURL
+        var missing: [String] = []
+        while !FileManager.default.fileExists(atPath: probe.path) {
+            let parent = probe.deletingLastPathComponent()
+            if parent.path == probe.path { break }
+            missing.insert(probe.lastPathComponent, at: 0)
+            probe = parent
+        }
+        var resolved = FileManager.default.fileExists(atPath: probe.path)
+            ? probe.resolvingSymlinksInPath()
+            : probe
+        for component in missing {
+            resolved.appendPathComponent(component)
+        }
+        return resolved.standardizedFileURL.path
+    }
+
+    private static func isWithin(root: String, path: String) -> Bool {
+        if path == root { return true }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return path.hasPrefix(prefix)
+    }
+
+    private static func isSensitivePath(_ path: String) -> Bool {
+        let home = canonicalPath(FileManager.default.homeDirectoryForCurrentUser.path)
+        let sensitiveRoots = [
+            "/",
+            "/System",
+            "/Library",
+            "/private/etc",
+            "/etc",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/var/db",
+            "/private/var/db",
+            "\(home)/Library",
+            "\(home)/.ssh",
+            "\(home)/.gnupg",
+            "\(home)/.aws",
+            "\(home)/.config",
+            "\(home)/.kube",
+            "\(home)/.docker",
+        ].map(canonicalPath)
+        if sensitiveRoots.contains(where: { root in
+            path == root || (root != "/" && isWithin(root: root, path: path))
+        }) {
+            return true
+        }
+        let sensitiveComponents: Set<String> = [
+            ".aws", ".azure", ".config", ".docker", ".gnupg", ".kube",
+            ".ssh", ".zsh_history", ".bash_history",
+        ]
+        return path.split(separator: "/").contains { sensitiveComponents.contains(String($0)) }
+    }
+
+    private static func redactHome(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") {
+            return "~/" + String(path.dropFirst(home.count + 1))
+        }
+        return path
+    }
+
+    private static func parseIsoDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    private static func sign(
+        plan: FilmtoneAutomationBatchPlan,
+        security: FilmtoneAutomationBatchPlanSecurity,
+        secret: String
+    ) -> String {
+        let key = SymmetricKey(data: Data(secret.utf8))
+        let payload = planSignaturePayload(plan: plan, security: security)
+        let code = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return code.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func planSignaturePayload(
+        plan: FilmtoneAutomationBatchPlan,
+        security: FilmtoneAutomationBatchPlanSecurity
+    ) -> String {
+        var parts: [String] = []
+        push(&parts, String(security.schemaVersion))
+        push(&parts, security.issuer)
+        push(&parts, security.expiresAtIso)
+        push(&parts, plan.createdAtIso)
+        push(&parts, plan.look.requested ?? "")
+        push(&parts, plan.look.label)
+        push(&parts, plan.look.presetName)
+        push(&parts, formatNumber(plan.look.presetStrength))
+        push(&parts, plan.look.lookSlug ?? "")
+        push(&parts, String(plan.profiles.count))
+        plan.profiles.forEach { push(&parts, $0.rawValue) }
+        push(&parts, String(plan.options.overwrite))
+        push(&parts, String(plan.options.continueOnError))
+        push(&parts, String(plan.options.recursive))
+        push(&parts, String(plan.items.count))
+        for item in plan.items {
+            push(&parts, item.sourcePath)
+            push(&parts, item.outputPath)
+            push(&parts, item.profile.rawValue)
+            push(&parts, item.status.rawValue)
+            push(&parts, item.reason ?? "")
+            pushDimensions(&parts, item.sourceDisplaySize)
+            pushDimensions(&parts, item.outputSize)
+            push(&parts, item.durationSeconds.map(formatNumber) ?? "")
+            push(&parts, item.nominalFrameRate.map(formatNumber) ?? "")
+            push(&parts, item.hasAudio.map { String($0) } ?? "")
+            push(&parts, String(item.warnings.count))
+            item.warnings.forEach { push(&parts, $0) }
+        }
+        push(&parts, String(plan.warnings.count))
+        plan.warnings.forEach { push(&parts, $0) }
+        return parts.joined(separator: "|")
+    }
+
+    private static func pushDimensions(_ parts: inout [String], _ dimensions: FilmtoneAutomationDimensions?) {
+        push(&parts, dimensions.map { String($0.width) } ?? "")
+        push(&parts, dimensions.map { String($0.height) } ?? "")
+    }
+
+    private static func push(_ parts: inout [String], _ value: String) {
+        parts.append("\(value.utf8.count):\(value)")
+    }
+
+    private static func formatNumber(_ value: Double) -> String {
+        String(format: "%.6f", locale: Locale(identifier: "en_US_POSIX"), value)
+    }
+}
+
+private extension FilmtoneAutomationBatchPlanSecurity {
+    var withoutSignature: FilmtoneAutomationBatchPlanSecurity {
+        FilmtoneAutomationBatchPlanSecurity(
+            schemaVersion: schemaVersion,
+            issuer: issuer,
+            expiresAtIso: expiresAtIso,
+            signature: ""
+        )
+    }
+}
+
 enum FilmtoneAutomationCore {
     static let videoExtensions: Set<String> = ["mov", "mp4", "m4v"]
     static let stillExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "tif", "tiff"]
 
     static func inspectSources(
         _ request: FilmtoneAutomationInspectSourcesRequest
-    ) async -> FilmtoneAutomationInspectSourcesResponse {
+    ) async throws -> FilmtoneAutomationInspectSourcesResponse {
+        try FilmtoneAutomationSecurityPolicy.validateSourcePaths(request.paths)
         let scan = expand(paths: request.paths, recursive: request.recursive ?? false)
         var sources: [FilmtoneAutomationSourceInspection] = []
         for candidate in scan.candidates {
@@ -212,7 +536,11 @@ enum FilmtoneAutomationCore {
 
     static func previewBatch(
         _ request: FilmtoneAutomationBatchPlanRequest
-    ) async -> FilmtoneAutomationPreviewBatchResponse {
+    ) async throws -> FilmtoneAutomationPreviewBatchResponse {
+        try FilmtoneAutomationSecurityPolicy.validateSourcePaths(request.paths)
+        if let outputDirectory = request.outputDirectory {
+            try FilmtoneAutomationSecurityPolicy.validateOutputPath(outputDirectory, label: "outputDirectory")
+        }
         let options = FilmtoneAutomationBatchOptions(
             overwrite: request.overwrite ?? false,
             continueOnError: request.continueOnError ?? true,
@@ -293,10 +621,10 @@ enum FilmtoneAutomationCore {
 
     static func answerContext(
         _ request: FilmtoneAutomationAnswerContextRequest
-    ) async -> FilmtoneAutomationAnswerContext {
+    ) async throws -> FilmtoneAutomationAnswerContext {
         let sources: [FilmtoneAutomationSourceInspection]
         if let paths = request.paths, !paths.isEmpty {
-            sources = await inspectSources(
+            sources = try await inspectSources(
                 FilmtoneAutomationInspectSourcesRequest(
                     paths: paths,
                     recursive: request.recursive
@@ -499,6 +827,8 @@ enum FilmtoneAutomationCore {
         var candidates: [URL] = []
         var missing: [URL] = []
         var warnings: [String] = []
+        let maxScanFiles = FilmtoneAutomationSecurityPolicy.maxScanFiles
+        var didHitScanLimit = false
         for path in paths {
             let url = URL(fileURLWithPath: path)
             var isDirectory: ObjCBool = false
@@ -515,6 +845,10 @@ enum FilmtoneAutomationCore {
                     options: [.skipsHiddenFiles]
                    ) {
                     for case let child as URL in enumerator where isSupportedSource(child) {
+                        if candidates.count >= maxScanFiles {
+                            didHitScanLimit = true
+                            break
+                        }
                         candidates.append(child)
                     }
                 } else {
@@ -524,16 +858,33 @@ enum FilmtoneAutomationCore {
                             includingPropertiesForKeys: keys,
                             options: [.skipsHiddenFiles]
                         )
-                        candidates.append(contentsOf: children.filter(isSupportedSource))
+                        for child in children where isSupportedSource(child) {
+                            if candidates.count >= maxScanFiles {
+                                didHitScanLimit = true
+                                break
+                            }
+                            candidates.append(child)
+                        }
                     } catch {
                         warnings.append("Could not read directory \(url.path): \(error)")
                     }
                 }
             } else if isSupportedSource(url) {
-                candidates.append(url)
+                if candidates.count < maxScanFiles {
+                    candidates.append(url)
+                } else {
+                    didHitScanLimit = true
+                }
             } else {
-                candidates.append(url)
+                if candidates.count < maxScanFiles {
+                    candidates.append(url)
+                } else {
+                    didHitScanLimit = true
+                }
             }
+        }
+        if didHitScanLimit {
+            warnings.append("Scan limit reached after \(maxScanFiles) candidate files. Narrow the folder or set FILMTONE_MCP_MAX_SCAN_FILES explicitly.")
         }
         return (
             Array(Set(candidates.map(\.standardizedFileURL))).sorted { $0.path < $1.path },
