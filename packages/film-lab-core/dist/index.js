@@ -172,10 +172,10 @@ var FILM_BREATH_ZERO_OFFSETS = {
   tint: 0
 };
 var FILM_BREATH_LIMITS = {
-  exposure: 0.16,
-  contrast: 0.055,
-  temperature: 0.09,
-  tint: 0.04
+  exposure: 0.5,
+  contrast: 0.15,
+  temperature: 0.22,
+  tint: 0.12
 };
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -214,10 +214,12 @@ function valueNoise(timeSeconds, seed, salt, periodSeconds) {
   return a + (b - a) * smoothstep(fraction);
 }
 function breathNoise(timeSeconds, seed, salt) {
-  const slow = valueNoise(timeSeconds, seed, salt, 4.8);
-  const medium = valueNoise(timeSeconds, seed, salt ^ 1831565813, 8.6);
+  const fast = valueNoise(timeSeconds, seed, salt ^ 1386723780, 1.8);
+  const medium = valueNoise(timeSeconds, seed, salt, 4.8);
+  const slow = valueNoise(timeSeconds, seed, salt ^ 1831565813, 8.6);
   const long = valueNoise(timeSeconds, seed, salt ^ 461845907, 15.5);
-  return clamp(slow * 0.56 + medium * 0.3 + long * 0.14, -1, 1);
+  const weighted = fast * 0.15 + medium * 0.55 + slow * 0.2 + long * 0.1;
+  return clamp(weighted * 2.5, -1, 1);
 }
 function deriveFilmBreathOffsets(amount, timeSeconds, sourceSeed) {
   const clampedAmount = clamp01(amount);

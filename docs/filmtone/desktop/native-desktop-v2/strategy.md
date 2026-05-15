@@ -470,6 +470,15 @@ Desktop, and iOS as a video-only Motion control. Deterministic time offsets
 modulate exposure/contrast/temperature/tint before the base grade; still paths
 stay identity through `timeSeconds = 0`.
 
+2026-05-16: Film Breath visible QA fix. Amplitude limits raised to a
+Dehancer-max benchmark (`exposure ±0.50 EV`, `contrast ±0.15`,
+`temperature ±0.22`, `tint ±0.12`); noise composition expanded to four bands
+(`fast 1.8s × 0.15`, `medium 4.8s × 0.55`, `slow 8.6s × 0.20`,
+`long 15.5s × 0.10`) and the weighted sum is calibrated `×2.5` then clamped so
+typical magnitudes reach the visible band. Strong recipe (`0.28`) stays subtle
+through unchanged `drive = amount^1.35`. Archive
+`archive/2026-05-16-film-breath-visible-qa-fix.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

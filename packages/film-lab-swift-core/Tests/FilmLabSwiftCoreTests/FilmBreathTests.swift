@@ -30,25 +30,33 @@ final class FilmBreathTests: XCTestCase {
                 timeSeconds: Double(frame) / 24.0,
                 sourceSeed: 7331
             )
-            XCTAssertLessThanOrEqual(abs(offsets.exposure), 0.16)
-            XCTAssertLessThanOrEqual(abs(offsets.contrast), 0.055)
-            XCTAssertLessThanOrEqual(abs(offsets.temperature), 0.09)
-            XCTAssertLessThanOrEqual(abs(offsets.tint), 0.04)
+            XCTAssertLessThanOrEqual(abs(offsets.exposure), 0.5)
+            XCTAssertLessThanOrEqual(abs(offsets.contrast), 0.15)
+            XCTAssertLessThanOrEqual(abs(offsets.temperature), 0.22)
+            XCTAssertLessThanOrEqual(abs(offsets.tint), 0.12)
         }
     }
 
-    func testMaximumAmountIsVisuallyInspectableOnRepresentativeFrames() {
+    func testMaximumAmountIsVisiblyModulatingExposureAtTheRegressionFrame() {
         let offsets = FilmtoneFilmBreath.deriveOffsets(
             amount: 1,
             timeSeconds: 24.72,
             sourceSeed: 7331
         )
-        let visibleEnergy = abs(offsets.exposure) +
-            abs(offsets.contrast) +
-            abs(offsets.temperature) +
-            abs(offsets.tint)
+        XCTAssertGreaterThan(abs(offsets.exposure), 0.15)
+    }
 
-        XCTAssertGreaterThan(visibleEnergy, 0.08)
+    func testMaximumAmountStaysAboveVisibleFloorAcrossPlaybackWindow() {
+        let timestamps: [Double] = [2, 5, 10, 15, 20, 24.72, 30, 45, 60, 90]
+        var exposureHits = 0
+        var temperatureHits = 0
+        for t in timestamps {
+            let offsets = FilmtoneFilmBreath.deriveOffsets(amount: 1, timeSeconds: t, sourceSeed: 7331)
+            if abs(offsets.exposure) > 0.15 { exposureHits += 1 }
+            if abs(offsets.temperature) > 0.05 { temperatureHits += 1 }
+        }
+        XCTAssertGreaterThanOrEqual(exposureHits, 6)
+        XCTAssertGreaterThanOrEqual(temperatureHits, 6)
     }
 
     func testAdjacentFramesStaySmooth() {
@@ -59,10 +67,10 @@ final class FilmBreathTests: XCTestCase {
                 timeSeconds: Double(frame) / 24.0,
                 sourceSeed: 99
             )
-            XCTAssertLessThan(abs(current.exposure - previous.exposure), 0.011)
-            XCTAssertLessThan(abs(current.contrast - previous.contrast), 0.0042)
-            XCTAssertLessThan(abs(current.temperature - previous.temperature), 0.006)
-            XCTAssertLessThan(abs(current.tint - previous.tint), 0.003)
+            XCTAssertLessThan(abs(current.exposure - previous.exposure), 0.05)
+            XCTAssertLessThan(abs(current.contrast - previous.contrast), 0.018)
+            XCTAssertLessThan(abs(current.temperature - previous.temperature), 0.022)
+            XCTAssertLessThan(abs(current.tint - previous.tint), 0.012)
             previous = current
         }
     }

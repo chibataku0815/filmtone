@@ -19,10 +19,10 @@ public struct FilmtoneFilmBreathOffsets: Equatable, Hashable, Sendable {
 }
 
 public enum FilmtoneFilmBreath {
-    private static let exposureLimit = 0.16
-    private static let contrastLimit = 0.055
-    private static let temperatureLimit = 0.09
-    private static let tintLimit = 0.04
+    private static let exposureLimit = 0.5
+    private static let contrastLimit = 0.15
+    private static let temperatureLimit = 0.22
+    private static let tintLimit = 0.12
 
     public static func deriveOffsets(
         amount: Double,
@@ -73,10 +73,19 @@ public enum FilmtoneFilmBreath {
     }
 
     private static func breathNoise(timeSeconds: Double, seed: UInt32, salt: UInt32) -> Double {
-        let slow = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt, periodSeconds: 4.8)
-        let medium = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt ^ 0x6d2b79f5, periodSeconds: 8.6)
+        // Medium (4.8s) carries the projector-breath fundamental; fast (1.8s)
+        // adds sub-second flutter without dominating; slow/long are residual
+        // drift. Independent-phase sums collapse toward zero
+        // (E|Σw·U| ≈ 0.27 for these weights), so the 2.5× calibration lifts
+        // typical magnitude into the visible band and the clamp truncates
+        // rare in-phase peaks at ±1. Must stay byte-aligned with the TS
+        // helper in packages/film-lab-core/src/film-breath.ts.
+        let fast = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt ^ 0x52a7b9c4, periodSeconds: 1.8)
+        let medium = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt, periodSeconds: 4.8)
+        let slow = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt ^ 0x6d2b79f5, periodSeconds: 8.6)
         let long = valueNoise(timeSeconds: timeSeconds, seed: seed, salt: salt ^ 0x1b873593, periodSeconds: 15.5)
-        return clamp(slow * 0.56 + medium * 0.30 + long * 0.14, min: -1, max: 1)
+        let weighted = fast * 0.15 + medium * 0.55 + slow * 0.2 + long * 0.1
+        return clamp(weighted * 2.5, min: -1, max: 1)
     }
 
     private static func valueNoise(

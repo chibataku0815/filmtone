@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { deriveFilmBreathOffsets } from "./film-breath";
 
 const LIMITS = {
-  exposure: 0.16,
-  contrast: 0.055,
-  temperature: 0.09,
-  tint: 0.04,
+  exposure: 0.5,
+  contrast: 0.15,
+  temperature: 0.22,
+  tint: 0.12,
 } as const;
+
+const VISIBLE_TIMESTAMPS = [2, 5, 10, 15, 20, 24.72, 30, 45, 60, 90] as const;
 
 describe("deriveFilmBreathOffsets", () => {
   test("is exact identity when amount is 0 or timeSeconds is 0", () => {
@@ -40,25 +42,33 @@ describe("deriveFilmBreathOffsets", () => {
     }
   });
 
-  test("maximum amount is visually inspectable on representative frames", () => {
+  test("maximum amount is visibly modulating exposure at the regression frame", () => {
     const offsets = deriveFilmBreathOffsets(1, 24.72, 7331);
-    const visibleEnergy =
-      Math.abs(offsets.exposure) +
-      Math.abs(offsets.contrast) +
-      Math.abs(offsets.temperature) +
-      Math.abs(offsets.tint);
+    expect(Math.abs(offsets.exposure)).toBeGreaterThan(0.15);
+  });
 
-    expect(visibleEnergy).toBeGreaterThan(0.08);
+  test("maximum amount stays above the human-visible exposure floor across the playback window", () => {
+    const exposureVisibleHits = VISIBLE_TIMESTAMPS.filter((t) => {
+      const offsets = deriveFilmBreathOffsets(1, t, 7331);
+      return Math.abs(offsets.exposure) > 0.15;
+    }).length;
+    const temperatureVisibleHits = VISIBLE_TIMESTAMPS.filter((t) => {
+      const offsets = deriveFilmBreathOffsets(1, t, 7331);
+      return Math.abs(offsets.temperature) > 0.05;
+    }).length;
+
+    expect(exposureVisibleHits).toBeGreaterThanOrEqual(6);
+    expect(temperatureVisibleHits).toBeGreaterThanOrEqual(6);
   });
 
   test("moves smoothly between adjacent 24fps frames", () => {
     let previous = deriveFilmBreathOffsets(1, 1 / 24, 99);
     for (let frame = 2; frame < 24 * 30; frame++) {
       const current = deriveFilmBreathOffsets(1, frame / 24, 99);
-      expect(Math.abs(current.exposure - previous.exposure)).toBeLessThan(0.011);
-      expect(Math.abs(current.contrast - previous.contrast)).toBeLessThan(0.0042);
-      expect(Math.abs(current.temperature - previous.temperature)).toBeLessThan(0.006);
-      expect(Math.abs(current.tint - previous.tint)).toBeLessThan(0.003);
+      expect(Math.abs(current.exposure - previous.exposure)).toBeLessThan(0.05);
+      expect(Math.abs(current.contrast - previous.contrast)).toBeLessThan(0.018);
+      expect(Math.abs(current.temperature - previous.temperature)).toBeLessThan(0.022);
+      expect(Math.abs(current.tint - previous.tint)).toBeLessThan(0.012);
       previous = current;
     }
   });
