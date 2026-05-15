@@ -14,6 +14,7 @@ import Foundation
 // `Localizable.strings`, swap the static `english` / `japanese` builders
 // for `NSLocalizedString` lookups; call sites and shape stay the same.
 struct FilmtoneDesktopStrings: Sendable {
+    let adjustTitle: String
     let advancedTitle: String
     let advancedActiveBadgeFormat: @Sendable (_ active: Int, _ total: Int) -> String
     let advancedResetAllOverrides: String
@@ -44,6 +45,7 @@ struct FilmtoneDesktopStrings: Sendable {
     }
 
     static let english: FilmtoneDesktopStrings = .init(
+        adjustTitle: "Adjust",
         advancedTitle: "Advanced Adjust",
         advancedActiveBadgeFormat: { active, total in
             "\(active) / \(total) active"
@@ -84,6 +86,7 @@ struct FilmtoneDesktopStrings: Sendable {
     // / presets / grain chips / tone chips / motion params translate;
     // everything else keeps the iOS default English even on JA hosts.
     static let japanese: FilmtoneDesktopStrings = .init(
+        adjustTitle: "調整",
         advancedTitle: "詳細調整",
         advancedActiveBadgeFormat: { active, total in
             "\(active) / \(total) active"

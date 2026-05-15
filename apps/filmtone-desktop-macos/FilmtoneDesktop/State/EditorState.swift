@@ -254,8 +254,7 @@ final class EditorState {
         )
     }
 
-    /// M5-C.3a: true when any Quick axis carries a non-zero offset.
-    /// Drives "Reset Quick" button enablement.
+    /// M5-C.3a: true when any legacy Quick axis carries a non-zero offset.
     var quickStateIsActive: Bool {
         quickState.filmCharacter != 0 ||
         quickState.era != 0 ||
@@ -740,9 +739,9 @@ final class EditorState {
 
     /// Apply a SavedLookEntry to live render state. Built-in entries
     /// land via `creativeLut.bundledSlug`; user-saved entries with a
-    /// nil binding clear the lookSlug. M5-C.3a: also restores the
-    /// entry's `quickState` and `paramOverrides` so a Look saved with
-    /// Quick offsets / per-key overrides round-trips faithfully.
+    /// nil binding clear the lookSlug. The visible editor now exposes
+    /// direct Adjust parameters instead of Quick axes, so legacy saved
+    /// Quick offsets are folded into `paramOverrides` on load.
     func applySavedLook(_ entry: SavedLookEntry) {
         packageCreativeLut = nil
         capturePackageCustomLutMissingReason = nil
@@ -752,13 +751,50 @@ final class EditorState {
         selectedSavedLookId = entry.id
         presetName = entry.presetName
         presetStrength = entry.strength
-        if let bundledSlug = entry.creativeLut?.bundledSlug {
+        let bundledSlug = entry.creativeLut?.bundledSlug
+        if let bundledSlug {
             lookSlug = bundledSlug
         } else {
             lookSlug = nil
         }
-        quickState = entry.quickState.clamped()
-        paramOverrides = entry.paramOverrides
+        quickState = .zero
+        paramOverrides = Self.adjustPatchForAppliedSavedLook(
+            entry,
+            lookSlug: bundledSlug
+        )
+    }
+
+    private static func adjustPatchForAppliedSavedLook(
+        _ entry: SavedLookEntry,
+        lookSlug: String?
+    ) -> FilmtonePhase0ParamsPatch {
+        if entry.bundled {
+            return .empty
+        }
+
+        let zeroQuickBase = FilmtonePresetCatalog.resolved(
+            presetName: entry.presetName,
+            strength: entry.strength,
+            lookSlug: lookSlug,
+            quickState: .zero,
+            paramOverrides: .empty
+        )
+        let savedVisibleParams = FilmtonePresetCatalog.resolved(
+            presetName: entry.presetName,
+            strength: entry.strength,
+            lookSlug: lookSlug,
+            quickState: entry.quickState.clamped(),
+            paramOverrides: entry.paramOverrides
+        )
+
+        var values: [String: Double] = [:]
+        for key in FilmtonePhase0Params.keyPaths.keys {
+            let visible = AdvancedAdjustCatalog.clamp(savedVisibleParams.value(for: key), for: key)
+            if abs(visible - zeroQuickBase.value(for: key)) >= AdvancedAdjustCatalog.paramEqualityTolerance {
+                values[key] = visible
+            }
+        }
+        return FilmtonePhase0ParamsPatch(values: values)
     }
 
     /// Reset the Look picker to "None". Mirrors what tapping the None

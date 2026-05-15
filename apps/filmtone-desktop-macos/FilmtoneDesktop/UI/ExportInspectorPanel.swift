@@ -10,7 +10,7 @@ import SwiftUI
 //
 // State priority matches iOS: source-cap blocked beats progress beats
 // finished beats ready. Width-locked at 220pt to match the rest of the
-// right-rail panels (Source Profile / Look / Quick / Grade).
+// right-rail panels (Source Profile / Look / Adjust / Grade).
 
 struct ExportInspectorPanel: View {
     @Bindable var state: EditorState

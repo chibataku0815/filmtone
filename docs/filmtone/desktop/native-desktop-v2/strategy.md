@@ -53,6 +53,7 @@ content layer stays glass-free so color judgment is not compromised.
 | M8 | Native Desktop v1.6 Release | M7 | Released 2026-05-10 | Public update metadata reports Desktop `1.6`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M9 | Native Desktop v1.7 Release | M8 | Released 2026-05-15 | Public update metadata reports Desktop `1.7`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M10 | Native Desktop v1.8 Release | M9 | Released 2026-05-16 | Public update metadata reports Desktop `1.8`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M11 | Native Desktop v1.9 Release | M10 | Released 2026-05-16 | Public update metadata reports Desktop `1.9`, and the fixed Desktop download rail points to the notarized Native DMG. |
 
 ## Current Strategic State
 
@@ -65,13 +66,13 @@ content layer stays glass-free so color judgment is not compromised.
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.8` via update metadata.
+- Public Desktop latest from truth script: `1.9` via update metadata.
 - iOS truth script reports separate public and local axes: public App Store
-  version `1.7`; local Xcode candidate `1.8` build `7`.
-- Native Desktop v2 public release is Desktop v1.8. Desktop release truth and
+  version `1.9`; local Xcode candidate `1.10` build `10`.
+- Native Desktop v2 public release is Desktop v1.9. Desktop release truth and
   iOS App Store truth are separate public axes; rerun truth scripts before
   making release/version claims.
-- No Native Desktop release `active.md` remains open after the v1.8 public
+- No Native Desktop release `active.md` remains open after the v1.9 public
   release.
 
 ## Interrupt / Decision Log
@@ -124,6 +125,13 @@ content layer stays glass-free so color judgment is not compromised.
   metadata reports `latestVersion: "1.8"`, the fixed download page returns
   `Filmtone-1.8.dmg`, and the release DMG sha256 is
   `8a7a398bff773ac6d9cd939ceea87ccc835b453a5aaff22696e7e156b5a82820`.
+- 2026-05-16 JST: Desktop editing rail Quick axes were replaced with inline
+  Adjust parameters. Built-in Look application no longer duplicates catalog
+  patches into live user overrides, so direct parameter edits own the surface.
+- 2026-05-16 JST: Native Desktop v1.9 public release completed. Public update
+  metadata reports `latestVersion: "1.9"`, the fixed download page returns
+  `Filmtone-1.9.dmg`, and the release DMG sha256 is
+  `d3efb71b4d30e21f2935df4c35e616ca4286c9999b46d222b579b3fb56a8bf08`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G

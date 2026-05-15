@@ -11,7 +11,7 @@ import SwiftUI
 //     the rail slides in/out from the right edge.
 //
 // The 4-panel content (`EditorPanelStack`) is shared across both, so Source /
-// Look / Quick / Export behave identically regardless of source orientation.
+// Look / Adjust / Export behave identically regardless of source orientation.
 //
 // Posture decisions:
 //   - Per-panel glass via `EditorSidebarPanelGlass` (RoundedRectangle 16,
@@ -62,7 +62,7 @@ struct EditorPanelStack: View {
                     .modifier(EditorSidebarPanelGlass())
                 LookLibraryControls(state: state, library: library)
                     .modifier(EditorSidebarPanelGlass())
-                QuickAdjustControls(state: state)
+                AdjustControls(state: state)
                     .modifier(EditorSidebarPanelGlass())
                 ExportInspectorPanel(
                     state: state,

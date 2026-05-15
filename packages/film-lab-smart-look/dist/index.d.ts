@@ -101,6 +101,8 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        blackPoint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        toeContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -113,6 +115,7 @@ declare const filmLabSmartLookRequestSchema: z.ZodObject<{
         motionBlurAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shutterAngle: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         trailIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        filmBreathAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         dustAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         scratchAmount: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shaftIntensity: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
