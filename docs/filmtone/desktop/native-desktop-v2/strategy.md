@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-12 JST
+Last updated: 2026-05-16 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -51,7 +51,8 @@ content layer stays glass-free so color judgment is not compromised.
 | M6 | Release Cutover | M5 | Released 2026-05-05 | Public update metadata reports Desktop `1.4`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M7 | Native Desktop v1.5 Release | M6 | Released 2026-05-06 | Public update metadata reports Desktop `1.5`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M8 | Native Desktop v1.6 Release | M7 | Released 2026-05-10 | Public update metadata reports Desktop `1.6`, and the fixed Desktop download rail points to the notarized Native DMG. |
-| M9 | Native Desktop v1.7 Release Prep | M8 | Candidate packaged | Local release candidate reports Desktop `1.7` build `4`; `Filmtone-1.7.dmg` is signed, notarized, stapled, Gatekeeper accepted, and held before public metadata mutation. |
+| M9 | Native Desktop v1.7 Release | M8 | Released 2026-05-15 | Public update metadata reports Desktop `1.7`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M10 | Native Desktop v1.8 Release | M9 | Released 2026-05-16 | Public update metadata reports Desktop `1.8`, and the fixed Desktop download rail points to the notarized Native DMG. |
 
 ## Current Strategic State
 
@@ -64,15 +65,14 @@ content layer stays glass-free so color judgment is not compromised.
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.6` via update metadata.
+- Public Desktop latest from truth script: `1.8` via update metadata.
 - iOS truth script reports separate public and local axes: public App Store
   version `1.7`; local Xcode candidate `1.8` build `7`.
-- Native Desktop v2 public release is Desktop v1.6. Desktop release truth and
+- Native Desktop v2 public release is Desktop v1.8. Desktop release truth and
   iOS App Store truth are separate public axes; rerun truth scripts before
   making release/version claims.
-- No Native Desktop release `active.md` remains open after the v1.7 local
-  candidate packaging log was archived. Public DMG upload/update metadata
-  mutation still requires an explicit owner confirmation step.
+- No Native Desktop release `active.md` remains open after the v1.8 public
+  release.
 
 ## Interrupt / Decision Log
 
@@ -120,6 +120,10 @@ content layer stays glass-free so color judgment is not compromised.
   `archive/2026-05-16-mcp-security-hardening.md`; public-runtime auto-build is
   disabled by default, MCP/CLI path access is bounded, and `runBatch` requires
   signed preview plans.
+- 2026-05-16 JST: Native Desktop v1.8 public release completed. Public update
+  metadata reports `latestVersion: "1.8"`, the fixed download page returns
+  `Filmtone-1.8.dmg`, and the release DMG sha256 is
+  `8a7a398bff773ac6d9cd939ceea87ccc835b453a5aaff22696e7e156b5a82820`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
