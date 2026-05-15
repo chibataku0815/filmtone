@@ -53,19 +53,11 @@ enum FilmtoneSidecarWriter {
         sourceInterpretation: String? = nil,
         resolvedSourceProfile: CameraProfileCatalogEntry? = nil
     ) -> [String: Any] {
-        let strength = FilmtonePresetCatalog.clampStrength(request.presetStrength)
-        let liveQuickState = request.quickState.clamped()
-        let params = FilmtonePresetCatalog.resolved(
-            presetName: request.presetName,
-            strength: strength,
-            lookSlug: request.lookSlug,
-            quickState: liveQuickState,
-            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
-                profileId: request.opticalFilterProfileId,
-                intensity: request.opticalFilterIntensity,
-                userOverrides: request.paramOverrides
-            )
-        )
+        let gradeRecipe = request.gradeRecipe
+        let strength = gradeRecipe.presetStrength
+        let liveQuickState = gradeRecipe.quickState
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: gradeRecipe)
+        let params = resolvedGrade.params
         let lookVersion = FilmtonePresetCatalog.presetVersion
 
         // M5-A.2: when a Look is active, switch lookId to the
@@ -73,15 +65,9 @@ enum FilmtoneSidecarWriter {
         // baseLookName with the slug so a sidecar consumer can route by
         // identity. baseLookName intentionally hides the underlying preset
         // ("reset") because the Look's overrides + cube are the SSOT.
-        let lookId: String
-        let baseLookName: String
-        if let lookSlug = request.lookSlug {
-            lookId = FilmtonePresetCatalog.lookId(forSlug: lookSlug)
-            baseLookName = lookSlug
-        } else {
-            lookId = FilmtonePresetCatalog.lookId(for: request.presetName)
-            baseLookName = request.presetName
-        }
+        let lookId: String = gradeRecipe.lookSlug.map(FilmtonePresetCatalog.lookId(forSlug:))
+            ?? FilmtonePresetCatalog.lookId(for: gradeRecipe.presetName)
+        let baseLookName: String = gradeRecipe.lookSlug ?? gradeRecipe.presetName
 
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -96,20 +82,35 @@ enum FilmtoneSidecarWriter {
             "sourceKind": request.sourceKind.rawValue,
             "outputFile": request.outputURL.path,
             "gradeParams": gradeParamsDictionary(params),
-            "batchLookChoice": [
-                "lookId": lookId,
-                "lookVersion": lookVersion,
-                "baseLookName": baseLookName,
-                "strength": strength,
-            ],
-            "lookId": lookId,
-            "lookVersion": lookVersion,
             "quickState": [
                 "filmCharacter": liveQuickState.filmCharacter,
                 "era": liveQuickState.era,
                 "dynamics": liveQuickState.dynamics,
             ],
         ]
+        if let importedGradeLook = gradeRecipe.importedGradeLook {
+            var imported: [String: Any] = [
+                "id": importedGradeLook.id.uuidString,
+                "title": importedGradeLook.title,
+                "sourceKind": importedGradeLook.source.sourceKindLabel,
+                "resolvedLutIntensity": resolvedGrade.lutIntensity,
+                "unsupportedMetadata": resolvedGrade.unsupportedMetadata,
+            ]
+            if let sourceGraph = importedGradeLook.sourceGraph,
+               let graph = try? jsonObject(sourceGraph) {
+                imported["sourceGraph"] = graph
+            }
+            payload["imported_grade"] = imported
+        } else {
+            payload["batchLookChoice"] = [
+                "lookId": lookId,
+                "lookVersion": lookVersion,
+                "baseLookName": baseLookName,
+                "strength": strength,
+            ]
+            payload["lookId"] = lookId
+            payload["lookVersion"] = lookVersion
+        }
         if let sourceInterpretation {
             payload["sourceInterpretation"] = sourceInterpretation
         }
@@ -143,9 +144,9 @@ enum FilmtoneSidecarWriter {
         // position. Omit at 1.0 for backward-compat (old readers ignore
         // the extra key anyway; new readers default to 1.0 when absent).
         if var opticalFilterProfile = FilmtoneOpticalFilterCatalog.sidecarPayload(
-            for: request.opticalFilterProfileId
+            for: gradeRecipe.opticalFilterProfileId
         ) {
-            let intensity = request.opticalFilterIntensity
+            let intensity = gradeRecipe.opticalFilterIntensity
             if abs(intensity - 1.0) > 1e-9 {
                 opticalFilterProfile["opticalFilterIntensity"] = intensity
             }
@@ -155,14 +156,21 @@ enum FilmtoneSidecarWriter {
         // active and its cube resolves. SHA mismatch / missing resource
         // path returns nil from the loader → block is omitted (OQ-3:
         // attempted-and-failed signal not surfaced in the sidecar).
-        if let packageCreativeLut = request.packageCreativeLut {
+        if case .importedGrade = resolvedGrade.source, let creativeLut = resolvedGrade.creativeLut {
+            payload["creativeLut"] = [
+                "size": creativeLut.size,
+                "intensity": resolvedGrade.lutIntensity,
+                "sourceHash": creativeLut.sourceHash,
+                "source": "imported-grade",
+            ]
+        } else if let packageCreativeLut = gradeRecipe.packageCreativeLut {
             payload["creativeLut"] = [
                 "size": packageCreativeLut.size,
                 "intensity": packageCreativeLut.intensity,
                 "sourceHash": packageCreativeLut.sourceHash,
                 "source": "capture-package",
             ]
-        } else if let lookSlug = request.lookSlug,
+        } else if let lookSlug = gradeRecipe.lookSlug,
            strength > 0,
            let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
            let prepared = FilmtoneCreativeLutLoader.load(look: look) {

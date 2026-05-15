@@ -23,6 +23,9 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
     let packageCreativeLut: PreparedCreativeLut?
+    let importedGradeLook: FilmtoneImportedGradeLook?
+    let importedGradeSidecarURL: URL?
+    let gradeRecipe: FilmtoneGradeRecipe
     let capturePackageProvenance: FilmtoneCapturePackageProvenance?
     let highlightMarkers: FilmtoneHighlightMarkers?
     let opticalFilterProfileId: String?
@@ -41,6 +44,9 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
         packageCreativeLut: PreparedCreativeLut? = nil,
+        importedGradeLook: FilmtoneImportedGradeLook? = nil,
+        importedGradeSidecarURL: URL? = nil,
+        gradeRecipe: FilmtoneGradeRecipe? = nil,
         capturePackageProvenance: FilmtoneCapturePackageProvenance? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
         opticalFilterProfileId: String? = nil,
@@ -56,6 +62,36 @@ struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
         self.quickState = quickState
         self.paramOverrides = paramOverrides
         self.packageCreativeLut = packageCreativeLut
+        self.importedGradeLook = importedGradeLook
+        self.importedGradeSidecarURL = importedGradeSidecarURL
+        if let gradeRecipe {
+            self.gradeRecipe = gradeRecipe
+        } else if let importedGradeLook {
+            self.gradeRecipe = FilmtoneGradeRecipe(
+                selection: .importedGrade(
+                    look: importedGradeLook,
+                    sidecarURL: importedGradeSidecarURL,
+                    packageCreativeLut: packageCreativeLut
+                ),
+                quickState: quickState,
+                paramOverrides: paramOverrides,
+                opticalFilterProfileId: opticalFilterProfileId,
+                opticalFilterIntensity: opticalFilterIntensity
+            )
+        } else {
+            self.gradeRecipe = FilmtoneGradeRecipe(
+                selection: .builtIn(
+                    presetName: presetName,
+                    presetStrength: presetStrength,
+                    lookSlug: lookSlug,
+                    packageCreativeLut: packageCreativeLut
+                ),
+                quickState: quickState,
+                paramOverrides: paramOverrides,
+                opticalFilterProfileId: opticalFilterProfileId,
+                opticalFilterIntensity: opticalFilterIntensity
+            )
+        }
         self.capturePackageProvenance = capturePackageProvenance
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
@@ -269,27 +305,10 @@ enum FilmtoneVideoExporter {
         try writer.start()
         try reader.start()
 
-        let params = FilmtonePresetCatalog.resolved(
-            presetName: request.presetName,
-            strength: request.presetStrength,
-            lookSlug: request.lookSlug,
-            quickState: request.quickState,
-            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
-                profileId: request.opticalFilterProfileId,
-                intensity: request.opticalFilterIntensity,
-                userOverrides: request.paramOverrides
-            )
-        )
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
-        // M5-A.2: resolve the cube ONCE outside the frame loop. The NSCache
-        // hit guarantees a parsed cube survives this entire export. nil
-        // when no Look is selected or strength gate is closed (D4-ii).
-        let creativeLut: PreparedCreativeLut? = request.packageCreativeLut
-            ?? bundledCreativeLut(lookSlug: request.lookSlug, strength: request.presetStrength)
-        let lutIntensity = request.packageCreativeLut.map { clampLutIntensity($0.intensity) }
-            ?? FilmtonePresetCatalog.clampStrength(request.presetStrength)
         let context = FilmtoneCIContext.shared
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
@@ -297,13 +316,13 @@ enum FilmtoneVideoExporter {
         let renderContext = VideoFrameRenderContext(
             contract: contract,
             resolvedProfile: resolvedProfile,
-            params: params,
+            params: resolvedGrade.params,
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
-            creativeLut: creativeLut,
-            lutIntensity: lutIntensity,
-            opticalFilterProfileId: request.opticalFilterProfileId,
-            opticalFilterIntensity: request.opticalFilterIntensity,
+            creativeLut: resolvedGrade.creativeLut,
+            lutIntensity: resolvedGrade.lutIntensity,
+            opticalFilterProfileId: request.gradeRecipe.opticalFilterProfileId,
+            opticalFilterIntensity: request.gradeRecipe.opticalFilterIntensity,
             sourceDetailBias: resolveSourceDetailBias(
                 cameraOptics: probe.cameraOptics,
                 colorClass: probe.colorClass,
@@ -426,33 +445,19 @@ enum FilmtoneVideoExporter {
         contract: FilmtoneColorPipelineContract,
         resolvedProfile: CameraProfileCatalogEntry?
     ) -> VideoFrameRenderContext {
-        let params = FilmtonePresetCatalog.resolved(
-            presetName: request.presetName,
-            strength: request.presetStrength,
-            lookSlug: request.lookSlug,
-            quickState: request.quickState,
-            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
-                profileId: request.opticalFilterProfileId,
-                intensity: request.opticalFilterIntensity,
-                userOverrides: request.paramOverrides
-            )
-        )
-        let creativeLut: PreparedCreativeLut? = request.packageCreativeLut
-            ?? bundledCreativeLut(lookSlug: request.lookSlug, strength: request.presetStrength)
-        let lutIntensity = request.packageCreativeLut.map { clampLutIntensity($0.intensity) }
-            ?? FilmtonePresetCatalog.clampStrength(request.presetStrength)
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
         return VideoFrameRenderContext(
             contract: contract,
             resolvedProfile: resolvedProfile,
-            params: params,
+            params: resolvedGrade.params,
             sourceSeed: FilmtoneGradePipeline.makeStableSourceSeed(
                 from: request.sourceURL.absoluteString
             ),
             cameraOptics: probe.cameraOptics,
-            creativeLut: creativeLut,
-            lutIntensity: lutIntensity,
-            opticalFilterProfileId: request.opticalFilterProfileId,
-            opticalFilterIntensity: request.opticalFilterIntensity,
+            creativeLut: resolvedGrade.creativeLut,
+            lutIntensity: resolvedGrade.lutIntensity,
+            opticalFilterProfileId: request.gradeRecipe.opticalFilterProfileId,
+            opticalFilterIntensity: request.gradeRecipe.opticalFilterIntensity,
             sourceDetailBias: resolveSourceDetailBias(
                 cameraOptics: probe.cameraOptics,
                 colorClass: probe.colorClass,

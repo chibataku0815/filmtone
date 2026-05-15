@@ -190,13 +190,13 @@ function chromaUnitFromHueDegrees(hueDegrees) {
   const { r, g, b } = hslToRgb01(hueDegrees, 1, 0.5);
   let x = r - 0.5;
   let y = g - 0.5;
-  let z5 = b - 0.5;
-  const len = Math.hypot(x, y, z5);
+  let z6 = b - 0.5;
+  const len = Math.hypot(x, y, z6);
   if (len < 1e-9) {
     return [0, 0, 1];
   }
   const inv = 1 / len;
-  return [x * inv, y * inv, z5 * inv];
+  return [x * inv, y * inv, z6 * inv];
 }
 function nearestHueDegreesToDirection(dir) {
   const [dx0, dy0, dz0] = dir;
@@ -3209,6 +3209,139 @@ function serializeCreativeCubeToText(cube, options) {
   return lines.join("\n");
 }
 
+// src/imported-grade-look.ts
+import { z as z5 } from "zod";
+var IMPORTED_GRADE_SCHEMA_ID = "filmtone-imported-grade-v1";
+var IMPORTED_GRADE_SCHEMA_VERSION = 1;
+var importedGradeControlSlotSchema = z5.enum(["preLut", "postLut"]);
+var importedGradeControlSchema = z5.object({
+  id: z5.string().min(1),
+  slot: importedGradeControlSlotSchema,
+  operation: z5.string().min(1),
+  paramKey: z5.string().min(1).nullable().default(null),
+  label: z5.string().min(1),
+  defaultValue: z5.number().finite(),
+  min: z5.number().finite(),
+  max: z5.number().finite()
+}).superRefine((control, ctx) => {
+  if (control.min > control.max) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["min"],
+      message: "min must be <= max"
+    });
+  }
+  if (control.defaultValue < control.min || control.defaultValue > control.max) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["defaultValue"],
+      message: "defaultValue must be inside min/max"
+    });
+  }
+});
+var importedGradeBaseLookSchema = z5.discriminatedUnion("kind", [
+  z5.object({ kind: z5.literal("none") }),
+  z5.object({
+    kind: z5.literal("cube"),
+    path: z5.string().min(1),
+    size: z5.number().int().positive(),
+    intensity: z5.number().finite().min(0).max(1).default(1),
+    sourceHash: z5.string().min(1).nullable().default(null)
+  })
+]);
+var importedGradeSourceSchema = z5.discriminatedUnion("kind", [
+  z5.object({
+    kind: z5.literal("davinci-powergrade-package"),
+    packagePath: z5.string().min(1).nullable().default(null)
+  }),
+  z5.object({
+    kind: z5.literal("davinci-drx"),
+    drxPath: z5.string().min(1).nullable().default(null)
+  }),
+  z5.object({
+    kind: z5.literal("cube-only"),
+    packagePath: z5.string().min(1).nullable().default(null)
+  })
+]);
+var drxGraphTripletSchema = z5.object({
+  parameterId: z5.number().int().nonnegative(),
+  values: z5.array(z5.number().finite()).default([])
+});
+var drxGraphWheelBlockSchema = z5.object({
+  path: z5.array(z5.number().int().nonnegative()),
+  floatValues: z5.array(z5.number().finite()).default([])
+});
+var importedGradeSourceGraphNodeSchema = z5.object({
+  index: z5.number().int().nonnegative(),
+  protobufPath: z5.array(z5.number().int().nonnegative()).default([]),
+  recognizedOps: z5.array(z5.string()).default([]),
+  unsupportedPayloadBase64: z5.string().nullable().default(null),
+  approximateInnerFieldCount: z5.number().int().nonnegative().default(0)
+});
+var importedGradeSourceGraphSchema = z5.object({
+  format: z5.literal("davinci-drx"),
+  decoded: z5.boolean().default(false),
+  bodyVersionFlag: z5.number().int().nonnegative().nullable().default(null),
+  rawTriplets: z5.array(drxGraphTripletSchema).default([]),
+  wheelAdjustmentBlocks: z5.array(drxGraphWheelBlockSchema).default([]),
+  nodes: z5.array(importedGradeSourceGraphNodeSchema).default([]),
+  approximateNodeCount: z5.number().int().nonnegative().default(0),
+  unsupportedNotes: z5.array(z5.string()).default([])
+});
+var importedGradeLookSchema = z5.object({
+  schemaId: z5.literal(IMPORTED_GRADE_SCHEMA_ID),
+  schemaVersion: z5.literal(IMPORTED_GRADE_SCHEMA_VERSION),
+  id: z5.string().uuid(),
+  title: z5.string().min(1),
+  source: importedGradeSourceSchema,
+  baseLook: importedGradeBaseLookSchema.default({ kind: "none" }),
+  preLutControls: z5.array(importedGradeControlSchema).default([]),
+  postLutControls: z5.array(importedGradeControlSchema).default([]),
+  sourceGraph: importedGradeSourceGraphSchema.nullable().default(null),
+  unsupportedMetadata: z5.array(z5.string()).default([])
+}).superRefine((look, ctx) => {
+  const ids = /* @__PURE__ */ new Set();
+  for (const [slot, controls] of [
+    ["preLutControls", look.preLutControls],
+    ["postLutControls", look.postLutControls]
+  ]) {
+    for (const control of controls) {
+      if (control.slot !== (slot === "preLutControls" ? "preLut" : "postLut")) {
+        ctx.addIssue({
+          code: "custom",
+          path: [slot, control.id, "slot"],
+          message: `control is in ${slot} but declares ${control.slot}`
+        });
+      }
+      if (ids.has(control.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [slot, control.id],
+          message: `duplicate control id ${control.id}`
+        });
+      }
+      ids.add(control.id);
+    }
+  }
+});
+function buildImportedGradeLookFromDrxImport(input) {
+  return importedGradeLookSchema.parse({
+    schemaId: IMPORTED_GRADE_SCHEMA_ID,
+    schemaVersion: IMPORTED_GRADE_SCHEMA_VERSION,
+    id: input.id,
+    title: input.title,
+    source: {
+      kind: "davinci-drx",
+      drxPath: input.drxPath ?? null
+    },
+    baseLook: { kind: "none" },
+    preLutControls: input.preLutControls ?? [],
+    postLutControls: [],
+    sourceGraph: input.sourceGraph,
+    unsupportedMetadata: input.unsupportedMetadata ?? []
+  });
+}
+
 // src/creative-pack-01-generator.ts
 var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-dlogm-palermo-display-v2";
 var CREATIVE_PACK_01_URBAN_TRANSFORM = "filmtone-urban-palermo-green-density-v1";
@@ -3265,16 +3398,16 @@ function sampleCube(sourceCube, r, g, b) {
   const n = sourceCube.size - 1;
   const x = clamp014(r) * n;
   const y = clamp014(g) * n;
-  const z5 = clamp014(b) * n;
+  const z6 = clamp014(b) * n;
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
-  const z0 = Math.floor(z5);
+  const z0 = Math.floor(z6);
   const x1 = Math.min(n, x0 + 1);
   const y1 = Math.min(n, y0 + 1);
   const z1 = Math.min(n, z0 + 1);
   const fx = x - x0;
   const fy = y - y0;
-  const fz = z5 - z0;
+  const fz = z6 - z0;
   let outR = 0;
   let outG = 0;
   let outB = 0;
@@ -4220,6 +4353,8 @@ export {
   FILM_GRAIN_INTENSITY_MAX,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
   FILM_LAB_DEFAULT_SHADOW_HUE,
+  IMPORTED_GRADE_SCHEMA_ID,
+  IMPORTED_GRADE_SCHEMA_VERSION,
   IOS_PHASE0_BENCHMARK_SLOTS,
   IOS_PHASE0_OUTPUT_CODEC,
   IOS_PHASE0_OUTPUT_FPS,
@@ -4267,6 +4402,7 @@ export {
   bakeColorOnly,
   benchmarkMarkdownTableHeader,
   buildBenchmarkRow,
+  buildImportedGradeLookFromDrxImport,
   buildLookParamOverrides,
   buildOpticalFilterParamPatch,
   buildOpticalParamPatch,
@@ -4304,6 +4440,11 @@ export {
   gradeMatchesPreset,
   halationHueToHex,
   hslToRgb01,
+  importedGradeBaseLookSchema,
+  importedGradeControlSchema,
+  importedGradeLookSchema,
+  importedGradeSourceGraphSchema,
+  importedGradeSourceSchema,
   interpolatePhase0PresetParams,
   iosPhase0AssetRefSchema,
   iosPhase0BenchmarkRecordSchema,

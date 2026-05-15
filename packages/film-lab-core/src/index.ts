@@ -220,6 +220,19 @@ export {
   type SerializeCubeOptions,
 } from "./creative-cube-serialize";
 export {
+  IMPORTED_GRADE_SCHEMA_ID,
+  IMPORTED_GRADE_SCHEMA_VERSION,
+  buildImportedGradeLookFromDrxImport,
+  importedGradeBaseLookSchema,
+  importedGradeControlSchema,
+  importedGradeLookSchema,
+  importedGradeSourceGraphSchema,
+  importedGradeSourceSchema,
+  type ImportedGradeControl,
+  type ImportedGradeLook,
+  type ImportedGradeSourceGraph,
+} from "./imported-grade-look";
+export {
   CREATIVE_PACK_01_BAKER_VERSION,
   CREATIVE_PACK_01_CUBE_SIZE,
   CREATIVE_PACK_01_ID,

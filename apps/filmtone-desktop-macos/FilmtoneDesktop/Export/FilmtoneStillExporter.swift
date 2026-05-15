@@ -42,6 +42,9 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
     let quickState: FilmtoneQuickState
     let paramOverrides: FilmtonePhase0ParamsPatch
     let packageCreativeLut: PreparedCreativeLut?
+    let importedGradeLook: FilmtoneImportedGradeLook?
+    let importedGradeSidecarURL: URL?
+    let gradeRecipe: FilmtoneGradeRecipe
     let capturePackageProvenance: FilmtoneCapturePackageProvenance?
     let highlightMarkers: FilmtoneHighlightMarkers?
     let opticalFilterProfileId: String?
@@ -61,6 +64,9 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         quickState: FilmtoneQuickState = .zero,
         paramOverrides: FilmtonePhase0ParamsPatch = .empty,
         packageCreativeLut: PreparedCreativeLut? = nil,
+        importedGradeLook: FilmtoneImportedGradeLook? = nil,
+        importedGradeSidecarURL: URL? = nil,
+        gradeRecipe: FilmtoneGradeRecipe? = nil,
         capturePackageProvenance: FilmtoneCapturePackageProvenance? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
         opticalFilterProfileId: String? = nil,
@@ -79,6 +85,36 @@ struct FilmtoneStillExportRequest: FilmtoneSidecarRequest {
         self.quickState = quickState
         self.paramOverrides = paramOverrides
         self.packageCreativeLut = packageCreativeLut
+        self.importedGradeLook = importedGradeLook
+        self.importedGradeSidecarURL = importedGradeSidecarURL
+        if let gradeRecipe {
+            self.gradeRecipe = gradeRecipe
+        } else if let importedGradeLook {
+            self.gradeRecipe = FilmtoneGradeRecipe(
+                selection: .importedGrade(
+                    look: importedGradeLook,
+                    sidecarURL: importedGradeSidecarURL,
+                    packageCreativeLut: packageCreativeLut
+                ),
+                quickState: quickState,
+                paramOverrides: paramOverrides,
+                opticalFilterProfileId: opticalFilterProfileId,
+                opticalFilterIntensity: opticalFilterIntensity
+            )
+        } else {
+            self.gradeRecipe = FilmtoneGradeRecipe(
+                selection: .builtIn(
+                    presetName: presetName,
+                    presetStrength: presetStrength,
+                    lookSlug: lookSlug,
+                    packageCreativeLut: packageCreativeLut
+                ),
+                quickState: quickState,
+                paramOverrides: paramOverrides,
+                opticalFilterProfileId: opticalFilterProfileId,
+                opticalFilterIntensity: opticalFilterIntensity
+            )
+        }
         self.capturePackageProvenance = capturePackageProvenance
         self.highlightMarkers = highlightMarkers
         self.opticalFilterProfileId = opticalFilterProfileId
@@ -133,33 +169,20 @@ enum FilmtoneStillExporter {
             entry: resolvedProfile
         )
 
-        let params = FilmtonePresetCatalog.resolved(
-            presetName: request.presetName,
-            strength: request.presetStrength,
-            lookSlug: request.lookSlug,
-            quickState: request.quickState,
-            paramOverrides: FilmtoneOpticalFilterCatalog.renderParamOverrides(
-                profileId: request.opticalFilterProfileId,
-                intensity: request.opticalFilterIntensity,
-                userOverrides: request.paramOverrides
-            )
-        )
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
+        let params = resolvedGrade.params
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
-        let creativeLut: PreparedCreativeLut? = request.packageCreativeLut
-            ?? bundledCreativeLut(lookSlug: request.lookSlug, strength: request.presetStrength)
-        let lutIntensity = request.packageCreativeLut.map { clampLutIntensity($0.intensity) }
-            ?? FilmtonePresetCatalog.clampStrength(request.presetStrength)
         let graded = FilmtoneGradePipeline.apply(
             to: normalizedSource,
             params: params,
             sourceSeed: sourceSeed,
             cameraOptics: probe.cameraOptics,
-            creativeLut: creativeLut,
-            lutIntensity: lutIntensity,
-            opticalFilterProfileId: request.opticalFilterProfileId,
-            opticalFilterIntensity: request.opticalFilterIntensity,
+            creativeLut: resolvedGrade.creativeLut,
+            lutIntensity: resolvedGrade.lutIntensity,
+            opticalFilterProfileId: request.gradeRecipe.opticalFilterProfileId,
+            opticalFilterIntensity: request.gradeRecipe.opticalFilterIntensity,
             sourceDetailBias: FilmtoneSourceDetailCompensation.resolve(
                 FilmtoneSourceDetailCompensationInput(
                     cameraMake: probe.cameraOptics?.cameraMake,

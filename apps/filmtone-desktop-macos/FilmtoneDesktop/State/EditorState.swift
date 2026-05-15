@@ -59,6 +59,12 @@ final class EditorState {
     /// UI-tracking sugar so the Picker remains consistent across
     /// re-selection of the same Look.
     var selectedSavedLookId: UUID?
+    /// DB-M13: selected normalized Imported Grade entry. This is separate
+    /// from Saved Look selection because Imported Grade is a DaVinci/source
+    /// bridge object, not a user-authored Filmtone Look snapshot.
+    var selectedImportedGradeId: UUID?
+    var selectedImportedGrade: FilmtoneImportedGradeLook?
+    var selectedImportedGradeSidecarURL: URL?
     /// M5-C.3a: Quick adjust 3-axis state (filmCharacter / era / dynamics)
     /// each in [-1, 1]. Folded into the resolved render params via
     /// `FilmtonePresetCatalog.applyQuickState`. Saved/restored as part of
@@ -176,16 +182,34 @@ final class EditorState {
     /// profile's reset-baseline-authored values (`lensSoftness 0.08`).
     /// `paramOverrides` here is the *raw* user manual overrides — Veil
     /// patch resolution moved into `resolved()` itself.
-    var presetParams: FilmtonePhase0Params {
-        FilmtonePresetCatalog.resolved(
+    var currentGradeSelection: FilmtoneGradeSelection {
+        if let selectedImportedGrade {
+            return .importedGrade(
+                look: selectedImportedGrade,
+                sidecarURL: selectedImportedGradeSidecarURL,
+                packageCreativeLut: packageCreativeLut
+            )
+        }
+        return .builtIn(
             presetName: presetName,
-            strength: presetStrength,
+            presetStrength: presetStrength,
             lookSlug: lookSlug,
-            quickState: quickState,
-            opticalFilterProfileId: opticalFilterProfileId,
-            opticalFilterIntensity: opticalFilterIntensity,
-            paramOverrides: paramOverrides
+            packageCreativeLut: packageCreativeLut
         )
+    }
+
+    var currentGradeRecipe: FilmtoneGradeRecipe {
+        FilmtoneGradeRecipe(
+            selection: currentGradeSelection,
+            quickState: quickState,
+            paramOverrides: paramOverrides,
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity
+        )
+    }
+
+    var presetParams: FilmtonePhase0Params {
+        FilmtoneGradeResolution.resolve(recipe: currentGradeRecipe).params
     }
 
     /// Flat (Veil + user) paramOverrides patch consumed by callers that
@@ -222,15 +246,7 @@ final class EditorState {
     /// once. strength == 0 gates the cube off so the bareline render is
     /// pure preset-reset (no Look identity bleed). nil otherwise.
     var resolvedCreativeLut: PreparedCreativeLut? {
-        if let packageCreativeLut {
-            return packageCreativeLut
-        }
-        guard let lookSlug,
-              presetStrength > 0,
-              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
-            return nil
-        }
-        return FilmtoneCreativeLutLoader.load(look: look)
+        FilmtoneGradeResolution.resolve(recipe: currentGradeRecipe).creativeLut
     }
 
     var lookId: String {
@@ -354,26 +370,15 @@ final class EditorState {
         for url: URL? = nil
     ) -> FilmtoneDesktopVideoRenderInputs {
         FilmtoneDesktopVideoRenderInputs(
-            presetName: presetName,
-            presetStrength: presetStrength,
-            lookSlug: lookSlug,
+            gradeRecipe: currentGradeRecipe,
             sourceProfileSelection: sourceProfileSelection,
             probedColorClass: probedSourceColorClass,
-            quickState: quickState,
-            paramOverrides: renderParamOverrides,
-            packageCreativeLut: packageCreativeLut,
             compareEnabled: isCompareEnabled,
             compareSplitFraction: compareSplitFraction,
             sourceURL: url ?? sourceURL ?? URL(fileURLWithPath: "/"),
-            // M5-M (CC-B): forward Backlight Veil identity, intensity,
-            // and probed camera optics so video preview / scrub thumbnails
-            // route through the optical scatter composite at the user's
-            // chosen strength. At intensity=0 the handler falls back to
-            // the legacy glow composite (no Backlight-specific math), so
-            // dragging the cursor to 0 with a chip selected is bytewise
-            // equivalent to selecting None.
-            opticalFilterProfileId: opticalFilterProfileId,
-            opticalFilterIntensity: opticalFilterIntensity,
+            // M5-M (CC-B): grade identity and optical filter state are
+            // captured in `currentGradeRecipe`; only probed camera optics
+            // is session-owned and patched in below.
             cameraOptics: videoSession?.cameraOptics
         )
     }
@@ -683,6 +688,9 @@ final class EditorState {
     func applySavedLook(_ entry: SavedLookEntry) {
         packageCreativeLut = nil
         capturePackageCustomLutMissingReason = nil
+        selectedImportedGradeId = nil
+        selectedImportedGrade = nil
+        selectedImportedGradeSidecarURL = nil
         selectedSavedLookId = entry.id
         presetName = entry.presetName
         presetStrength = entry.strength
@@ -703,8 +711,29 @@ final class EditorState {
         packageCreativeLut = nil
         capturePackageCustomLutMissingReason = nil
         selectedSavedLookId = nil
+        selectedImportedGradeId = nil
+        selectedImportedGrade = nil
+        selectedImportedGradeSidecarURL = nil
         lookSlug = nil
         quickState = .zero
         paramOverrides = .empty
+    }
+
+    func applyImportedGrade(_ look: FilmtoneImportedGradeLook, sidecarURL: URL? = nil) {
+        selectedImportedGradeId = look.id
+        selectedImportedGrade = look
+        selectedImportedGradeSidecarURL = sidecarURL
+        selectedSavedLookId = nil
+        lookSlug = nil
+        presetName = FilmtonePresetCatalog.defaultName
+        presetStrength = FilmtonePresetCatalog.presetStrengthDefault
+        packageCreativeLut = nil
+        capturePackageCustomLutMissingReason = nil
+    }
+
+    func clearImportedGradeSelection() {
+        selectedImportedGradeId = nil
+        selectedImportedGrade = nil
+        selectedImportedGradeSidecarURL = nil
     }
 }

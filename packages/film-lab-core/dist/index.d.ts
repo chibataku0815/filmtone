@@ -2376,6 +2376,148 @@ interface SerializeCubeOptions {
  */
 declare function serializeCreativeCubeToText(cube: CreativeCube, options: SerializeCubeOptions): string;
 
+declare const IMPORTED_GRADE_SCHEMA_ID = "filmtone-imported-grade-v1";
+declare const IMPORTED_GRADE_SCHEMA_VERSION = 1;
+declare const importedGradeControlSchema: z.ZodObject<{
+    id: z.ZodString;
+    slot: z.ZodEnum<{
+        preLut: "preLut";
+        postLut: "postLut";
+    }>;
+    operation: z.ZodString;
+    paramKey: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    label: z.ZodString;
+    defaultValue: z.ZodNumber;
+    min: z.ZodNumber;
+    max: z.ZodNumber;
+}, z.core.$strip>;
+declare const importedGradeBaseLookSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    kind: z.ZodLiteral<"none">;
+}, z.core.$strip>, z.ZodObject<{
+    kind: z.ZodLiteral<"cube">;
+    path: z.ZodString;
+    size: z.ZodNumber;
+    intensity: z.ZodDefault<z.ZodNumber>;
+    sourceHash: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+}, z.core.$strip>], "kind">;
+declare const importedGradeSourceSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    kind: z.ZodLiteral<"davinci-powergrade-package">;
+    packagePath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+}, z.core.$strip>, z.ZodObject<{
+    kind: z.ZodLiteral<"davinci-drx">;
+    drxPath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+}, z.core.$strip>, z.ZodObject<{
+    kind: z.ZodLiteral<"cube-only">;
+    packagePath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+}, z.core.$strip>], "kind">;
+declare const importedGradeSourceGraphSchema: z.ZodObject<{
+    format: z.ZodLiteral<"davinci-drx">;
+    decoded: z.ZodDefault<z.ZodBoolean>;
+    bodyVersionFlag: z.ZodDefault<z.ZodNullable<z.ZodNumber>>;
+    rawTriplets: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        parameterId: z.ZodNumber;
+        values: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+    }, z.core.$strip>>>;
+    wheelAdjustmentBlocks: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        path: z.ZodArray<z.ZodNumber>;
+        floatValues: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+    }, z.core.$strip>>>;
+    nodes: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        index: z.ZodNumber;
+        protobufPath: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+        recognizedOps: z.ZodDefault<z.ZodArray<z.ZodString>>;
+        unsupportedPayloadBase64: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        approximateInnerFieldCount: z.ZodDefault<z.ZodNumber>;
+    }, z.core.$strip>>>;
+    approximateNodeCount: z.ZodDefault<z.ZodNumber>;
+    unsupportedNotes: z.ZodDefault<z.ZodArray<z.ZodString>>;
+}, z.core.$strip>;
+declare const importedGradeLookSchema: z.ZodObject<{
+    schemaId: z.ZodLiteral<"filmtone-imported-grade-v1">;
+    schemaVersion: z.ZodLiteral<1>;
+    id: z.ZodString;
+    title: z.ZodString;
+    source: z.ZodDiscriminatedUnion<[z.ZodObject<{
+        kind: z.ZodLiteral<"davinci-powergrade-package">;
+        packagePath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>, z.ZodObject<{
+        kind: z.ZodLiteral<"davinci-drx">;
+        drxPath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>, z.ZodObject<{
+        kind: z.ZodLiteral<"cube-only">;
+        packagePath: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>], "kind">;
+    baseLook: z.ZodDefault<z.ZodDiscriminatedUnion<[z.ZodObject<{
+        kind: z.ZodLiteral<"none">;
+    }, z.core.$strip>, z.ZodObject<{
+        kind: z.ZodLiteral<"cube">;
+        path: z.ZodString;
+        size: z.ZodNumber;
+        intensity: z.ZodDefault<z.ZodNumber>;
+        sourceHash: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    }, z.core.$strip>], "kind">>;
+    preLutControls: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        slot: z.ZodEnum<{
+            preLut: "preLut";
+            postLut: "postLut";
+        }>;
+        operation: z.ZodString;
+        paramKey: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        label: z.ZodString;
+        defaultValue: z.ZodNumber;
+        min: z.ZodNumber;
+        max: z.ZodNumber;
+    }, z.core.$strip>>>;
+    postLutControls: z.ZodDefault<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        slot: z.ZodEnum<{
+            preLut: "preLut";
+            postLut: "postLut";
+        }>;
+        operation: z.ZodString;
+        paramKey: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+        label: z.ZodString;
+        defaultValue: z.ZodNumber;
+        min: z.ZodNumber;
+        max: z.ZodNumber;
+    }, z.core.$strip>>>;
+    sourceGraph: z.ZodDefault<z.ZodNullable<z.ZodObject<{
+        format: z.ZodLiteral<"davinci-drx">;
+        decoded: z.ZodDefault<z.ZodBoolean>;
+        bodyVersionFlag: z.ZodDefault<z.ZodNullable<z.ZodNumber>>;
+        rawTriplets: z.ZodDefault<z.ZodArray<z.ZodObject<{
+            parameterId: z.ZodNumber;
+            values: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+        }, z.core.$strip>>>;
+        wheelAdjustmentBlocks: z.ZodDefault<z.ZodArray<z.ZodObject<{
+            path: z.ZodArray<z.ZodNumber>;
+            floatValues: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+        }, z.core.$strip>>>;
+        nodes: z.ZodDefault<z.ZodArray<z.ZodObject<{
+            index: z.ZodNumber;
+            protobufPath: z.ZodDefault<z.ZodArray<z.ZodNumber>>;
+            recognizedOps: z.ZodDefault<z.ZodArray<z.ZodString>>;
+            unsupportedPayloadBase64: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+            approximateInnerFieldCount: z.ZodDefault<z.ZodNumber>;
+        }, z.core.$strip>>>;
+        approximateNodeCount: z.ZodDefault<z.ZodNumber>;
+        unsupportedNotes: z.ZodDefault<z.ZodArray<z.ZodString>>;
+    }, z.core.$strip>>>;
+    unsupportedMetadata: z.ZodDefault<z.ZodArray<z.ZodString>>;
+}, z.core.$strip>;
+type ImportedGradeControl = z.infer<typeof importedGradeControlSchema>;
+type ImportedGradeLook = z.infer<typeof importedGradeLookSchema>;
+type ImportedGradeSourceGraph = z.infer<typeof importedGradeSourceGraphSchema>;
+declare function buildImportedGradeLookFromDrxImport(input: {
+    id: string;
+    title: string;
+    drxPath?: string | null;
+    sourceGraph: ImportedGradeSourceGraph;
+    preLutControls?: ImportedGradeControl[];
+    unsupportedMetadata?: string[];
+}): ImportedGradeLook;
+
 declare const CREATIVE_PACK_01_STONE_TRANSFORM: "filmtone-stone-dlogm-palermo-display-v2";
 declare const CREATIVE_PACK_01_URBAN_TRANSFORM: "filmtone-urban-palermo-green-density-v1";
 type CreativePack01SourceTransform = typeof CREATIVE_PACK_01_STONE_TRANSFORM | typeof CREATIVE_PACK_01_URBAN_TRANSFORM;
@@ -2648,4 +2790,4 @@ interface SourceDetailCompensationInput {
  */
 declare function resolveSourceDetailCompensation(input?: SourceDetailCompensationInput): SourceDetailProfile;
 
-export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, DETAIL_SOFTNESS_EFFECTIVE_MAX, type DetailSoftnessOptions, type DetailSoftnessUniforms, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_COMPRESSION_V3_CONSTANTS, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmCompressionRgb, type FilmCompressionV3Options, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SHADOW_LATITUDE_CONSTANTS, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type ShadowLatitudeOptions, type ShadowLatitudeRgb, type SourceColorClass, type SourceColorMetadata, type SourceDetailCompensationInput, type SourceDetailConfidence, type SourceDetailProfile, type SourceDetailTransferClass, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmCompressionV3Sample, applyQuickStateToParams, applyQuickStateToPhase0Params, applyShadowLatitudeSample, applyStoneDisplayPalermoTransform, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deriveDetailSoftnessUniforms, deserializeCubeLutData, diagonalMaxDelta, filmCompressionChromaMagnitude, filmCompressionLuma, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesPreset, halationHueToHex, hslToRgb01, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, resolveSourceDetailCompensation, serializeCreativeCubeToText, serializeCubeLut, shadowLatitudeLuma };
+export { BAKE_COLOR_IDENTITY, BAKE_COLOR_PARAM_KEYS, type BakeColorParams, type BehaviorProfile, type BenchmarkRow, type BenchmarkRowInput, type BenchmarkSaveResult, type BenchmarkVisualFloor, type BuiltSourceProfileLut, CREATIVE_CUBE_DEFAULT_SIZE, CREATIVE_PACK_01_BAKER_VERSION, CREATIVE_PACK_01_CUBE_SIZE, CREATIVE_PACK_01_ID, CREATIVE_PACK_01_LOOKS, CREATIVE_PACK_01_STONE_TRANSFORM, CREATIVE_PACK_01_URBAN_TRANSFORM, type CameraOptics, type CameraOpticsSource, type CreativeCube, type CreativePack01SourceTransform, type CreativePackLook, type CubeLUT, DEFAULT_QUICK_STATE, DETAIL_SOFTNESS_EFFECTIVE_MAX, type DetailSoftnessOptions, type DetailSoftnessUniforms, FILMTONE_DEFAULT_BASE_PRESET, FILMTONE_SOFT_FINISH_PATCH, FILM_COMPRESSION_V3_CONSTANTS, FILM_GRAIN_INTENSITY_MAX, FILM_LAB_DEFAULT_HIGHLIGHT_HUE, FILM_LAB_DEFAULT_SHADOW_HUE, type FilmCompressionRgb, type FilmCompressionV3Options, type FilmLabDepthTrackInput, type FilmLabParamsValidated, type FilmLookGradeInputProps, type FilmLookSpikeInputProps, IMPORTED_GRADE_SCHEMA_ID, IMPORTED_GRADE_SCHEMA_VERSION, IOS_PHASE0_BENCHMARK_SLOTS, IOS_PHASE0_OUTPUT_CODEC, IOS_PHASE0_OUTPUT_FPS, IOS_PHASE0_OUTPUT_LONG_EDGE, IOS_PHASE0_PARAM_KEYS, IOS_PHASE0_PRESET_IDS, IOS_PHASE0_SCHEMA_VERSION, IOS_PHASE0_SOURCE_CAPS, IOS_PHASE0_SOURCE_DURATION_CAP_SEC, IOS_PHASE0_SOURCE_FILE_SIZE_CAP_BYTES, IOS_PHASE0_SOURCE_LONG_EDGE_CAP, type ImportedGradeControl, type ImportedGradeLook, type ImportedGradeSourceGraph, type IosHdrPreparationPolicy, type IosHdrPreparationStrategy, type IosPhase0AssetRef, type IosPhase0BenchmarkRecord, type IosPhase0BenchmarkSlot, type IosPhase0ExportPayload, type IosPhase0ExportResult, type IosPhase0ExportSettings, type IosPhase0LocalProject, type IosPhase0ParamKey, type IosPhase0Params, type IosPhase0PickedLutFile, type IosPhase0PickedSource, type IosPhase0SerializableLut, type IosPhase0SourceInfo, type IosPhase0SourceKind, LEGACY_HIGHLIGHT_TONE_MAGNITUDE, LEGACY_SHADOW_TONE_MAGNITUDE, LOOK_ID_BY_PRESET, OPTICAL_FILTER_DISCLAIMER, OPTICAL_FILTER_PARAM_KEYS, OPTICAL_FILTER_PROFILES, type OpticalAnalyzerProvider, type OpticalFamily, type OpticalFilterBehavior, type OpticalFilterDensity, type OpticalFilterFamily, type OpticalFilterParamKey, type OpticalFilterParamPatch, type OpticalFilterProfile, type OpticalFilterProfileId, type OpticalRecipeId, type OpticalRecommendationV1, PARAM_KEYS, PHASE0_APPROX_SOURCE_LONG_EDGE_MAX, PHASE0_APPROX_SOURCE_SIZE_MAX_BYTES, PHASE0_BENCHMARK_GATES, PHASE0_MAX_SOURCE_DURATION_SEC, PHASE0_OUTPUT_PROFILE, PHASE0_PARAM_KEYS, PHASE0_PRESET_DEFAULT, PHASE0_PRESET_STRENGTH_DEFAULT, PHASE0_RGB_SHIFT_MAX, PHASE0_SCHEMA_VERSION, PRESETS, PRESET_BUTTONS, PRESET_VERSION, type PackedCubeLut2D, type ParamKey, type Params, type ParsedBenchmarkRow, type ParsedCubeLut, type Phase0ExportBenchmarkRecord, type Phase0ExportProgress, type Phase0ExportRequest, type Phase0ExportResult, type Phase0ExportStage, type Phase0MezzanineProfileVariant, type Phase0OutputProfile, type Phase0ParamKey, type Phase0Params, type Phase0PreviewRenderResult, type Phase0ProjectLut, type Phase0ProjectState, type Phase0QuickTarget, type Phase0RenderMode, type PickedLutFile, type PresetName, QUICK_AXIS_DEFAULT_RANGE, QUICK_AXIS_IDS, type QuickAxisId, type QuickState, type RGB, SHADOW_LATITUDE_CONSTANTS, SOURCE_PROFILE_CATALOG, type SceneAnalysisState, type SceneDescriptorV1, type SerializeCubeOptions, type ShadowLatitudeOptions, type ShadowLatitudeRgb, type SourceColorClass, type SourceColorMetadata, type SourceDetailCompensationInput, type SourceDetailConfidence, type SourceDetailProfile, type SourceDetailTransferClass, type SourceDisplayGeometry, type SourceInfo, type SourceKind, type SourceProbe, type SourceProfileCatalogEntry, type SourceProfileCurve, type SourceProfileId, type SourceProfileImplKind, type SourceVideoMetadata, type SourceVideoTimingMetadata, applyCreativePack01SourceTransform, applyFilmCompressionV3Sample, applyQuickStateToParams, applyQuickStateToPhase0Params, applyShadowLatitudeSample, applyStoneDisplayPalermoTransform, applyStoneFingerprintTransform, applyUrbanCoolDensityTransform, assertPhase0SourceProbeWithinCaps, bakeColorOnly, benchmarkMarkdownTableHeader, buildBenchmarkRow, buildImportedGradeLookFromDrxImport, buildLookParamOverrides, buildOpticalFilterParamPatch, buildOpticalParamPatch, buildPhase0ExportRequest, buildSourceProfileLut, cameraOpticsSchema, chromaUnitFromHueDegrees, clampGrainIntensity, cloneParams, coerceQuickState, createDefaultFilmLookGradeProps, createDefaultPhase0Params, createFilmtoneDefaultParams, createFilmtoneDefaultPhase0Params, createIosPhase0SerializableLut, createPhase0ProjectState, deriveDetailSoftnessUniforms, deserializeCubeLutData, diagonalMaxDelta, filmCompressionChromaMagnitude, filmCompressionLuma, filmLabDepthTrackSchema, filmLabParamsSchema, filmLookGradeDefaultProps, filmLookGradeInputSchema, filmLookSpikeDefaultProps, filmLookSpikeInputSchema, findCreativePack01Look, findMatchingPreset, formatBenchmarkRow, getIosPhase0SourceCapViolations, getOpticalFilterProfile, getPhase0SourceCapViolations, getSourceProfile, gradeMatchesPreset, halationHueToHex, hslToRgb01, importedGradeBaseLookSchema, importedGradeControlSchema, importedGradeLookSchema, importedGradeSourceGraphSchema, importedGradeSourceSchema, interpolatePhase0PresetParams, iosPhase0AssetRefSchema, iosPhase0BenchmarkRecordSchema, iosPhase0ExportPayloadSchema, iosPhase0ExportResultSchema, iosPhase0ExportSettingsSchema, iosPhase0LocalProjectSchema, iosPhase0ParamsSchema, iosPhase0PickedLutFileSchema, iosPhase0PickedSourceSchema, iosPhase0PresetIdSchema, iosPhase0SerializableLutSchema, iosPhase0SourceInfoSchema, iosPhase0SourceKindSchema, iosPhase0ThermalStateSchema, lookIdForPreset, makeCreativeCube, makeIdentityCube, mergePhase0Params, nearestHueDegreesToDirection, packCubeLutToFloatRgbaGrid, parseBenchmarkRow, parseCube, phase0ParamsSchema, phase0ProjectLutSchema, phase0ProjectSchema, phase0QuickStateSchema, pickBakeColorParams, pickIosPhase0Params, pickPhase0Params, quickStateSchema, recommendOpticalFinish, resolveSourceDetailCompensation, serializeCreativeCubeToText, serializeCubeLut, shadowLatitudeLuma };

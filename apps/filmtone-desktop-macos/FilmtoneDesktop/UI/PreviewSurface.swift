@@ -14,9 +14,7 @@ struct PreviewSurface: View {
     @Bindable var state: EditorState
     let sourceURL: URL?
     let sourceKind: FilmtoneSourceKind
-    let presetName: String
-    let presetStrength: Double
-    let lookSlug: String?
+    let gradeRecipe: FilmtoneGradeRecipe
     /// M5-A.3: scrub-bar time in seconds for video sources. `nil`
     /// triggers the legacy midpoint loader (still path or pre-probe
     /// state — keeps first paint identical to pre-M5-A.3).
@@ -25,23 +23,6 @@ struct PreviewSurface: View {
     /// .builtIn(...) is sticky. Routed into the preview render so the
     /// Picker change drives a visible re-grade.
     let sourceProfileSelection: CameraProfileSelection
-    /// M5-C.3a: Quick adjust 3-axis offsets folded into the resolved
-    /// render params after preset/look/strength resolution.
-    let quickState: FilmtoneQuickState
-    /// M5-C.3a: per-key parameter override patch applied between the
-    /// preset/look resolve and the quick-state pass.
-    let paramOverrides: FilmtonePhase0ParamsPatch
-    /// Source-bound custom LUT from an imported iOS capture package.
-    let packageCreativeLut: PreparedCreativeLut?
-    /// M5-M (CC-B): Backlight Veil profile id + continuous intensity. The
-    /// still preview path resolves the optical scatter coefficients in
-    /// `FilmtoneGradePipeline.apply` so the live preview matches video /
-    /// export Backlight behavior. `paramOverrides` already carries the
-    /// (intensity-scaled) energy-key changes from
-    /// `FilmtoneOpticalFilterCatalog.renderParamOverrides`; these two
-    /// fields drive the optical scatter composite branch + cache key.
-    let opticalFilterProfileId: String?
-    let opticalFilterIntensity: Double
     /// M5-J.2 / M5-K3: when true the still preview also renders a raw
     /// pre-transform companion frame so the compare overlay can show
     /// left=source / right=graded as a SwiftUI mask, and so dragging the
@@ -143,17 +124,10 @@ struct PreviewSurface: View {
         .task(id: PreviewRenderKey(
             sourceURL: sourceURL,
             sourceKind: sourceKind,
-            presetName: presetName,
-            presetStrength: presetStrength,
-            lookSlug: lookSlug,
+            gradeRecipeKey: gradeRecipe.key,
             videoPreviewSeconds: sourceKind == .video ? nil : videoPreviewSeconds,
             sourceProfileSelection: sourceProfileSelection,
-            quickState: quickState,
-            paramOverrides: paramOverrides,
-            packageCreativeLutKey: packageCreativeLut?.identityKey,
-            compareEnabled: compareEnabled,
-            opticalFilterProfileId: opticalFilterProfileId,
-            opticalFilterIntensity: opticalFilterIntensity
+            compareEnabled: compareEnabled
         )) {
             await renderCurrent()
         }
@@ -196,16 +170,9 @@ struct PreviewSurface: View {
             renderedSourceURL = nil
             return
         }
-        let preset = presetName
-        let strength = presetStrength
-        let slug = lookSlug
+        let recipe = gradeRecipe
         let profileSelection = sourceProfileSelection
-        let quick = quickState
-        let overrides = paramOverrides
-        let packageLut = packageCreativeLut
         let compare = compareEnabled
-        let opticalProfileId = opticalFilterProfileId
-        let opticalIntensity = opticalFilterIntensity
 
         let source: CIImage? = CIImage(contentsOf: sourceURL)
         let probe = FilmtoneSourceProber.probeStill(sourceURL: sourceURL)
@@ -217,19 +184,12 @@ struct PreviewSurface: View {
         let frames = await Task.detached(priority: .userInitiated) { () -> RenderedFrames? in
             return PreviewSurface.renderFrames(
                 source: source,
-                presetName: preset,
-                presetStrength: strength,
-                lookSlug: slug,
+                gradeRecipe: recipe,
                 sourceURL: sourceURL,
                 fallbackURL: sourceURL,
                 sourceProfileSelection: profileSelection,
                 probedColorClass: probedColorClass,
-                quickState: quick,
-                paramOverrides: overrides,
-                packageCreativeLut: packageLut,
                 compareEnabled: compare,
-                opticalFilterProfileId: opticalProfileId,
-                opticalFilterIntensity: opticalIntensity,
                 cameraOptics: probedOptics
             )
         }.value
@@ -247,24 +207,17 @@ struct PreviewSurface: View {
 
     nonisolated private static func renderFrames(
         source: CIImage?,
-        presetName: String,
-        presetStrength: Double,
-        lookSlug: String?,
+        gradeRecipe: FilmtoneGradeRecipe,
         sourceURL: URL,
         fallbackURL: URL,
         sourceProfileSelection: CameraProfileSelection,
         probedColorClass: SourceColorClassDTO?,
-        quickState: FilmtoneQuickState,
-        paramOverrides: FilmtonePhase0ParamsPatch,
-        packageCreativeLut: PreparedCreativeLut?,
         compareEnabled: Bool,
         // M5-M (CC-B): Backlight Veil profile + intensity + still-probe
         // camera optics. Threaded from `state.opticalFilterProfileId` /
         // `state.opticalFilterIntensity` and `FilmtoneSourceProber.probeStill`
         // so the still live preview routes through the same Backlight Veil
         // composite as exports / video preview, at the user's chosen strength.
-        opticalFilterProfileId: String?,
-        opticalFilterIntensity: Double,
         cameraOptics: CameraOpticsDTO?
     ) -> RenderedFrames? {
         guard let source else {
@@ -287,29 +240,19 @@ struct PreviewSurface: View {
             to: source,
             entry: resolvedProfile
         )
-        let params = FilmtonePresetCatalog.resolved(
-            presetName: presetName,
-            strength: presetStrength,
-            lookSlug: lookSlug,
-            quickState: quickState,
-            paramOverrides: paramOverrides
-        )
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: gradeRecipe)
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: sourceURL.absoluteString
         )
-        let creativeLut: PreparedCreativeLut? = packageCreativeLut
-            ?? bundledCreativeLut(lookSlug: lookSlug, strength: presetStrength)
-        let lutIntensity = packageCreativeLut.map { clampLutIntensity($0.intensity) }
-            ?? FilmtonePresetCatalog.clampStrength(presetStrength)
         let graded = FilmtoneGradePipeline.apply(
             to: normalizedSource,
-            params: params,
+            params: resolvedGrade.params,
             sourceSeed: sourceSeed,
             cameraOptics: cameraOptics,
-            creativeLut: creativeLut,
-            lutIntensity: lutIntensity,
-            opticalFilterProfileId: opticalFilterProfileId,
-            opticalFilterIntensity: opticalFilterIntensity,
+            creativeLut: resolvedGrade.creativeLut,
+            lutIntensity: resolvedGrade.lutIntensity,
+            opticalFilterProfileId: gradeRecipe.opticalFilterProfileId,
+            opticalFilterIntensity: gradeRecipe.opticalFilterIntensity,
             sourceDetailBias: FilmtoneSourceDetailCompensation.resolve(
                 FilmtoneSourceDetailCompensationInput(
                     cameraMake: cameraOptics?.cameraMake,
@@ -340,22 +283,6 @@ struct PreviewSurface: View {
             graded: gradedNSImage,
             sourceForCompare: sourceForCompare
         )
-    }
-
-    nonisolated private static func clampLutIntensity(_ intensity: Double) -> Double {
-        max(0, min(1, intensity.isFinite ? intensity : 1))
-    }
-
-    nonisolated private static func bundledCreativeLut(
-        lookSlug: String?,
-        strength: Double
-    ) -> PreparedCreativeLut? {
-        guard let lookSlug,
-              strength > 0,
-              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug) else {
-            return nil
-        }
-        return FilmtoneCreativeLutLoader.load(look: look)
     }
 
     /// Rasterize a CIImage to NSImage at the canvas extent. When
@@ -397,17 +324,10 @@ private struct RenderedFrames {
 private struct PreviewRenderKey: Hashable {
     let sourceURL: URL?
     let sourceKind: FilmtoneSourceKind
-    let presetName: String
-    let presetStrength: Double
-    let lookSlug: String?
+    let gradeRecipeKey: FilmtoneGradeRecipeKey
     let videoPreviewSeconds: Double?
     let sourceProfileSelection: CameraProfileSelection
-    let quickState: FilmtoneQuickState
-    let paramOverrides: FilmtonePhase0ParamsPatch
-    let packageCreativeLutKey: String?
     let compareEnabled: Bool
-    let opticalFilterProfileId: String?
-    let opticalFilterIntensity: Double
 }
 
 /// M5-K3: still preview compositor. Lays the graded NSImage on the full
@@ -661,16 +581,16 @@ private struct BrandedOpeningBackdrop: View {
         state: EditorState(),
         sourceURL: nil,
         sourceKind: .still,
-        presetName: "reset",
-        presetStrength: 1.0,
-        lookSlug: nil,
+        gradeRecipe: FilmtoneGradeRecipe(
+            selection: .builtIn(
+                presetName: "reset",
+                presetStrength: 1.0,
+                lookSlug: nil,
+                packageCreativeLut: nil
+            )
+        ),
         videoPreviewSeconds: nil,
         sourceProfileSelection: .auto,
-        quickState: .zero,
-        paramOverrides: .empty,
-        packageCreativeLut: nil,
-        opticalFilterProfileId: nil,
-        opticalFilterIntensity: 1.0,
         compareEnabled: false
     )
     .frame(width: 600, height: 400)

@@ -332,19 +332,12 @@ final class FilmtoneDesktopVideoSession {
     ) -> FilmtoneDesktopVideoRenderInputs {
         if inputs.cameraOptics != nil { return inputs }
         return FilmtoneDesktopVideoRenderInputs(
-            presetName: inputs.presetName,
-            presetStrength: inputs.presetStrength,
-            lookSlug: inputs.lookSlug,
+            gradeRecipe: inputs.gradeRecipe,
             sourceProfileSelection: inputs.sourceProfileSelection,
             probedColorClass: inputs.probedColorClass,
-            quickState: inputs.quickState,
-            paramOverrides: inputs.paramOverrides,
-            packageCreativeLut: inputs.packageCreativeLut,
             compareEnabled: inputs.compareEnabled,
             compareSplitFraction: inputs.compareSplitFraction,
             sourceURL: inputs.sourceURL,
-            opticalFilterProfileId: inputs.opticalFilterProfileId,
-            opticalFilterIntensity: inputs.opticalFilterIntensity,
             cameraOptics: cameraOptics
         )
     }

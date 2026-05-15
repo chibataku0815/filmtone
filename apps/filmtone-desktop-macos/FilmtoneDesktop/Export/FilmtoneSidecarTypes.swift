@@ -30,6 +30,15 @@ protocol FilmtoneSidecarRequest: Sendable {
     var paramOverrides: FilmtonePhase0ParamsPatch { get }
     /// Source-bound custom LUT from an imported iOS capture package.
     var packageCreativeLut: PreparedCreativeLut? { get }
+    /// DB-M13: selected Imported Grade, if the render came from the
+    /// DaVinci/Imported Grade library instead of a built-in Look.
+    var importedGradeLook: FilmtoneImportedGradeLook? { get }
+    var importedGradeSidecarURL: URL? { get }
+    /// DB-M13+: canonical grade recipe consumed by preview/export/sidecar.
+    /// Legacy protocol fields stay available during migration, but runtime
+    /// surfaces should prefer this value object to avoid per-surface resolve
+    /// drift.
+    var gradeRecipe: FilmtoneGradeRecipe { get }
     /// iOS capture-package provenance to carry into Desktop sidecars.
     var capturePackageProvenance: FilmtoneCapturePackageProvenance? { get }
     /// Source-relative highlight markers shared with iOS and DaVinci.
@@ -49,6 +58,32 @@ extension FilmtoneSidecarRequest {
     var quickState: FilmtoneQuickState { .zero }
     var paramOverrides: FilmtonePhase0ParamsPatch { .empty }
     var packageCreativeLut: PreparedCreativeLut? { nil }
+    var importedGradeLook: FilmtoneImportedGradeLook? { nil }
+    var importedGradeSidecarURL: URL? { nil }
+    var gradeRecipe: FilmtoneGradeRecipe {
+        let selection: FilmtoneGradeSelection
+        if let importedGradeLook {
+            selection = .importedGrade(
+                look: importedGradeLook,
+                sidecarURL: importedGradeSidecarURL,
+                packageCreativeLut: packageCreativeLut
+            )
+        } else {
+            selection = .builtIn(
+                presetName: presetName,
+                presetStrength: presetStrength,
+                lookSlug: lookSlug,
+                packageCreativeLut: packageCreativeLut
+            )
+        }
+        return FilmtoneGradeRecipe(
+            selection: selection,
+            quickState: quickState,
+            paramOverrides: paramOverrides,
+            opticalFilterProfileId: opticalFilterProfileId,
+            opticalFilterIntensity: opticalFilterIntensity
+        )
+    }
     var capturePackageProvenance: FilmtoneCapturePackageProvenance? { nil }
     var highlightMarkers: FilmtoneHighlightMarkers? { nil }
     var opticalFilterProfileId: String? { nil }

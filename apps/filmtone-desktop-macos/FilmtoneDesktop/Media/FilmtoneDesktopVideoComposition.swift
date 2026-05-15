@@ -18,14 +18,9 @@ import Foundation
 // preview path; only the per-frame plumbing changes.
 
 struct FilmtoneDesktopVideoRenderInputs: Sendable {
-    let presetName: String
-    let presetStrength: Double
-    let lookSlug: String?
+    let gradeRecipe: FilmtoneGradeRecipe
     let sourceProfileSelection: CameraProfileSelection
     let probedColorClass: SourceColorClassDTO?
-    let quickState: FilmtoneQuickState
-    let paramOverrides: FilmtonePhase0ParamsPatch
-    let packageCreativeLut: PreparedCreativeLut?
     /// M5-J.2: when true the composition handler emits a split
     /// (left = pre-transform source, right = graded) instead of the
     /// graded frame alone. Preview-only — never reaches the export path.
@@ -36,16 +31,6 @@ struct FilmtoneDesktopVideoRenderInputs: Sendable {
     /// the new fraction; defaults to mid-frame for fresh sessions.
     let compareSplitFraction: Double
     let sourceURL: URL
-    /// M5-M (CC-B): Backlight Veil profile selection. The composition
-    /// handler resolves this through `FilmtoneOpticalFilterCatalog` and
-    /// forwards the six scatter coefficients to `FilmtoneGradePipeline`.
-    /// `nil` keeps the legacy glow composite path bytewise.
-    let opticalFilterProfileId: String?
-    /// M5-M (CC-B): continuous Backlight Veil intensity in `[0, 1]`. At 0
-    /// the composition handler routes back to the legacy glow composite
-    /// (no Backlight-specific direct-loss / scatter math); at 1 the
-    /// behavior is identical to the original chip-only path.
-    let opticalFilterIntensity: Double
     /// M5-M (CC-B): probed source camera optics. Already used by the
     /// vignette stage in the export path; threading it into the preview
     /// / scrub-thumbnail composition handler keeps Backlight Veil and
@@ -125,19 +110,11 @@ enum FilmtoneDesktopVideoComposition {
 
         // Resolve invariants once per composition build so the handler
         // closure does not redo them per frame.
-        let resolvedParams = FilmtonePresetCatalog.resolved(
-            presetName: inputs.presetName,
-            strength: inputs.presetStrength,
-            lookSlug: inputs.lookSlug,
-            quickState: inputs.quickState,
-            paramOverrides: inputs.paramOverrides
-        )
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: inputs.gradeRecipe)
         let resolvedProfileEntry = FilmtoneSourceInputTransform.resolve(
             selection: inputs.sourceProfileSelection,
             probedColorClass: inputs.probedColorClass
         )
-        let preparedCreativeLut: PreparedCreativeLut? = inputs.packageCreativeLut
-            ?? bundledCreativeLut(lookSlug: inputs.lookSlug, strength: inputs.presetStrength)
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: inputs.sourceURL.absoluteString
         )
@@ -151,11 +128,9 @@ enum FilmtoneDesktopVideoComposition {
         let compareSplitFraction = FilmtoneCompareSplitMath.clamp(
             inputs.compareSplitFraction
         )
-        let opticalFilterProfileId = inputs.opticalFilterProfileId
-        let opticalFilterIntensity = inputs.opticalFilterIntensity
+        let opticalFilterProfileId = inputs.gradeRecipe.opticalFilterProfileId
+        let opticalFilterIntensity = inputs.gradeRecipe.opticalFilterIntensity
         let cameraOptics = inputs.cameraOptics
-        let lutIntensity = inputs.packageCreativeLut.map { clampLutIntensity($0.intensity) }
-            ?? FilmtonePresetCatalog.clampStrength(inputs.presetStrength)
         let sourceDetailBias = FilmtoneSourceDetailCompensation.resolve(
             FilmtoneSourceDetailCompensationInput(
                 cameraMake: cameraOptics?.cameraMake,
@@ -184,12 +159,12 @@ enum FilmtoneDesktopVideoComposition {
                 )
                 let graded = FilmtoneGradePipeline.apply(
                     to: normalized,
-                    params: resolvedParams,
+                    params: resolvedGrade.params,
                     frameTimeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
                     sourceSeed: sourceSeed,
                     cameraOptics: cameraOptics,
-                    creativeLut: preparedCreativeLut,
-                    lutIntensity: lutIntensity,
+                    creativeLut: resolvedGrade.creativeLut,
+                    lutIntensity: resolvedGrade.lutIntensity,
                     opticalFilterProfileId: opticalFilterProfileId,
                     opticalFilterIntensity: opticalFilterIntensity,
                     sourceDetailBias: sourceDetailBias
@@ -231,22 +206,6 @@ enum FilmtoneDesktopVideoComposition {
         )
 
         return composition
-    }
-
-    private static func bundledCreativeLut(
-        lookSlug: String?,
-        strength: Double
-    ) -> PreparedCreativeLut? {
-        guard let slug = lookSlug,
-              strength > 0,
-              let look = FilmtoneCreativePackCatalog.find(slug: slug) else {
-            return nil
-        }
-        return FilmtoneCreativeLutLoader.load(look: look)
-    }
-
-    private static func clampLutIntensity(_ intensity: Double) -> Double {
-        max(0, min(1, intensity.isFinite ? intensity : 1))
     }
 
     /// Apply the track's preferredTransform to the natural size, then

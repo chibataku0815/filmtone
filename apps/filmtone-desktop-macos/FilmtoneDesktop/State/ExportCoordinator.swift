@@ -69,6 +69,9 @@ final class ExportCoordinator {
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
             packageCreativeLut: state.packageCreativeLut,
+            importedGradeLook: state.selectedImportedGrade,
+            importedGradeSidecarURL: state.selectedImportedGradeSidecarURL,
+            gradeRecipe: state.currentGradeRecipe,
             capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: nil,
             opticalFilterProfileId: state.opticalFilterProfileId,
@@ -139,6 +142,9 @@ final class ExportCoordinator {
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
             packageCreativeLut: state.packageCreativeLut,
+            importedGradeLook: state.selectedImportedGrade,
+            importedGradeSidecarURL: state.selectedImportedGradeSidecarURL,
+            gradeRecipe: state.currentGradeRecipe,
             capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId,
@@ -220,9 +226,13 @@ final class ExportCoordinator {
             quickState: state.quickState,
             paramOverrides: state.paramOverrides,
             packageCreativeLut: state.packageCreativeLut,
+            importedGradeLook: state.selectedImportedGrade,
+            importedGradeSidecarURL: state.selectedImportedGradeSidecarURL,
+            gradeRecipe: state.currentGradeRecipe,
             capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
-            opticalFilterProfileId: state.opticalFilterProfileId
+            opticalFilterProfileId: state.opticalFilterProfileId,
+            opticalFilterIntensity: state.opticalFilterIntensity
         )
 
         let startedAt = Date()

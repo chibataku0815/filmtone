@@ -71,6 +71,15 @@
 		FT0000000000000000000A42 /* FilmtoneLutBlobCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B41 /* FilmtoneLutBlobCodec.swift */; };
 		FT0000000000000000000A43 /* FilmtoneCapturePackageImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */; };
 		FT0000000000000000000A44 /* filmtone-creative-pack-01-noir.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B43 /* filmtone-creative-pack-01-noir.cube */; };
+		FT0000000000000000000A45 /* FilmtoneImportedGradeSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B44 /* FilmtoneImportedGradeSchema.swift */; };
+		FT0000000000000000000A46 /* FilmtoneImportedGradeEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B45 /* FilmtoneImportedGradeEvaluator.swift */; };
+		FT0000000000000000000A47 /* FilmtoneImportedGradeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B46 /* FilmtoneImportedGradeStore.swift */; };
+		FT0000000000000000000A48 /* FilmtoneGradeResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B47 /* FilmtoneGradeResolution.swift */; };
+		FT0000000000000000000A49 /* FilmtoneImportedGradePackageImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B48 /* FilmtoneImportedGradePackageImport.swift */; };
+		FT0000000000000000000A4A /* FilmtoneDrxImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B49 /* FilmtoneDrxImport.swift */; };
+		FT0000000000000000000A4B /* ImportedGradeLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4A /* ImportedGradeLibraryViewModel.swift */; };
+		FT0000000000000000000A4C /* ImportedGradeLibraryControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4B /* ImportedGradeLibraryControls.swift */; };
+		FT0000000000000000000A4D /* FilmtoneGradeRecipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4C /* FilmtoneGradeRecipe.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -137,6 +146,15 @@
 		FT0000000000000000000B41 /* FilmtoneLutBlobCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneLutBlobCodec.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCapturePackageImport.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B43 /* filmtone-creative-pack-01-noir.cube */ = {isa = PBXFileReference; lastKnownFileType = text; path = "filmtone-creative-pack-01-noir.cube"; sourceTree = "<group>"; };
+		FT0000000000000000000B44 /* FilmtoneImportedGradeSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneImportedGradeSchema.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B45 /* FilmtoneImportedGradeEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneImportedGradeEvaluator.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B46 /* FilmtoneImportedGradeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneImportedGradeStore.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B47 /* FilmtoneGradeResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGradeResolution.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B48 /* FilmtoneImportedGradePackageImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneImportedGradePackageImport.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B49 /* FilmtoneDrxImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDrxImport.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B4A /* ImportedGradeLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedGradeLibraryViewModel.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B4B /* ImportedGradeLibraryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedGradeLibraryControls.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B4C /* FilmtoneGradeRecipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGradeRecipe.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -212,6 +230,7 @@
 				FT0000000000000000000B08 /* PreviewSurface.swift */,
 				FT0000000000000000000B28 /* SourceProfileControls.swift */,
 				FT0000000000000000000B2C /* LookLibraryControls.swift */,
+				FT0000000000000000000B4B /* ImportedGradeLibraryControls.swift */,
 				FT0000000000000000000B2D /* QuickAdjustControls.swift */,
 				FT0000000000000000000B2E /* MetricRow.swift */,
 				FT0000000000000000000B2F /* ExportInspectorPanel.swift */,
@@ -256,6 +275,11 @@
 				FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */,
 				FT0000000000000000000B29 /* FilmtoneSavedLookSchema.swift */,
 				FT0000000000000000000B2A /* FilmtoneSavedLookStore.swift */,
+				FT0000000000000000000B44 /* FilmtoneImportedGradeSchema.swift */,
+				FT0000000000000000000B45 /* FilmtoneImportedGradeEvaluator.swift */,
+				FT0000000000000000000B46 /* FilmtoneImportedGradeStore.swift */,
+				FT0000000000000000000B4C /* FilmtoneGradeRecipe.swift */,
+				FT0000000000000000000B47 /* FilmtoneGradeResolution.swift */,
 				FT0000000000000000000B3C /* FilmtoneCompareCompose.swift */,
 			);
 			path = Color;
@@ -267,8 +291,11 @@
 				FT0000000000000000000B0D /* EditorState.swift */,
 				FT0000000000000000000B33 /* EditorState+ParamOverrides.swift */,
 				FT0000000000000000000B42 /* FilmtoneCapturePackageImport.swift */,
+				FT0000000000000000000B48 /* FilmtoneImportedGradePackageImport.swift */,
+				FT0000000000000000000B49 /* FilmtoneDrxImport.swift */,
 				FT0000000000000000000B34 /* ExportCoordinator.swift */,
 				FT0000000000000000000B2B /* LibraryViewModel.swift */,
+				FT0000000000000000000B4A /* ImportedGradeLibraryViewModel.swift */,
 				FT0000000000000000000B35 /* SaveLookPayload.swift */,
 			);
 			path = State;
@@ -424,8 +451,14 @@
 				FT0000000000000000000A28 /* SourceProfileControls.swift in Sources */,
 				FT0000000000000000000A29 /* FilmtoneSavedLookSchema.swift in Sources */,
 				FT0000000000000000000A2A /* FilmtoneSavedLookStore.swift in Sources */,
+				FT0000000000000000000A45 /* FilmtoneImportedGradeSchema.swift in Sources */,
+				FT0000000000000000000A46 /* FilmtoneImportedGradeEvaluator.swift in Sources */,
+				FT0000000000000000000A47 /* FilmtoneImportedGradeStore.swift in Sources */,
+				FT0000000000000000000A4D /* FilmtoneGradeRecipe.swift in Sources */,
+				FT0000000000000000000A48 /* FilmtoneGradeResolution.swift in Sources */,
 				FT0000000000000000000A2B /* LibraryViewModel.swift in Sources */,
 				FT0000000000000000000A2C /* LookLibraryControls.swift in Sources */,
+				FT0000000000000000000A4C /* ImportedGradeLibraryControls.swift in Sources */,
 				FT0000000000000000000A2D /* QuickAdjustControls.swift in Sources */,
 				FT0000000000000000000A2E /* MetricRow.swift in Sources */,
 				FT0000000000000000000A2F /* ExportInspectorPanel.swift in Sources */,
@@ -435,7 +468,10 @@
 				FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */,
 				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
 				FT0000000000000000000A43 /* FilmtoneCapturePackageImport.swift in Sources */,
+				FT0000000000000000000A49 /* FilmtoneImportedGradePackageImport.swift in Sources */,
+				FT0000000000000000000A4A /* FilmtoneDrxImport.swift in Sources */,
 				FT0000000000000000000A35 /* ExportCoordinator.swift in Sources */,
+				FT0000000000000000000A4B /* ImportedGradeLibraryViewModel.swift in Sources */,
 				FT0000000000000000000A36 /* SaveLookPayload.swift in Sources */,
 				FT0000000000000000000A38 /* FilmtoneDesktopVideoSession.swift in Sources */,
 				FT0000000000000000000A39 /* FilmtoneDesktopVideoComposition.swift in Sources */,
