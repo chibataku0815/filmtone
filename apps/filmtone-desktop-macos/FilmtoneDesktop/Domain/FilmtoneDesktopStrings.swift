@@ -133,8 +133,8 @@ struct FilmtoneDesktopStrings: Sendable {
 
 // iOS canonical defaults from `FilmtoneStrings.swift:989-1021`. Most
 // rows fall back to English even on JA locale because iOS keeps the
-// English defaultValue for them; only `shutterAngle` / `trailIntensity`
-// branch on `prefersJapanese`. Match that exactly to avoid drift.
+// English defaultValue for them; only motion-specific params branch on
+// `prefersJapanese`. Match that exactly to avoid drift.
 private let englishParamLabels: [String: String] = [
     "exposure": "Exposure",
     "contrast": "Contrast",
@@ -168,6 +168,7 @@ private let englishParamLabels: [String: String] = [
     "yellow": "Yellow",
     "shutterAngle": "Shutter Angle",
     "trailIntensity": "Trail Length",
+    "filmBreathAmount": "Film Breath",
 ]
 
 private let japaneseParamLabels: [String: String] = [
@@ -203,4 +204,5 @@ private let japaneseParamLabels: [String: String] = [
     "yellow": "Yellow",
     "shutterAngle": "シャッターアングル",
     "trailIntensity": "残像の長さ",
+    "filmBreathAmount": "フィルムブレス",
 ]

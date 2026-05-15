@@ -59,7 +59,7 @@ extension FilmtoneStrengthSheet {
             return .diffusion
         case "grainIntensity", "grainSize", "grainRadialMix":
             return .grain
-        case "shutterAngle", "trailIntensity":
+        case "shutterAngle", "trailIntensity", "filmBreathAmount":
             return .motion
         default:
             return .advanced
@@ -190,18 +190,21 @@ extension FilmtoneStrengthSheet {
                             [
                                 "shutterAngle": 360,
                                 "trailIntensity": 0,
+                                "filmBreathAmount": 0,
                             ]
                         },
                         strongValues: { _ in
                             [
                                 "shutterAngle": 720,
                                 "trailIntensity": 0.35,
+                                "filmBreathAmount": 0.28,
                             ]
                         }
                     ),
                     controls: [
                         control("shutterAngle", range: 0...720, digits: 0),
                         control("trailIntensity", range: 0...0.95),
+                        control("filmBreathAmount", range: 0...1),
                     ]
                 )
             )

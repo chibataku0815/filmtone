@@ -1,110 +1,90 @@
-# Active — Twilight bundled built-in Look (iOS + macOS)
+# Active — Film Breath Visible QA Fix
 
-Inserted 2026-05-12 as a short interrupt against M9 v1.7 release prep.
+Inserted 2026-05-15 JST after visual QA reported no visible difference between
+Film Breath amount `0` and `1` in the launched Desktop debug app.
+
+## Milestone
+
+Follow-up / unexpected blocker for the Film Breath cross-platform quality task.
 
 ## Goal
 
-Add a 4th bundled built-in Look — `Twilight` — to Filmtone's Look library
-on Native macOS Desktop AND iOS simultaneously. Twilight is a preset-only
-Look (no Creative LUT cube) sourced from
-`packages/film-lab-core/src/presets.ts:632-689` `vision3500t` (tungsten 500T
-blue-hour recipe). UI surface stays under the existing Look library
-(Stone / Urban / Noir + Twilight) — `Preset` is **not** exposed as a
-user-facing label per CLAUDE.md §6 term lock.
+Make Film Breath visibly respond in Desktop video preview and export while
+preserving still identity. First prove whether the failure is value propagation,
+frame-time propagation, or amount tuning; then patch the smallest product
+surface that makes amount `1` clearly observable without adding Gate Weave,
+damage, or frame translation.
 
-## Why a Look, not a "Preset" panel
+## Edit Targets
 
-Internal classification: Twilight's body is a Preset (curve / grade
-foundation, not a Creative LUT Pack entry). But UI vocabulary is locked
-to `Look` for user-facing surfaces. Solution: bundled `SavedLookEntry`
-with `creativeLut: nil`, materialized into the existing Look strip /
-Look library menu. `EditorState.applySavedLook` keeps `lookSlug == nil`
-so the Creative LUT pipeline (`FilmtoneSidecarWriter` /
-`FilmtoneCreativeLutLoader` / `lookSlug` lookup sites) never sees
-Twilight.
+- `apps/filmtone-desktop-macos/`: preview/export state flow and grade pipeline
+  wiring; focused verifier tests if the bug is testable outside UI.
+- `packages/film-lab-swift-core/` and `packages/film-lab-core/`: only if the
+  bounded modulation itself is too subtle after propagation is proven.
+- `docs/filmtone/desktop/native-desktop-v2/active.md`: checklist and
+  verification notes.
 
-## Cross-Stream Visibility
+## Read-Only References
 
-iOS and macOS land in one lane — no silent stream split. Twilight's
-canonical UUID `FB1A0001-0000-4000-8000-000000000011` is identical
-across both Swift catalogs; parity is verified with two independent
-greps (slug and UUID must each match in both `apps/` subtrees, since
-they sit on different lines in the Swift catalogs):
+- `AGENTS.md`
+- `docs/filmtone/desktop/native-desktop-v2/archive/2026-05-15-film-breath.md`
+- Desktop preview/export call sites under `apps/filmtone-desktop-macos/`
 
-```
-rg "filmtone-built-in-twilight" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos
-rg "FB1A0001-0000-4000-8000-000000000011" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos
-```
+## Checklist
 
-## Native-supported subset (vs `vision3500t`)
+- [x] Confirm Desktop Advanced value reaches resolved render params.
+- [x] Confirm Desktop video preview passes positive frame time into the grade
+  pipeline.
+- [x] Confirm Desktop video export passes positive frame time into the grade
+  pipeline.
+- [x] Patch the no-op cause or retune amount response if propagation is correct
+  but amount `1` is not visibly useful.
+- [x] Rebuild/relaunch the Desktop debug app.
+- [x] Record verification and remaining visual QA risk.
 
-`vision3500t` in `packages/film-lab-core/src/presets.ts:632-689` carries
-two keys that are **not** declared in
-`FilmtonePhase0Generated.paramKeys` and are therefore intentionally
-dropped from `twilightPatch` on both OSes:
+## Verification
 
-- `highlights: -0.12`
-- `shadows: -0.16`
+- [ ] Focused Desktop verifier or unit-level check for the fixed path.
+- [x] `bun run verify:desktop` — passed after the initial-time seek fix.
+- [x] `git diff --check` — passed.
 
-The native tone is reproduced via `shadowTone` / `highlightTone` /
-`compressionAmount` / `printContrast`. Extending Phase0 to carry
-`highlights` / `shadows` is **out of scope** for this bundled-Look lane
-(would touch the generated Phase0 contract, sidecar V1 readers, and
-every preset row). Track it under a separate lane if a future preset
-truly needs them.
+## Done Conditions
 
-## Edits landed
+- User-visible Desktop video preview responds between amount `0` and `1`.
+- Desktop video export uses the same Film Breath path as preview.
+- Still image processing remains identity when `timeSeconds = 0`.
 
-- `apps/capacitor-film-lab-ios/ios/App/App/Look/FilmtoneBuiltInCatalog.swift`
-  — appended `BuiltInLook` (slug `filmtone-built-in-twilight`,
-  `creativeLut: nil`, `packId: nil`, `presetName: "reset"`) plus
-  `twilightPatch` static let and `BuiltInLookUUID.twilight`.
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCreativePackCatalog.swift`
-  — added parallel `BuiltInPresetLook` struct + `presetOnlyLooks` array +
-  preset-only `materializeAsSavedLookEntry` overload + unified
-  `builtInSlug(canonicalUUID:)` and `materializeAnyBuiltIn(canonicalUUID:)`
-  helpers. Cube-bound `BuiltInLook` shape untouched.
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookStore.swift`
-  — routed `deleteLook` / `renameLook` / `setFavorite` / `loadLook` /
-  `currentSnapshot` through the new unified helpers so Twilight is
-  immutable + favorite-able + loadable.
-- `apps/filmtone-desktop-macos/Verify/main.swift` — appended 5 Twilight
-  assertions (catalog registration, materialize creativeLut nil,
-  representative Phase0 values, unified helper resolution, sidecar
-  gradeParams + no creativeLut block).
+## Stop Conditions
 
-## Stop conditions
+- Stop after 3 consecutive failures of the same verification command.
+- Stop if fixing visible response requires adding out-of-scope Gate Weave,
+  scratches, dust, scan jitter, or image translation.
+- Stop if value/frame-time propagation cannot be determined from local source.
 
-- iOS / macOS `canonicalUUID` mismatch (parity grep fails).
-- Cube-bound code path (`FilmtoneCreativeLutLoader` / `FilmtoneSidecarWriter`
-  `find(slug:)` sites) sees a Twilight slug.
-- `Verify/main.swift` Twilight assertions fail.
-- `bun run check:filmtone-context` flags doc / sync drift.
-- xcodebuild fails on either OS.
+## Out Of Scope
 
-## Out of scope
+- iOS live capture monitor.
+- Sidecar schema bump.
+- Public release/version copy.
 
-- New "Preset" UI label or panel.
-- `ios-preset-overrides.ts` edits / `FilmtonePhase0Generated.paramsByName`
-  expansion / `GeneratedLandmarkTests.swift` update.
-- iOS V2 capture / Gyroflow lane.
-- Web preset UI / Electron / legacy Desktop.
-- M9 release-prep scope change (logged as an Interrupt only).
-- portfolio submodule bump / App Store / release notes copy.
-- Native preview orientation bug.
+## Unexpected Blockers
 
-## Done
+- 2026-05-15: User reported Desktop visual QA shows no visible difference
+  between Film Breath amount `0` and `1`.
+- 2026-05-15: Source inspection found the preview/export grade paths pass real
+  frame time, but the AVPlayer initial frame can remain at `0s`; Film Breath is
+  exact identity at `timeSeconds = 0`, so opening a video and toggling the
+  control before playback can look like a no-op. Patched video session setup and
+  duration probing to seek the initial preview frame to the midpoint when
+  paused.
 
-Archive this file into `archive/2026-05-12-twilight-bundled-look.md` once
-both verification commands return clean:
+## Current Visual QA Risk
 
-- `bash apps/filmtone-desktop-macos/Verify/run.sh`
-- `bun run check:filmtone-context`
-- Parity grep (run **both** — slug and UUID sit on different lines):
-  `rg "filmtone-built-in-twilight" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos`
-  and
-  `rg "FB1A0001-0000-4000-8000-000000000011" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos`
-
-xcodebuild and Simulator visual confirmation are the user's call before
-the lane is fully closed (commit / push remains user-driven per
-CLAUDE.md §9).
+- 2026-05-15: User provided two screenshots at `0` and max around `24.72s`;
+  the midpoint seek fix was not enough. Retuned shared Film Breath limits from
+  the original subtle caps (`±0.055EV`, `±2%` contrast, `±0.030` temperature,
+  `±0.015` tint) to visible max caps (`±0.16EV`, `±5.5%` contrast,
+  `±0.090` temperature, `±0.040` tint), while keeping `drive = amount^1.35`.
+- Post-retune code/tests/build passed, but the debug app has not been relaunched
+  and visually rechecked after the retune. The currently running Desktop process
+  may still be the pre-retune binary.

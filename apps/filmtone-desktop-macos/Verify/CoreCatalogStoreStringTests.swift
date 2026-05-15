@@ -15,9 +15,9 @@ func registerCoreCatalogStoreStringTests() {
     runner.test("AdvancedAdjustCatalog group + control counts match the spec") {
         let allKeys = AdvancedAdjustCatalog.allGroups.flatMap { $0.controls.map(\.key) }
         try assertEqual(AdvancedAdjustCatalog.allGroups.count, 6, "expected 6 groups")
-        try assertEqual(allKeys.count, 32, "expected 32 controls total")
+        try assertEqual(allKeys.count, 33, "expected 33 controls total")
         try assertEqual(
-            Set(allKeys).count, 32,
+            Set(allKeys).count, 33,
             "control key collision — every key must appear exactly once"
         )
     }
@@ -27,12 +27,12 @@ func registerCoreCatalogStoreStringTests() {
             .flatMap { $0.controls.map(\.key) }
         let videoKeys = AdvancedAdjustCatalog.groups(forVideo: true)
             .flatMap { $0.controls.map(\.key) }
-        try assertEqual(stillKeys.count, 30, "still mode = 32 - 2 motion")
-        try assertEqual(videoKeys.count, 32, "video mode exposes all 32")
-        if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") {
+        try assertEqual(stillKeys.count, 30, "still mode = 33 - 3 motion")
+        try assertEqual(videoKeys.count, 33, "video mode exposes all 33")
+        if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") || stillKeys.contains("filmBreathAmount") {
             throw AssertionError(description: "still mode must not surface motion params")
         }
-        if !videoKeys.contains("shutterAngle") || !videoKeys.contains("trailIntensity") {
+        if !videoKeys.contains("shutterAngle") || !videoKeys.contains("trailIntensity") || !videoKeys.contains("filmBreathAmount") {
             throw AssertionError(description: "video mode must surface motion params")
         }
     }
@@ -67,6 +67,8 @@ func registerCoreCatalogStoreStringTests() {
         try assertClose(AdvancedAdjustCatalog.clamp(150, for: "halationHue"), 100, "halationHue ceiling")
         try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "trailIntensity"), 0, "trailIntensity floor")
         try assertClose(AdvancedAdjustCatalog.clamp(2, for: "trailIntensity"), 0.95, "trailIntensity ceiling")
+        try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "filmBreathAmount"), 0, "filmBreathAmount floor")
+        try assertClose(AdvancedAdjustCatalog.clamp(2, for: "filmBreathAmount"), 1, "filmBreathAmount ceiling")
         try assertClose(AdvancedAdjustCatalog.clamp(-1, for: "rgbShift"), 0, "rgbShift floor")
         try assertClose(
             AdvancedAdjustCatalog.clamp(1, for: "rgbShift"),
@@ -153,6 +155,7 @@ func registerCoreCatalogStoreStringTests() {
         "yellow": "Yellow",
         "shutterAngle": "Shutter Angle",
         "trailIntensity": "Trail Length",
+        "filmBreathAmount": "Film Breath",
     ]
 
     runner.test("AdvancedAdjustCatalog labels match iOS canonical paramLabels") {
@@ -718,15 +721,17 @@ func registerCoreCatalogStoreStringTests() {
         try assertEqual(FilmtoneDesktopStrings.japanese.toneDepth, "深み", "japanese toneDepth")
     }
 
-    runner.test("FilmtoneDesktopStrings paramLabel mirrors iOS branching (Exposure EN-only; shutterAngle/trailIntensity translate)") {
+    runner.test("FilmtoneDesktopStrings paramLabel mirrors iOS branching (Exposure EN-only; motion params translate)") {
         // iOS defaults most paramLabels to English even on JA locale; only
-        // shutterAngle and trailIntensity carry an explicit JA variant.
+        // motion-specific params carry explicit JA variants.
         try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "exposure"), "Exposure", "english exposure")
         try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "shutterAngle"), "Shutter Angle", "english shutterAngle")
         try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "trailIntensity"), "Trail Length", "english trailIntensity")
+        try assertEqual(FilmtoneDesktopStrings.english.paramLabel(for: "filmBreathAmount"), "Film Breath", "english filmBreathAmount")
         try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "exposure"), "Exposure", "japanese exposure falls back to EN per iOS")
         try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "shutterAngle"), "シャッターアングル", "japanese shutterAngle")
         try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "trailIntensity"), "残像の長さ", "japanese trailIntensity")
+        try assertEqual(FilmtoneDesktopStrings.japanese.paramLabel(for: "filmBreathAmount"), "フィルムブレス", "japanese filmBreathAmount")
     }
 
     runner.test("FilmtoneDesktopStrings paramLabel falls back to the key when unknown") {
@@ -778,6 +783,7 @@ func registerCoreCatalogStoreStringTests() {
         }
         try assertEqual(jaByKey["shutterAngle"], "シャッターアングル", "JA shutterAngle in motion group")
         try assertEqual(jaByKey["trailIntensity"], "残像の長さ", "JA trailIntensity in motion group")
+        try assertEqual(jaByKey["filmBreathAmount"], "フィルムブレス", "JA filmBreathAmount in motion group")
 
         // basic.exposure remains EN per iOS default
         guard let basic = groups.first(where: { $0.id == "basic" }),

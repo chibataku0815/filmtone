@@ -67,7 +67,10 @@ function schemaForParamKey(key: ParamKey): z.ZodType<number> {
                   ? z.number().min(0).max(720).default(0)
                   : key === "trailIntensity"
                     ? z.number().min(0).max(0.95).default(0)
-                    : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount"
+                    : key === "filmBreathAmount" ||
+                        key === "motionBlurAmount" ||
+                        key === "dustAmount" ||
+                        key === "scratchAmount"
                       ? z.number().min(0).max(1).default(0)
                       : key === "shaftIntensity"
                         ? z.number().min(0).max(1).default(0)

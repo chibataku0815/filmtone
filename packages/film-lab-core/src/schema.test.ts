@@ -285,6 +285,27 @@ describe("filmLabParamsSchema", () => {
     }
   });
 
+  test("filmBreathAmount defaults to 0 and accepts only 0...1", () => {
+    const { filmBreathAmount: _omit, ...rest } = PRESETS.cinematic;
+    const omitted = filmLabParamsSchema.safeParse(rest);
+    expect(omitted.success).toBe(true);
+    if (omitted.success) {
+      expect(omitted.data.filmBreathAmount).toBe(0);
+    }
+
+    for (const val of [0, 1]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, filmBreathAmount: val });
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.filmBreathAmount).toBe(val);
+      }
+    }
+    for (const val of [-0.001, 1.001]) {
+      const r = filmLabParamsSchema.safeParse({ ...PRESETS.cinematic, filmBreathAmount: val });
+      expect(r.success).toBe(false);
+    }
+  });
+
   test("depthMistGain / depthGlowGain 省略時は既定 0", () => {
     const {
       depthMistGain: _omitMist,

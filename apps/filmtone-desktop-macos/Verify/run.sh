@@ -29,6 +29,7 @@ PKG_OBJ_DIR="$PKG_BIN_PATH/FilmLabSwiftCore.build"
 # directly to swiftc alongside `-I $PKG_BIN_PATH/Modules` for module lookup.
 PKG_OBJECTS=(
   "$PKG_OBJ_DIR/FilmtonePhase0Generated.swift.o"
+  "$PKG_OBJ_DIR/FilmtoneFilmBreath.swift.o"
   "$PKG_OBJ_DIR/FilmtoneQuickState.swift.o"
   "$PKG_OBJ_DIR/FilmtonePhase0Params.swift.o"
   "$PKG_OBJ_DIR/FilmtonePhase0ParamsPatch.swift.o"

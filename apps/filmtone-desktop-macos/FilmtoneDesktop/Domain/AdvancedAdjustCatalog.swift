@@ -226,6 +226,7 @@ enum AdvancedAdjustCatalog {
                 controls: [
                     .init(key: "shutterAngle",   label: strings.paramLabel(for: "shutterAngle"),   range: 0...720, digits: 0),
                     .init(key: "trailIntensity", label: strings.paramLabel(for: "trailIntensity"), range: 0...0.95, digits: 2),
+                    .init(key: "filmBreathAmount", label: strings.paramLabel(for: "filmBreathAmount"), range: 0...1, digits: 2),
                 ],
                 videoOnly: true,
                 recipes: standardAdvancedRecipes(
@@ -234,12 +235,14 @@ enum AdvancedAdjustCatalog {
                         [
                             "shutterAngle": 360,
                             "trailIntensity": 0,
+                            "filmBreathAmount": 0,
                         ]
                     },
                     strongValues: { _ in
                         [
                             "shutterAngle": 720,
                             "trailIntensity": 0.35,
+                            "filmBreathAmount": 0.28,
                         ]
                     }
                 )
@@ -356,7 +359,8 @@ enum AdvancedAdjustCatalog {
              "compressionRange",
              "printContrast",
              "fade",
-             "vignette":
+             "vignette",
+             "filmBreathAmount":
             return max(0, min(1, value))
         default:
             return value

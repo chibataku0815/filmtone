@@ -6,7 +6,7 @@ import FilmLabSwiftCore
 /// or accidental hand-edits of the generated Swift artifact.
 final class GeneratedLandmarkTests: XCTestCase {
     func testParamKeysCountAndOrder() {
-        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 37)
+        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 38)
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.first, "exposure")
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.last, "grainIntensity")
 
@@ -36,6 +36,14 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertNotNil(shadowLatitudeIndex)
         if let shadowToneIndex, let shadowLatitudeIndex {
             XCTAssertEqual(shadowLatitudeIndex, shadowToneIndex + 1)
+        }
+
+        let trailIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "trailIntensity")
+        let breathIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "filmBreathAmount")
+        XCTAssertNotNil(trailIndex)
+        XCTAssertNotNil(breathIndex)
+        if let trailIndex, let breathIndex {
+            XCTAssertEqual(breathIndex, trailIndex + 1)
         }
     }
 
@@ -83,6 +91,7 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertEqual(r.contrast, 1.0)
         XCTAssertEqual(r.saturation, 1.0)
         XCTAssertEqual(r.grainIntensity, 0.0)
+        XCTAssertEqual(r.filmBreathAmount, 0.0)
         XCTAssertEqual(r.shadowHue, 180.0)
         XCTAssertEqual(r.highlightHue, 60.0)
     }

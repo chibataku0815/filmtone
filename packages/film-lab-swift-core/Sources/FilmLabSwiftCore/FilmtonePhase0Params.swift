@@ -30,6 +30,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
     public var yellow: Double
     public var shutterAngle: Double
     public var trailIntensity: Double
+    public var filmBreathAmount: Double
     public var fade: Double
     public var shadowTone: Double
     public var shadowLatitude: Double
@@ -69,6 +70,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         yellow: Double,
         shutterAngle: Double,
         trailIntensity: Double,
+        filmBreathAmount: Double,
         fade: Double,
         shadowTone: Double,
         shadowLatitude: Double,
@@ -107,6 +109,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         self.yellow = yellow
         self.shutterAngle = shutterAngle
         self.trailIntensity = trailIntensity
+        self.filmBreathAmount = filmBreathAmount
         self.fade = fade
         self.shadowTone = shadowTone
         self.shadowLatitude = shadowLatitude
@@ -151,6 +154,7 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         "yellow": \.yellow,
         "shutterAngle": \.shutterAngle,
         "trailIntensity": \.trailIntensity,
+        "filmBreathAmount": \.filmBreathAmount,
         "fade": \.fade,
         "shadowTone": \.shadowTone,
         "shadowLatitude": \.shadowLatitude,

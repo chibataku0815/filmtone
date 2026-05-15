@@ -251,6 +251,7 @@ enum FilmtonePresetCatalog {
             yellow: mix(reset.yellow, target.yellow, t),
             shutterAngle: mix(reset.shutterAngle, target.shutterAngle, t),
             trailIntensity: mix(reset.trailIntensity, target.trailIntensity, t),
+            filmBreathAmount: mix(reset.filmBreathAmount, target.filmBreathAmount, t),
             fade: mix(reset.fade, target.fade, t),
             shadowTone: mix(reset.shadowTone, target.shadowTone, t),
             shadowLatitude: mix(reset.shadowLatitude, target.shadowLatitude, t),

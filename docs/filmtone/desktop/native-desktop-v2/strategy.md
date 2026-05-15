@@ -465,6 +465,11 @@ catalogs; macOS adds a parallel `BuiltInPresetLook` struct + `presetOnlyLooks`
 array so cube-bound code paths stay untouched. UI surface stays under the
 existing Look library — no "Preset" UI label per CLAUDE.md §6 term lock.
 
+2026-05-15: Film Breath landed across shared core, generated Swift, Native
+Desktop, and iOS as a video-only Motion control. Deterministic time offsets
+modulate exposure/contrast/temperature/tint before the base grade; still paths
+stay identity through `timeSeconds = 0`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

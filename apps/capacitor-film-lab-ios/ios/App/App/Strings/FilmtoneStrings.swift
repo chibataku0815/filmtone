@@ -617,6 +617,8 @@ extension FilmtoneStrings {
             return paramHelpCopy(id: key, title: label, jaBody: "動画のシャッター感を調整します。大きいほど動きにブラーが残りやすくなります。", enBody: "Controls video shutter feel. Larger values let motion blur carry farther.", jaEffect: "上げると動きが滑らかに流れます。", enEffect: "Higher values make motion flow more smoothly.")
         case "trailIntensity":
             return paramHelpCopy(id: key, title: label, jaBody: "動く被写体に残る軌跡の強さです。", enBody: "Controls how strongly moving subjects leave a trail.", jaEffect: "上げると残像がはっきり出ます。", enEffect: "Higher values make trails more apparent.")
+        case "filmBreathAmount":
+            return paramHelpCopy(id: key, title: label, jaBody: "動画の露出、コントラスト、色を時間方向にわずかに揺らします。", enBody: "Adds subtle time variation to video exposure, contrast, and color.", jaEffect: "上げると画が固定されすぎず、ゆっくり呼吸するように変化します。", enEffect: "Higher values make the grade breathe gently instead of staying fixed.")
         default:
             return paramHelpCopy(id: key, title: label, jaBody: "このパラメーターは Look の細部を直接調整します。少しずつ動かして、プレビューで変化を確認してください。", enBody: "This parameter directly adjusts a detail of the Look. Move it gradually and judge it in the preview.", jaEffect: "値に応じて現在の Look の質感が変わります。", enEffect: "The current Look's texture changes as the value moves.")
         }
@@ -1101,6 +1103,7 @@ extension FilmtoneStrings {
             "yellow": filmtoneLocalized("filmtone.param.yellow", defaultValue: "Yellow", comment: "Advanced parameter label."),
             "shutterAngle": filmtoneLocalized("filmtone.param.shutter_angle", defaultValue: prefersJapanese ? "シャッターアングル" : "Shutter Angle", comment: "Advanced parameter label."),
             "trailIntensity": filmtoneLocalized("filmtone.param.trail_intensity", defaultValue: prefersJapanese ? "残像の長さ" : "Trail Length", comment: "Advanced parameter label."),
+            "filmBreathAmount": filmtoneLocalized("filmtone.param.film_breath_amount", defaultValue: prefersJapanese ? "フィルムブレス" : "Film Breath", comment: "Advanced parameter label."),
         ]
         resetLabel = filmtoneLocalized(
             "filmtone.action.reset",

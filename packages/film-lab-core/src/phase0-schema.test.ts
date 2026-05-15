@@ -12,6 +12,7 @@ import {
   phase0ProjectSchema,
   pickPhase0Params,
   PHASE0_OUTPUT_PROFILE,
+  PHASE0_PARAM_KEYS,
   PHASE0_RGB_SHIFT_MAX,
   PHASE0_SCHEMA_VERSION,
   PHASE0_PRESET_DEFAULT,
@@ -32,6 +33,7 @@ describe("phase0 schema", () => {
     expect(phase0.yellow).toBe(PRESETS.cinematic.yellow);
     expect(phase0.shutterAngle).toBe(PRESETS.cinematic.shutterAngle);
     expect(phase0.trailIntensity).toBe(PRESETS.cinematic.trailIntensity);
+    expect(phase0.filmBreathAmount).toBe(PRESETS.cinematic.filmBreathAmount);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
     expect(phase0.detailSoftness).toBe(PRESETS.cinematic.detailSoftness);
     expect(phase0.shadowLatitude).toBe(PRESETS.cinematic.shadowLatitude);
@@ -136,6 +138,7 @@ describe("phase0 schema", () => {
         ...reset,
         shutterAngle: 720,
         trailIntensity: 0.95,
+        filmBreathAmount: 1,
       }).shutterAngle,
     ).toBe(720);
     expect(
@@ -143,8 +146,20 @@ describe("phase0 schema", () => {
         ...reset,
         shutterAngle: 0,
         trailIntensity: 0,
+        filmBreathAmount: 0,
       }).trailIntensity,
     ).toBe(0);
+  });
+
+  test("filmBreathAmount defaults to 0 and lands directly after trailIntensity", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { filmBreathAmount: _omit, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    const trailIndex = PHASE0_PARAM_KEYS.indexOf("trailIntensity");
+    const breathIndex = PHASE0_PARAM_KEYS.indexOf("filmBreathAmount");
+
+    expect(parsed.filmBreathAmount).toBe(0);
+    expect(breathIndex).toBe(trailIndex + 1);
   });
 
   test("rejects out-of-range reduced params", () => {
@@ -198,6 +213,18 @@ describe("phase0 schema", () => {
       phase0ParamsSchema.safeParse({
         ...pickPhase0Params(PRESETS.reset),
         trailIntensity: 0.951,
+      }).success,
+    ).toBe(false);
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        filmBreathAmount: -0.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        filmBreathAmount: 1.001,
       }).success,
     ).toBe(false);
   });

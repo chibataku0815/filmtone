@@ -305,6 +305,7 @@ struct Phase0ParamsDTO: Codable {
     let yellow: Double
     let shutterAngle: Double
     let trailIntensity: Double
+    let filmBreathAmount: Double
     let fade: Double
     let shadowTone: Double
     let shadowLatitude: Double
@@ -313,6 +314,140 @@ struct Phase0ParamsDTO: Codable {
     let highlightHue: Double
     let vignette: Double
     let grainIntensity: Double
+
+    init(
+        exposure: Double,
+        contrast: Double,
+        saturation: Double,
+        temperature: Double,
+        tint: Double,
+        rgbShift: Double,
+        lensSoftness: Double,
+        detailSoftness: Double,
+        grainRadialMix: Double,
+        grainSize: Double,
+        bloomThreshold: Double,
+        bloomStrength: Double,
+        bloomRadius: Double,
+        diffusion: Double,
+        halationIntensity: Double,
+        halationSpread: Double,
+        halationHue: Double,
+        halationThreshold: Double,
+        halationRadius: Double,
+        bloomSoftKnee: Double,
+        halationSoftKnee: Double,
+        compressionAmount: Double,
+        compressionRange: Double,
+        printContrast: Double,
+        cyan: Double,
+        magenta: Double,
+        yellow: Double,
+        shutterAngle: Double,
+        trailIntensity: Double,
+        filmBreathAmount: Double = 0,
+        fade: Double,
+        shadowTone: Double,
+        shadowLatitude: Double,
+        highlightTone: Double,
+        shadowHue: Double,
+        highlightHue: Double,
+        vignette: Double,
+        grainIntensity: Double
+    ) {
+        self.exposure = exposure
+        self.contrast = contrast
+        self.saturation = saturation
+        self.temperature = temperature
+        self.tint = tint
+        self.rgbShift = rgbShift
+        self.lensSoftness = lensSoftness
+        self.detailSoftness = detailSoftness
+        self.grainRadialMix = grainRadialMix
+        self.grainSize = grainSize
+        self.bloomThreshold = bloomThreshold
+        self.bloomStrength = bloomStrength
+        self.bloomRadius = bloomRadius
+        self.diffusion = diffusion
+        self.halationIntensity = halationIntensity
+        self.halationSpread = halationSpread
+        self.halationHue = halationHue
+        self.halationThreshold = halationThreshold
+        self.halationRadius = halationRadius
+        self.bloomSoftKnee = bloomSoftKnee
+        self.halationSoftKnee = halationSoftKnee
+        self.compressionAmount = compressionAmount
+        self.compressionRange = compressionRange
+        self.printContrast = printContrast
+        self.cyan = cyan
+        self.magenta = magenta
+        self.yellow = yellow
+        self.shutterAngle = shutterAngle
+        self.trailIntensity = trailIntensity
+        self.filmBreathAmount = filmBreathAmount
+        self.fade = fade
+        self.shadowTone = shadowTone
+        self.shadowLatitude = shadowLatitude
+        self.highlightTone = highlightTone
+        self.shadowHue = shadowHue
+        self.highlightHue = highlightHue
+        self.vignette = vignette
+        self.grainIntensity = grainIntensity
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case exposure, contrast, saturation, temperature, tint
+        case rgbShift, lensSoftness, detailSoftness, grainRadialMix, grainSize
+        case bloomThreshold, bloomStrength, bloomRadius, diffusion
+        case halationIntensity, halationSpread, halationHue, halationThreshold, halationRadius
+        case bloomSoftKnee, halationSoftKnee, compressionAmount, compressionRange
+        case printContrast, cyan, magenta, yellow
+        case shutterAngle, trailIntensity, filmBreathAmount
+        case fade, shadowTone, shadowLatitude, highlightTone, shadowHue, highlightHue
+        case vignette, grainIntensity
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.exposure = try c.decode(Double.self, forKey: .exposure)
+        self.contrast = try c.decode(Double.self, forKey: .contrast)
+        self.saturation = try c.decode(Double.self, forKey: .saturation)
+        self.temperature = try c.decode(Double.self, forKey: .temperature)
+        self.tint = try c.decode(Double.self, forKey: .tint)
+        self.rgbShift = try c.decode(Double.self, forKey: .rgbShift)
+        self.lensSoftness = try c.decode(Double.self, forKey: .lensSoftness)
+        self.detailSoftness = try c.decode(Double.self, forKey: .detailSoftness)
+        self.grainRadialMix = try c.decode(Double.self, forKey: .grainRadialMix)
+        self.grainSize = try c.decode(Double.self, forKey: .grainSize)
+        self.bloomThreshold = try c.decode(Double.self, forKey: .bloomThreshold)
+        self.bloomStrength = try c.decode(Double.self, forKey: .bloomStrength)
+        self.bloomRadius = try c.decode(Double.self, forKey: .bloomRadius)
+        self.diffusion = try c.decode(Double.self, forKey: .diffusion)
+        self.halationIntensity = try c.decode(Double.self, forKey: .halationIntensity)
+        self.halationSpread = try c.decode(Double.self, forKey: .halationSpread)
+        self.halationHue = try c.decode(Double.self, forKey: .halationHue)
+        self.halationThreshold = try c.decode(Double.self, forKey: .halationThreshold)
+        self.halationRadius = try c.decode(Double.self, forKey: .halationRadius)
+        self.bloomSoftKnee = try c.decode(Double.self, forKey: .bloomSoftKnee)
+        self.halationSoftKnee = try c.decode(Double.self, forKey: .halationSoftKnee)
+        self.compressionAmount = try c.decode(Double.self, forKey: .compressionAmount)
+        self.compressionRange = try c.decode(Double.self, forKey: .compressionRange)
+        self.printContrast = try c.decode(Double.self, forKey: .printContrast)
+        self.cyan = try c.decode(Double.self, forKey: .cyan)
+        self.magenta = try c.decode(Double.self, forKey: .magenta)
+        self.yellow = try c.decode(Double.self, forKey: .yellow)
+        self.shutterAngle = try c.decode(Double.self, forKey: .shutterAngle)
+        self.trailIntensity = try c.decode(Double.self, forKey: .trailIntensity)
+        self.filmBreathAmount = try c.decodeIfPresent(Double.self, forKey: .filmBreathAmount) ?? 0
+        self.fade = try c.decode(Double.self, forKey: .fade)
+        self.shadowTone = try c.decode(Double.self, forKey: .shadowTone)
+        self.shadowLatitude = try c.decode(Double.self, forKey: .shadowLatitude)
+        self.highlightTone = try c.decode(Double.self, forKey: .highlightTone)
+        self.shadowHue = try c.decode(Double.self, forKey: .shadowHue)
+        self.highlightHue = try c.decode(Double.self, forKey: .highlightHue)
+        self.vignette = try c.decode(Double.self, forKey: .vignette)
+        self.grainIntensity = try c.decode(Double.self, forKey: .grainIntensity)
+    }
 }
 
 struct ParsedCubeLutDTO: Codable {

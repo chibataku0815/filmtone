@@ -98,6 +98,8 @@ var PARAM_KEYS = [
   "shutterAngle",
   /** 残像フィードバック強度（0=なし、0.95=最大）。リングバッファに前フレームを畳み込んで長い残像を生成。range: 0–0.95 */
   "trailIntensity",
+  /** Film Breath amount（0=off、1=max）。動画時のみ露出・コントラスト・色を時間方向に微変調する。range: 0–1 */
+  "filmBreathAmount",
   /** ダスト（埃）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
   "dustAmount",
   /** スクラッチ（傷）オーバーレイ強度（0=オフ、1=最大）。range: 0–1 */
@@ -160,6 +162,81 @@ function clampGrainIntensity(value) {
 }
 function cloneParams(params) {
   return { ...params };
+}
+
+// src/film-breath.ts
+var FILM_BREATH_ZERO_OFFSETS = {
+  exposure: 0,
+  contrast: 0,
+  temperature: 0,
+  tint: 0
+};
+var FILM_BREATH_LIMITS = {
+  exposure: 0.16,
+  contrast: 0.055,
+  temperature: 0.09,
+  tint: 0.04
+};
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+function clamp01(value) {
+  return clamp(value, 0, 1);
+}
+function smoothstep(t) {
+  const x = clamp01(t);
+  return x * x * (3 - 2 * x);
+}
+function normalizeSeed(sourceSeed) {
+  if (!Number.isFinite(sourceSeed)) {
+    return 0;
+  }
+  return Math.trunc(Math.abs(sourceSeed)) >>> 0;
+}
+function hashUnit(seed, lattice, salt) {
+  let x = seed >>> 0;
+  x ^= Math.imul((lattice | 0) >>> 0, 2654435761) >>> 0;
+  x ^= Math.imul(salt >>> 0, 2246822507) >>> 0;
+  x ^= x >>> 16;
+  x = Math.imul(x, 2146121005) >>> 0;
+  x ^= x >>> 15;
+  x = Math.imul(x, 2221713035) >>> 0;
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967295;
+}
+function valueNoise(timeSeconds, seed, salt, periodSeconds) {
+  const phase = hashUnit(seed, 0, salt ^ 2769414579) * 8;
+  const position = timeSeconds / periodSeconds + phase;
+  const lattice = Math.floor(position);
+  const fraction = position - lattice;
+  const a = hashUnit(seed, lattice, salt) * 2 - 1;
+  const b = hashUnit(seed, lattice + 1, salt) * 2 - 1;
+  return a + (b - a) * smoothstep(fraction);
+}
+function breathNoise(timeSeconds, seed, salt) {
+  const slow = valueNoise(timeSeconds, seed, salt, 4.8);
+  const medium = valueNoise(timeSeconds, seed, salt ^ 1831565813, 8.6);
+  const long = valueNoise(timeSeconds, seed, salt ^ 461845907, 15.5);
+  return clamp(slow * 0.56 + medium * 0.3 + long * 0.14, -1, 1);
+}
+function deriveFilmBreathOffsets(amount, timeSeconds, sourceSeed) {
+  const clampedAmount = clamp01(amount);
+  if (clampedAmount <= 0 || !Number.isFinite(timeSeconds) || timeSeconds <= 0) {
+    return FILM_BREATH_ZERO_OFFSETS;
+  }
+  const drive = Math.pow(clampedAmount, 1.35);
+  const envelope = smoothstep(timeSeconds / 1.25);
+  const scale = drive * envelope;
+  if (scale <= 0) {
+    return FILM_BREATH_ZERO_OFFSETS;
+  }
+  const seed = normalizeSeed(sourceSeed);
+  return {
+    exposure: breathNoise(timeSeconds, seed, 1327217884) * FILM_BREATH_LIMITS.exposure * scale,
+    contrast: breathNoise(timeSeconds, seed, 2653711215) * FILM_BREATH_LIMITS.contrast * scale,
+    temperature: breathNoise(timeSeconds, seed, 668265263) * FILM_BREATH_LIMITS.temperature * scale,
+    tint: breathNoise(timeSeconds, seed, 374761393) * FILM_BREATH_LIMITS.tint * scale
+  };
 }
 
 // src/split-tone-default-hues.ts
@@ -320,6 +397,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -382,6 +460,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -440,6 +519,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -498,6 +578,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -556,6 +637,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -614,6 +696,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -672,6 +755,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -730,6 +814,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -788,6 +873,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -850,6 +936,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -913,6 +1000,7 @@ var RAW_PRESETS = {
     motionBlurAmount: 0,
     shutterAngle: 0,
     trailIntensity: 0,
+    filmBreathAmount: 0,
     dustAmount: 0,
     scratchAmount: 0,
     shaftIntensity: 0,
@@ -993,7 +1081,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" || key === "shadowLatitude" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" || key === "shadowLatitude" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "filmBreathAmount" || key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1338,6 +1426,7 @@ var PHASE0_PARAM_KEYS = [
   "yellow",
   "shutterAngle",
   "trailIntensity",
+  "filmBreathAmount",
   "fade",
   "shadowTone",
   "shadowLatitude",
@@ -1394,6 +1483,7 @@ var phase0ParamsSchema = z3.object({
   yellow: z3.number().min(-1).max(1).default(PRESETS.reset.yellow),
   shutterAngle: z3.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
   trailIntensity: z3.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
+  filmBreathAmount: z3.number().min(0).max(1).default(PRESETS.reset.filmBreathAmount),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   shadowTone: z3.number().min(0).max(1).default(PRESETS.reset.shadowTone),
   shadowLatitude: z3.number().min(0).max(1).default(PRESETS.reset.shadowLatitude),
@@ -1433,6 +1523,7 @@ var phase0ParamsPatchSchema = z3.object({
   yellow: z3.number().min(-1).max(1).optional(),
   shutterAngle: z3.number().min(0).max(720).optional(),
   trailIntensity: z3.number().min(0).max(0.95).optional(),
+  filmBreathAmount: z3.number().min(0).max(1).optional(),
   fade: z3.number().min(0).max(1).optional(),
   shadowTone: z3.number().min(0).max(1).optional(),
   shadowLatitude: z3.number().min(0).max(1).optional(),
@@ -1885,7 +1976,7 @@ var OPTICAL_RECIPE_PATCHES = {
     lensSoftness: 0.12
   }
 };
-function clamp01(value) {
+function clamp012(value) {
   if (!Number.isFinite(value)) return 0;
   if (value <= 0) return 0;
   if (value >= 1) return 1;
@@ -1893,30 +1984,30 @@ function clamp01(value) {
 }
 function normalizeDescriptor(descriptor) {
   return {
-    medianLuma: clamp01(descriptor.medianLuma),
-    highlightCoverage: clamp01(descriptor.highlightCoverage),
-    specularIslands: clamp01(descriptor.specularIslands),
-    pointLightScore: clamp01(descriptor.pointLightScore),
-    globalContrast: clamp01(descriptor.globalContrast),
-    warmthScore: clamp01(descriptor.warmthScore),
-    portraitLikelihood: clamp01(descriptor.portraitLikelihood),
-    nightScore: clamp01(descriptor.nightScore),
-    sceneComplexity: clamp01(descriptor.sceneComplexity),
-    dominantShotCoverage: clamp01(descriptor.dominantShotCoverage),
+    medianLuma: clamp012(descriptor.medianLuma),
+    highlightCoverage: clamp012(descriptor.highlightCoverage),
+    specularIslands: clamp012(descriptor.specularIslands),
+    pointLightScore: clamp012(descriptor.pointLightScore),
+    globalContrast: clamp012(descriptor.globalContrast),
+    warmthScore: clamp012(descriptor.warmthScore),
+    portraitLikelihood: clamp012(descriptor.portraitLikelihood),
+    nightScore: clamp012(descriptor.nightScore),
+    sceneComplexity: clamp012(descriptor.sceneComplexity),
+    dominantShotCoverage: clamp012(descriptor.dominantShotCoverage),
     sampleCount: typeof descriptor.sampleCount === "number" && descriptor.sampleCount > 0 ? Math.round(descriptor.sampleCount) : void 0
   };
 }
 function buildScores(descriptor) {
-  const glowScore = clamp01(
+  const glowScore = clamp012(
     descriptor.highlightCoverage * 1.4 + descriptor.specularIslands * 0.22 + descriptor.warmthScore * 0.26 + descriptor.globalContrast * 0.18 + descriptor.pointLightScore * 0.08 + (1 - descriptor.sceneComplexity) * 0.12
   );
-  const crossScore = clamp01(
+  const crossScore = clamp012(
     descriptor.pointLightScore * 0.56 + descriptor.specularIslands * 0.16 + descriptor.nightScore * 0.16 + descriptor.globalContrast * 0.08 + descriptor.sceneComplexity * 0.04
   );
-  const mistScore = clamp01(
+  const mistScore = clamp012(
     descriptor.portraitLikelihood * 0.44 + (1 - descriptor.highlightCoverage) * 0.16 + (1 - descriptor.pointLightScore) * 0.18 + descriptor.medianLuma * 0.08 + descriptor.warmthScore * 0.06 + (1 - descriptor.sceneComplexity) * 0.08
   );
-  const lensScore = clamp01(
+  const lensScore = clamp012(
     descriptor.globalContrast * 0.24 + (1 - descriptor.sceneComplexity) * 0.18 + descriptor.specularIslands * 0.12
   );
   return {
@@ -2874,7 +2965,7 @@ var FILM_COMPRESSION_V3_CONSTANTS = {
   highlightDensityLandingChromaEnd: 0.62,
   highlightDensityLandingWarmProtect: 0.35
 };
-function clamp012(x) {
+function clamp013(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
@@ -2887,8 +2978,8 @@ function clampRange(x, lo, hi) {
 function mix(a, b, t) {
   return a + (b - a) * t;
 }
-function smoothstep(edge0, edge1, x) {
-  const t = clamp012((x - edge0) / (edge1 - edge0));
+function smoothstep2(edge0, edge1, x) {
+  const t = clamp013((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
 function filmCompressionLuma(rgb) {
@@ -2914,19 +3005,19 @@ function warmHueProtect(cr, cg, cb, mag) {
   const dr = cr / mag;
   const dg = cg / mag;
   const db = cb / mag;
-  const redWarm = smoothstep(0.32, 0.72, dr);
-  const blueOpposed = 1 - smoothstep(-0.58, -0.2, db);
-  const greenModerate = 1 - smoothstep(0.18, 0.58, Math.abs(dg));
-  return clamp012(redWarm * blueOpposed * greenModerate);
+  const redWarm = smoothstep2(0.32, 0.72, dr);
+  const blueOpposed = 1 - smoothstep2(-0.58, -0.2, db);
+  const greenModerate = 1 - smoothstep2(0.18, 0.58, Math.abs(dg));
+  return clamp013(redWarm * blueOpposed * greenModerate);
 }
 function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
   if (amount < 1e-3) {
     return rgb;
   }
   const c = FILM_COMPRESSION_V3_CONSTANTS;
-  const r = clamp012(range);
+  const r = clamp013(range);
   const k = mix(c.lumaKMax, c.lumaKMin, r);
-  const rangeSoft = smoothstep(c.rangeSoftStart, c.rangeSoftEnd, r);
+  const rangeSoft = smoothstep2(c.rangeSoftStart, c.rangeSoftEnd, r);
   const amt = amount * (1 - c.rangeAmountTrim * rangeSoft);
   const y = filmCompressionLuma(rgb);
   const x = clampRange(k * (y - 0.5), -5.5, 5.5);
@@ -2940,7 +3031,7 @@ function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
   const cg = lg - shoulderY;
   const cb = lb - shoulderY;
   const chromaMag = Math.sqrt(cr * cr + cg * cg + cb * cb);
-  const shadowRelease = smoothstep(
+  const shadowRelease = smoothstep2(
     c.shadowReleaseStart,
     c.shadowReleaseEnd,
     shoulderY
@@ -2955,30 +3046,30 @@ function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
     c.highlightKneeEndHighRange,
     r
   );
-  const highlightMask = smoothstep(kneeStart, kneeEnd, shoulderY);
-  const chromaStress = smoothstep(
+  const highlightMask = smoothstep2(kneeStart, kneeEnd, shoulderY);
+  const chromaStress = smoothstep2(
     c.chromaStressStart,
     c.chromaStressEnd,
     chromaMag
   );
   const maxChannel = max3(lr, lg, lb);
   const minChannel = min3(lr, lg, lb);
-  const highEdgeStress = smoothstep(
+  const highEdgeStress = smoothstep2(
     c.gamutStressStart,
     c.gamutStressEnd,
     maxChannel
   );
-  const lowEdgeStress = smoothstep(
+  const lowEdgeStress = smoothstep2(
     c.gamutStressStart,
     c.gamutStressEnd,
     -minChannel
   );
-  const gamutStress = Math.max(highEdgeStress, lowEdgeStress) * chromaStress * smoothstep(0.08, 0.24, shoulderY);
+  const gamutStress = Math.max(highEdgeStress, lowEdgeStress) * chromaStress * smoothstep2(0.08, 0.24, shoulderY);
   const warmProtect = warmHueProtect(cr, cg, cb, chromaMag);
   const highlightCompression = c.chromaCompressionMax * highlightMask * shadowRelease * mix(0.55, 1, chromaStress);
   const guardCompression = c.problemColorGuardMax * gamutStress * shadowRelease;
   const protectedCompression = (highlightCompression + guardCompression) * (1 - c.warmProtectStrength * warmProtect);
-  const chromaScale = clamp012(1 - amt * protectedCompression);
+  const chromaScale = clamp013(1 - amt * protectedCompression);
   const landedCr = cr * chromaScale;
   const landedCg = cg * chromaScale;
   const landedCb = cb * chromaScale;
@@ -2988,18 +3079,18 @@ function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
     b: shoulderY + landedCb
   };
   const outMax = max3(out.r, out.g, out.b);
-  const landingChroma = smoothstep(
+  const landingChroma = smoothstep2(
     c.highlightDensityLandingChromaStart,
     c.highlightDensityLandingChromaEnd,
     chromaMag
   );
-  const landingMask = smoothstep(c.highlightDensityLandingStart, 0.98, outMax) * landingChroma * shadowRelease * (1 - c.highlightDensityLandingWarmProtect * warmProtect);
+  const landingMask = smoothstep2(c.highlightDensityLandingStart, 0.98, outMax) * landingChroma * shadowRelease * (1 - c.highlightDensityLandingWarmProtect * warmProtect);
   if (outMax > c.highlightDensityLandingStart && outMax > shoulderY + 1e-6) {
     const over = outMax - c.highlightDensityLandingStart;
     const headroom = 1 - c.highlightDensityLandingStart;
     const softMax = c.highlightDensityLandingStart + headroom * over / (over + headroom);
-    const landingScale = clamp012((softMax - shoulderY) / (outMax - shoulderY));
-    const landingBlend = clamp012(
+    const landingScale = clamp013((softMax - shoulderY) / (outMax - shoulderY));
+    const landingBlend = clamp013(
       amt * c.highlightDensityLandingStrength * landingMask
     );
     const finalScale = mix(1, landingScale, landingBlend);
@@ -3009,9 +3100,9 @@ function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
   }
   if (options.clampOutput) {
     return {
-      r: clamp012(out.r),
-      g: clamp012(out.g),
-      b: clamp012(out.b)
+      r: clamp013(out.r),
+      g: clamp013(out.g),
+      b: clamp013(out.b)
     };
   }
   return out;
@@ -3021,13 +3112,13 @@ function applyFilmCompressionV3Sample(rgb, amount, range, options = {}) {
 function mix2(a, b, t) {
   return a + (b - a) * t;
 }
-function clamp013(x) {
+function clamp014(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
 }
 function clampedRGB(rgb) {
-  return { r: clamp013(rgb.r), g: clamp013(rgb.g), b: clamp013(rgb.b) };
+  return { r: clamp014(rgb.r), g: clamp014(rgb.g), b: clamp014(rgb.b) };
 }
 var BAKE_COLOR_PARAM_KEYS = [
   "exposure",
@@ -3345,13 +3436,13 @@ function buildImportedGradeLookFromDrxImport(input) {
 // src/creative-pack-01-generator.ts
 var CREATIVE_PACK_01_STONE_TRANSFORM = "filmtone-stone-dlogm-palermo-display-v2";
 var CREATIVE_PACK_01_URBAN_TRANSFORM = "filmtone-urban-palermo-green-density-v1";
-function clamp014(x) {
+function clamp015(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
 }
-function smoothstep2(edge0, edge1, x) {
-  const t = clamp014((x - edge0) / (edge1 - edge0));
+function smoothstep3(edge0, edge1, x) {
+  const t = clamp015((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
 function luma(r, g, b) {
@@ -3361,12 +3452,12 @@ function mix3(a, b, t) {
   return a + (b - a) * t;
 }
 function rec709Decode(encoded) {
-  const v = clamp014(encoded);
+  const v = clamp015(encoded);
   if (v < 0.081) return v / 4.5;
   return Math.pow((v + 0.099) / 1.099, 1 / 0.45);
 }
 function inverseFilmtoneSdrShoulder(shouldered) {
-  const y = clamp014(shouldered);
+  const y = clamp015(shouldered);
   const exposed = y <= 0.18 ? y : 0.9244 * y / (1 - 0.42 * y);
   return exposed / 1.18;
 }
@@ -3381,9 +3472,9 @@ function dlogMEncode(linear) {
   const linearCut = (cut - linearOffset) / linearSlope;
   const value = Math.max(0, linear);
   if (value <= linearCut) {
-    return clamp014(value * linearSlope + linearOffset);
+    return clamp015(value * linearSlope + linearOffset);
   }
-  return clamp014((Math.log10(value * logD + logC) - logB) / logA);
+  return clamp015((Math.log10(value * logD + logC) - logB) / logA);
 }
 function rec709DisplayToDlogMCode(r, g, b) {
   const rr = inverseFilmtoneSdrShoulder(rec709Decode(r));
@@ -3396,9 +3487,9 @@ function rec709DisplayToDlogMCode(r, g, b) {
 }
 function sampleCube(sourceCube, r, g, b) {
   const n = sourceCube.size - 1;
-  const x = clamp014(r) * n;
-  const y = clamp014(g) * n;
-  const z6 = clamp014(b) * n;
+  const x = clamp015(r) * n;
+  const y = clamp015(g) * n;
+  const z6 = clamp015(b) * n;
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
   const z0 = Math.floor(z6);
@@ -3431,37 +3522,37 @@ function protectShadowFloor(input, output) {
   const inputLuma = luma(input[0], input[1], input[2]);
   const outputLuma = luma(output[0], output[1], output[2]);
   if (inputLuma >= 0.26 || outputLuma <= 1e-4) return output;
-  const shadowMask = 1 - smoothstep2(0.08, 0.26, inputLuma);
+  const shadowMask = 1 - smoothstep3(0.08, 0.26, inputLuma);
   const maxLift = 4e-3 + inputLuma * (1.05 + 0.18 * (1 - shadowMask));
   if (outputLuma <= maxLift) return output;
   const scale = mix3(1, maxLift / outputLuma, shadowMask);
   return [
-    clamp014(output[0] * scale),
-    clamp014(output[1] * scale),
-    clamp014(output[2] * scale)
+    clamp015(output[0] * scale),
+    clamp015(output[1] * scale),
+    clamp015(output[2] * scale)
   ];
 }
 function dominantGreenMask(r, g, b, inputLuma) {
   const dominance = g - Math.max(r, b);
-  const lumaGate = smoothstep2(0.12, 0.32, inputLuma) * (1 - smoothstep2(0.68, 0.9, inputLuma));
-  return smoothstep2(0.035, 0.22, dominance) * lumaGate;
+  const lumaGate = smoothstep3(0.12, 0.32, inputLuma) * (1 - smoothstep3(0.68, 0.9, inputLuma));
+  return smoothstep3(0.035, 0.22, dominance) * lumaGate;
 }
 function cyanSkyMask(r, g, b, inputLuma) {
   const blueDominance = b - r;
   const cyanBody = Math.min(b - g * 0.72, g - r * 0.58);
-  const lumaGate = smoothstep2(0.22, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
-  return smoothstep2(0.08, 0.36, blueDominance) * smoothstep2(0.06, 0.28, cyanBody) * lumaGate;
+  const lumaGate = smoothstep3(0.22, 0.42, inputLuma) * (1 - smoothstep3(0.88, 1, inputLuma));
+  return smoothstep3(0.08, 0.36, blueDominance) * smoothstep3(0.06, 0.28, cyanBody) * lumaGate;
 }
 function warmSkinMask(r, g, b, inputLuma) {
-  const warmOrder = smoothstep2(0.035, 0.18, r - g) * smoothstep2(0.025, 0.16, g - b);
-  const lumaGate = smoothstep2(0.2, 0.42, inputLuma) * (1 - smoothstep2(0.76, 0.94, inputLuma));
-  const saturationGuard = 1 - smoothstep2(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
+  const warmOrder = smoothstep3(0.035, 0.18, r - g) * smoothstep3(0.025, 0.16, g - b);
+  const lumaGate = smoothstep3(0.2, 0.42, inputLuma) * (1 - smoothstep3(0.76, 0.94, inputLuma));
+  const saturationGuard = 1 - smoothstep3(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
   return warmOrder * lumaGate * saturationGuard;
 }
 function applyStonePalermoSignature(input, output) {
   const inputLuma = luma(input[0], input[1], input[2]);
   const inputChroma = Math.max(input[0], input[1], input[2]) - Math.min(input[0], input[1], input[2]);
-  const neutralMask = (1 - smoothstep2(0.025, 0.2, inputChroma)) * smoothstep2(0.12, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
+  const neutralMask = (1 - smoothstep3(0.025, 0.2, inputChroma)) * smoothstep3(0.12, 0.42, inputLuma) * (1 - smoothstep3(0.88, 1, inputLuma));
   const skinMask = warmSkinMask(input[0], input[1], input[2], inputLuma);
   const skyMask = cyanSkyMask(input[0], input[1], input[2], inputLuma);
   const greenMask = dominantGreenMask(input[0], input[1], input[2], inputLuma);
@@ -3480,7 +3571,7 @@ function applyStonePalermoSignature(input, output) {
   r *= 1 - 0.05 * greenMask;
   g *= 1 - 0.045 * greenMask;
   b *= 1 - 0.02 * greenMask;
-  return [clamp014(r), clamp014(g), clamp014(b)];
+  return [clamp015(r), clamp015(g), clamp015(b)];
 }
 function applyStoneDisplayPalermoTransform(sourceCube) {
   const { size } = sourceCube;
@@ -3499,10 +3590,10 @@ function applyStoneDisplayPalermoTransform(sourceCube) {
         const signedPalermo = applyStonePalermoSignature(input, palermo);
         const safePalermo = protectShadowFloor(input, signedPalermo);
         const inputLuma = luma(r, g, b);
-        const strength = smoothstep2(0.025, 0.12, inputLuma);
-        data[idx + 0] = clamp014(mix3(r, safePalermo[0], strength));
-        data[idx + 1] = clamp014(mix3(g, safePalermo[1], strength));
-        data[idx + 2] = clamp014(mix3(b, safePalermo[2], strength));
+        const strength = smoothstep3(0.025, 0.12, inputLuma);
+        data[idx + 0] = clamp015(mix3(r, safePalermo[0], strength));
+        data[idx + 1] = clamp015(mix3(g, safePalermo[1], strength));
+        data[idx + 2] = clamp015(mix3(b, safePalermo[2], strength));
       }
     }
   }
@@ -3524,14 +3615,14 @@ function applyStoneFingerprintTransform(sourceCube) {
         const sourceB = sourceCube.data[idx + 2];
         const inputLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         const inputChroma = Math.max(r, g, b) - Math.min(r, g, b);
-        const neutralWeight = 1 - smoothstep2(0.025, 0.18, inputChroma);
-        const shadowWeight = 1 - smoothstep2(0.1, 0.42, inputLuma);
-        const midWeight = smoothstep2(0.18, 0.62, inputLuma) * (1 - smoothstep2(0.72, 0.95, inputLuma));
-        const highlightProtect = 1 - smoothstep2(0.76, 0.98, inputLuma);
+        const neutralWeight = 1 - smoothstep3(0.025, 0.18, inputChroma);
+        const shadowWeight = 1 - smoothstep3(0.1, 0.42, inputLuma);
+        const midWeight = smoothstep3(0.18, 0.62, inputLuma) * (1 - smoothstep3(0.72, 0.95, inputLuma));
+        const highlightProtect = 1 - smoothstep3(0.76, 0.98, inputLuma);
         const cool = neutralWeight * highlightProtect;
-        data[idx + 0] = clamp014(sourceR * (1 - 0.012 * cool) - 2e-3 * shadowWeight);
-        data[idx + 1] = clamp014(sourceG * (1 + 3e-3 * cool * midWeight));
-        data[idx + 2] = clamp014(sourceB * (1 + 0.014 * cool * midWeight));
+        data[idx + 0] = clamp015(sourceR * (1 - 0.012 * cool) - 2e-3 * shadowWeight);
+        data[idx + 1] = clamp015(sourceG * (1 + 3e-3 * cool * midWeight));
+        data[idx + 2] = clamp015(sourceB * (1 + 0.014 * cool * midWeight));
       }
     }
   }
@@ -3553,10 +3644,10 @@ function applyUrbanCoolDensityTransform(sourceCube) {
         const sourceB = sourceCube.data[idx + 2];
         const inputLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         const inputChroma = Math.max(r, g, b) - Math.min(r, g, b);
-        const shadowWeight = 1 - smoothstep2(0.05, 0.45, inputLuma);
-        const midWeight = smoothstep2(0.18, 0.5, inputLuma) * (1 - smoothstep2(0.65, 0.92, inputLuma));
-        const highlightWeight = smoothstep2(0.78, 0.96, inputLuma);
-        const neutralMask = 1 - smoothstep2(0.02, 0.22, inputChroma);
+        const shadowWeight = 1 - smoothstep3(0.05, 0.45, inputLuma);
+        const midWeight = smoothstep3(0.18, 0.5, inputLuma) * (1 - smoothstep3(0.65, 0.92, inputLuma));
+        const highlightWeight = smoothstep3(0.78, 0.96, inputLuma);
+        const neutralMask = 1 - smoothstep3(0.02, 0.22, inputChroma);
         const coolStrength = shadowWeight * 0.12 + midWeight * neutralMask * 0.075;
         const greenCastStrength = midWeight * neutralMask * 0.035;
         const shadowLift = shadowWeight * 0.028;
@@ -3564,9 +3655,9 @@ function applyUrbanCoolDensityTransform(sourceCube) {
         const newR = sourceR * (1 - coolStrength * 1.05 - highlightCool) + shadowLift * 0.7;
         const newG = sourceG * (1 + greenCastStrength) + shadowLift;
         const newB = sourceB * (1 + coolStrength * 1.3 + highlightCool * 0.5) + shadowLift * 1.1;
-        data[idx + 0] = clamp014(newR);
-        data[idx + 1] = clamp014(newG);
-        data[idx + 2] = clamp014(newB);
+        data[idx + 0] = clamp015(newR);
+        data[idx + 1] = clamp015(newG);
+        data[idx + 2] = clamp015(newB);
       }
     }
   }
@@ -3839,16 +3930,16 @@ function generateCubeForEntry(entry, size) {
     }
   }
 }
-function clamp015(v) {
+function clamp016(v) {
   return Math.min(Math.max(v, 0), 1);
 }
 function filmtoneSdrShoulder(linear) {
   const exposed = Math.max(0, linear * 1.18);
   const shoulder = exposed / (1 + Math.max(exposed - 0.18, 0) * 0.42);
-  return clamp015(shoulder);
+  return clamp016(shoulder);
 }
 function rec709Encode(linear) {
-  const value = clamp015(linear);
+  const value = clamp016(linear);
   if (value < 0.018) {
     return value * 4.5;
   }
@@ -4144,30 +4235,30 @@ var SHADOW_LATITUDE_CONSTANTS = {
   lumaGainMax: 0.22,
   chromaRetentionMax: 0.08
 };
-function clamp016(x) {
+function clamp017(x) {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
 }
-function smoothstep3(edge0, edge1, x) {
-  const t = clamp016((x - edge0) / (edge1 - edge0));
+function smoothstep4(edge0, edge1, x) {
+  const t = clamp017((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
 function shadowLatitudeLuma(rgb) {
   return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
 }
 function applyShadowLatitudeSample(rgb, amount, options = {}) {
-  const amt = clamp016(amount);
+  const amt = clamp017(amount);
   if (amt < 1e-3) {
     return rgb;
   }
   const c = SHADOW_LATITUDE_CONSTANTS;
   const y = shadowLatitudeLuma(rgb);
-  const blackProtect = smoothstep3(c.blackAnchor, c.mainBandStart, y);
-  const release = 1 - smoothstep3(c.mainBandEnd, c.releaseEnd, y);
+  const blackProtect = smoothstep4(c.blackAnchor, c.mainBandStart, y);
+  const release = 1 - smoothstep4(c.mainBandEnd, c.releaseEnd, y);
   const band = blackProtect * release;
   if (band <= 1e-6) {
-    return options.clampOutput ? { r: clamp016(rgb.r), g: clamp016(rgb.g), b: clamp016(rgb.b) } : rgb;
+    return options.clampOutput ? { r: clamp017(rgb.r), g: clamp017(rgb.g), b: clamp017(rgb.b) } : rgb;
   }
   const toeShape = Math.max(0, 1 - y / c.releaseEnd);
   const lumaLift = y * toeShape * c.lumaGainMax * amt * band;
@@ -4178,7 +4269,7 @@ function applyShadowLatitudeSample(rgb, amount, options = {}) {
     g: outY + (rgb.g - y) * chromaScale,
     b: outY + (rgb.b - y) * chromaScale
   };
-  return options.clampOutput ? { r: clamp016(out.r), g: clamp016(out.g), b: clamp016(out.b) } : out;
+  return options.clampOutput ? { r: clamp017(out.r), g: clamp017(out.g), b: clamp017(out.b) } : out;
 }
 
 // src/source-detail-compensation.ts
@@ -4349,6 +4440,7 @@ export {
   DETAIL_SOFTNESS_EFFECTIVE_MAX,
   FILMTONE_DEFAULT_BASE_PRESET,
   FILMTONE_SOFT_FINISH_PATCH,
+  FILM_BREATH_ZERO_OFFSETS,
   FILM_COMPRESSION_V3_CONSTANTS,
   FILM_GRAIN_INTENSITY_MAX,
   FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -4420,6 +4512,7 @@ export {
   createIosPhase0SerializableLut,
   createPhase0ProjectState,
   deriveDetailSoftnessUniforms,
+  deriveFilmBreathOffsets,
   deserializeCubeLutData,
   diagonalMaxDelta,
   filmCompressionChromaMagnitude,
