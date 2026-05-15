@@ -78,6 +78,16 @@ export const PARAM_KEYS = [
   "shadowTone",
   /** Toe separation amount（0=off、1=max）。Deep black anchor is preserved. */
   "shadowLatitude",
+  /** 黒の床位置（-1=深黒 Baselight Flare、0=neutral、+1=milky lift）。bi-directional。
+   *  正方向は shadow-masked additive lift（最大 +0.18）。負方向は Baselight Base
+   *  Grade Flare 型 `y = x²(1+f)/(x+f)`（0 anchor smooth、x=1 不変、負値リスクなし）。
+   *  baseGradeV2 内 fade 直前で適用。range: -1..+1 */
+  "blackPoint",
+  /** 黒 anchor 近傍 (0..0.15) の局所 power-curve（0=off、1=max）。0 を anchor 保持で
+   *  「黒の硬さ」を増やす。Baselight Black Soft Clip / Color Finale Toe 系。
+   *  baseGradeV2 内、blackPoint より前で適用（blackPoint=+1 と toe=1 を独立に
+   *  操作可能にするため）。range: 0..1 */
+  "toeContrast",
   "highlightTone",
   "shadowHue",
   "highlightHue",
@@ -242,6 +252,10 @@ export interface Params {
   shadowTone: number;
   /** 黒の芯を固定したまま暗部中間の分離を戻す toe separation（0〜1）。 */
   shadowLatitude: number;
+  /** 黒の床位置（-1=深黒 Baselight Flare、0=neutral、+1=milky lift）。range: -1..+1 */
+  blackPoint: number;
+  /** 黒 anchor 近傍の局所 power-curve（0=off、1=max）。0 anchor 保持。range: 0..1 */
+  toeContrast: number;
   highlightTone: number;
   /** シャドウスプリットトーンの色相（度 0〜360） */
   shadowHue: number;

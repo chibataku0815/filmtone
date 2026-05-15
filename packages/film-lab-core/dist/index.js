@@ -76,6 +76,16 @@ var PARAM_KEYS = [
   "shadowTone",
   /** Toe separation amount（0=off、1=max）。Deep black anchor is preserved. */
   "shadowLatitude",
+  /** 黒の床位置（-1=深黒 Baselight Flare、0=neutral、+1=milky lift）。bi-directional。
+   *  正方向は shadow-masked additive lift（最大 +0.18）。負方向は Baselight Base
+   *  Grade Flare 型 `y = x²(1+f)/(x+f)`（0 anchor smooth、x=1 不変、負値リスクなし）。
+   *  baseGradeV2 内 fade 直前で適用。range: -1..+1 */
+  "blackPoint",
+  /** 黒 anchor 近傍 (0..0.15) の局所 power-curve（0=off、1=max）。0 を anchor 保持で
+   *  「黒の硬さ」を増やす。Baselight Black Soft Clip / Color Finale Toe 系。
+   *  baseGradeV2 内、blackPoint より前で適用（blackPoint=+1 と toe=1 を独立に
+   *  操作可能にするため）。range: 0..1 */
+  "toeContrast",
   "highlightTone",
   "shadowHue",
   "highlightHue",
@@ -308,6 +318,8 @@ var RAW_PRESETS = {
     shadows: 0,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -370,6 +382,8 @@ var RAW_PRESETS = {
     shadows: -0.11,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -428,6 +442,8 @@ var RAW_PRESETS = {
     shadows: 0.1,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -486,6 +502,8 @@ var RAW_PRESETS = {
     shadows: 0,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -544,6 +562,8 @@ var RAW_PRESETS = {
     shadows: 0.15,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -602,6 +622,8 @@ var RAW_PRESETS = {
     shadows: -0.1,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -660,6 +682,8 @@ var RAW_PRESETS = {
     shadows: -0.1,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -718,6 +742,8 @@ var RAW_PRESETS = {
     shadows: 0.05,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -776,6 +802,8 @@ var RAW_PRESETS = {
     shadows: 0,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -838,6 +866,8 @@ var RAW_PRESETS = {
     shadows: -0.16,
     shadowTone: 0.18,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0.12,
     shadowHue: 225,
     highlightHue: 214,
@@ -901,6 +931,8 @@ var RAW_PRESETS = {
     shadows: -0.05,
     shadowTone: 0,
     shadowLatitude: 0,
+    blackPoint: 0,
+    toeContrast: 0,
     highlightTone: 0,
     shadowHue: FILM_LAB_DEFAULT_SHADOW_HUE,
     highlightHue: FILM_LAB_DEFAULT_HIGHLIGHT_HUE,
@@ -993,7 +1025,7 @@ var LOOK_ID_BY_PRESET = {
 // src/schema.ts
 import { z } from "zod";
 function schemaForParamKey(key) {
-  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" || key === "shadowLatitude" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
+  return key === "grainIntensity" ? z.number().min(0).transform(clampGrainIntensity) : key === "grainRadialMix" ? z.number().min(0).max(1).default(1) : key === "grainSize" ? z.number().min(0).max(1).default(0.3) : key === "diffusion" ? z.number().min(0).max(1).default(0) : key === "depthMistGain" || key === "depthGlowGain" ? z.number().min(0).max(1).default(0) : key === "depthRayAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "depthRayAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "depthMistRayAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "depthBloomRayAngleGain" ? z.number().min(0).max(1).default(0.25) : key === "depthHalationRayAngleGain" ? z.number().min(0).max(1).default(0.18) : key === "depthMistFieldPsfGain" || key === "depthBloomFieldPsfGain" || key === "depthHalationFieldPsfGain" ? z.number().min(0).max(1).default(1) : key === "depthMistFieldPsfRadiusPx" ? z.number().min(0).max(64).default(18) : key === "depthBloomFieldPsfRadiusPx" ? z.number().min(0).max(64).default(9) : key === "depthHalationFieldPsfRadiusPx" ? z.number().min(0).max(64).default(12) : key === "lensSoftness" ? z.number().min(0).max(1).default(0) : key === "detailSoftness" || key === "shadowLatitude" ? z.number().min(0).max(1).default(0) : key === "blackPoint" ? z.number().min(-1).max(1).default(0) : key === "toeContrast" ? z.number().min(0).max(1).default(0) : key === "opticalDirectTransmission" ? z.number().min(0).max(1).default(1) : key === "opticalBlackRetention" ? z.number().min(0).max(1).default(1) : key === "opticalScatterStrength" || key === "opticalHighlightReactivity" || key === "opticalWarmScatter" || key === "opticalSpectralTail" ? z.number().min(0).max(1).default(0) : key === "compressionRange" ? z.number().min(0).max(1).default(0.5) : key === "compressionAmount" || key === "printContrast" ? z.number().min(0).max(1).default(0) : key === "cyan" || key === "magenta" || key === "yellow" ? z.number().min(-1).max(1).default(0) : key === "shutterAngle" ? z.number().min(0).max(720).default(0) : key === "trailIntensity" ? z.number().min(0).max(0.95).default(0) : key === "motionBlurAmount" || key === "dustAmount" || key === "scratchAmount" ? z.number().min(0).max(1).default(0) : key === "shaftIntensity" ? z.number().min(0).max(1).default(0) : key === "shaftDecay" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginX" ? z.number().min(0).max(1).default(0.5) : key === "shaftOriginY" ? z.number().min(0).max(1).default(0.15) : key === "crossFilterStrength" ? z.number().min(0).max(1).default(0) : key === "crossFilterSpikes" ? z.number().min(4).max(8).default(4) : key === "crossFilterAngle" ? z.number().min(0).max(360).default(0) : key === "crossFilterLength" ? z.number().min(0).max(1).default(0.4) : key === "crossFilterThreshold" ? z.number().min(0).max(1).default(0.92) : key === "crossFilterChromatic" ? z.number().min(0).max(1).default(0.3) : key === "crossFilterSizeLimit" ? z.number().min(0).max(1).default(0) : key === "crossFilterRandomness" ? z.number().min(0).max(1).default(1) : key === "crossFilterHardMode" ? z.number().min(0).max(1).default(1) : key === "crossFilterMinSpacing" ? z.number().min(0).max(2).default(1) : key === "crossFilterDepthGain" ? z.number().min(0).max(1).default(0.25) : key === "crossFilterAngleGain" ? z.number().min(0).max(1).default(0.35) : key === "crossFilterAngleGamma" ? z.number().min(0.1).max(4).default(1.4) : key === "crossFilterAngleInnerThreshold" ? z.number().min(0).max(0.8).default(0.1) : key === "crossFilterEdgeLengthGain" ? z.number().min(0).max(1).default(0.45) : key === "crossFilterEdgeStrengthGain" ? z.number().min(0).max(1).default(0.25) : key === "haloPrismStrength" ? z.number().min(0).max(1).default(0) : key === "haloPrismRadius" ? z.number().min(0).max(1).default(0.62) : key === "haloPrismWidth" ? z.number().min(0).max(1).default(0.22) : key === "haloPrismChromatic" ? z.number().min(0).max(1).default(0.65) : key === "haloPrismThreshold" ? z.number().min(0).max(1).default(0.9) : key === "haloPrismSplit" ? z.number().min(0).max(1).default(0.7) : key === "haloPrismAngle" ? z.number().min(0).max(360).default(0) : key === "haloPrismSourceReactivity" ? z.number().min(0).max(1).default(0.85) : z.number();
 }
 var paramShape = Object.fromEntries(
   PARAM_KEYS.map((key) => [key, schemaForParamKey(key)])
@@ -1341,6 +1373,8 @@ var PHASE0_PARAM_KEYS = [
   "fade",
   "shadowTone",
   "shadowLatitude",
+  "blackPoint",
+  "toeContrast",
   "highlightTone",
   "shadowHue",
   "highlightHue",
@@ -1397,6 +1431,8 @@ var phase0ParamsSchema = z3.object({
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   shadowTone: z3.number().min(0).max(1).default(PRESETS.reset.shadowTone),
   shadowLatitude: z3.number().min(0).max(1).default(PRESETS.reset.shadowLatitude),
+  blackPoint: z3.number().min(-1).max(1).default(PRESETS.reset.blackPoint),
+  toeContrast: z3.number().min(0).max(1).default(PRESETS.reset.toeContrast),
   highlightTone: z3.number().min(0).max(1).default(PRESETS.reset.highlightTone),
   shadowHue: z3.number().min(0).max(360).default(PRESETS.reset.shadowHue),
   highlightHue: z3.number().min(0).max(360).default(PRESETS.reset.highlightHue),
@@ -1436,6 +1472,8 @@ var phase0ParamsPatchSchema = z3.object({
   fade: z3.number().min(0).max(1).optional(),
   shadowTone: z3.number().min(0).max(1).optional(),
   shadowLatitude: z3.number().min(0).max(1).optional(),
+  blackPoint: z3.number().min(-1).max(1).optional(),
+  toeContrast: z3.number().min(0).max(1).optional(),
   highlightTone: z3.number().min(0).max(1).optional(),
   shadowHue: z3.number().min(0).max(360).optional(),
   highlightHue: z3.number().min(0).max(360).optional(),
@@ -3026,6 +3064,10 @@ function clamp013(x) {
   if (x > 1) return 1;
   return x;
 }
+function smoothstep2(edge0, edge1, x) {
+  const t = clamp013((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
 function clampedRGB(rgb) {
   return { r: clamp013(rgb.r), g: clamp013(rgb.g), b: clamp013(rgb.b) };
 }
@@ -3035,6 +3077,8 @@ var BAKE_COLOR_PARAM_KEYS = [
   "saturation",
   "temperature",
   "tint",
+  "toeContrast",
+  "blackPoint",
   "fade",
   "compressionAmount",
   "compressionRange",
@@ -3049,6 +3093,8 @@ var BAKE_COLOR_IDENTITY = {
   saturation: 1,
   temperature: 0,
   tint: 0,
+  toeContrast: 0,
+  blackPoint: 0,
   fade: 0,
   compressionAmount: 0,
   compressionRange: 0.5,
@@ -3064,6 +3110,8 @@ function pickBakeColorParams(params) {
     saturation: params.saturation,
     temperature: params.temperature,
     tint: params.tint,
+    toeContrast: params.toeContrast,
+    blackPoint: params.blackPoint,
     fade: params.fade,
     compressionAmount: params.compressionAmount,
     compressionRange: params.compressionRange,
@@ -3093,6 +3141,38 @@ function applyBaseGrade(rgb, params) {
   r += params.tint * 0.05;
   g -= params.tint * 0.08;
   b += params.tint * 0.05;
+  const lumaTB = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (params.toeContrast > 1e-4) {
+    const toeMaskAmt = (1 - smoothstep2(0, 0.15, lumaTB)) * params.toeContrast;
+    if (toeMaskAmt > 0) {
+      const exponent = 1 + toeMaskAmt * 1.5;
+      const tR = Math.pow(Math.max(r, 0), exponent);
+      const tG = Math.pow(Math.max(g, 0), exponent);
+      const tB = Math.pow(Math.max(b, 0), exponent);
+      r = mix2(r, tR, toeMaskAmt);
+      g = mix2(g, tG, toeMaskAmt);
+      b = mix2(b, tB, toeMaskAmt);
+    }
+  }
+  const bpPos = Math.max(params.blackPoint, 0);
+  const bpNeg = Math.max(-params.blackPoint, 0);
+  if (bpPos > 1e-4) {
+    const luma2 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const shadowMaskBp = 1 - smoothstep2(0, 0.35, luma2);
+    const lift = bpPos * 0.18 * shadowMaskBp;
+    r += lift;
+    g += lift;
+    b += lift;
+  }
+  if (bpNeg > 1e-4) {
+    const f = bpNeg * 0.15;
+    const xR = Math.max(r, 0);
+    const xG = Math.max(g, 0);
+    const xB = Math.max(b, 0);
+    r = xR * xR * (1 + f) / (xR + f);
+    g = xG * xG * (1 + f) / (xG + f);
+    b = xB * xB * (1 + f) / (xB + f);
+  }
   r = r + params.fade * (1 - r);
   g = g + params.fade * (1 - g);
   b = b + params.fade * (1 - b);
@@ -3350,7 +3430,7 @@ function clamp014(x) {
   if (x > 1) return 1;
   return x;
 }
-function smoothstep2(edge0, edge1, x) {
+function smoothstep3(edge0, edge1, x) {
   const t = clamp014((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
@@ -3431,7 +3511,7 @@ function protectShadowFloor(input, output) {
   const inputLuma = luma(input[0], input[1], input[2]);
   const outputLuma = luma(output[0], output[1], output[2]);
   if (inputLuma >= 0.26 || outputLuma <= 1e-4) return output;
-  const shadowMask = 1 - smoothstep2(0.08, 0.26, inputLuma);
+  const shadowMask = 1 - smoothstep3(0.08, 0.26, inputLuma);
   const maxLift = 4e-3 + inputLuma * (1.05 + 0.18 * (1 - shadowMask));
   if (outputLuma <= maxLift) return output;
   const scale = mix3(1, maxLift / outputLuma, shadowMask);
@@ -3443,25 +3523,25 @@ function protectShadowFloor(input, output) {
 }
 function dominantGreenMask(r, g, b, inputLuma) {
   const dominance = g - Math.max(r, b);
-  const lumaGate = smoothstep2(0.12, 0.32, inputLuma) * (1 - smoothstep2(0.68, 0.9, inputLuma));
-  return smoothstep2(0.035, 0.22, dominance) * lumaGate;
+  const lumaGate = smoothstep3(0.12, 0.32, inputLuma) * (1 - smoothstep3(0.68, 0.9, inputLuma));
+  return smoothstep3(0.035, 0.22, dominance) * lumaGate;
 }
 function cyanSkyMask(r, g, b, inputLuma) {
   const blueDominance = b - r;
   const cyanBody = Math.min(b - g * 0.72, g - r * 0.58);
-  const lumaGate = smoothstep2(0.22, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
-  return smoothstep2(0.08, 0.36, blueDominance) * smoothstep2(0.06, 0.28, cyanBody) * lumaGate;
+  const lumaGate = smoothstep3(0.22, 0.42, inputLuma) * (1 - smoothstep3(0.88, 1, inputLuma));
+  return smoothstep3(0.08, 0.36, blueDominance) * smoothstep3(0.06, 0.28, cyanBody) * lumaGate;
 }
 function warmSkinMask(r, g, b, inputLuma) {
-  const warmOrder = smoothstep2(0.035, 0.18, r - g) * smoothstep2(0.025, 0.16, g - b);
-  const lumaGate = smoothstep2(0.2, 0.42, inputLuma) * (1 - smoothstep2(0.76, 0.94, inputLuma));
-  const saturationGuard = 1 - smoothstep2(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
+  const warmOrder = smoothstep3(0.035, 0.18, r - g) * smoothstep3(0.025, 0.16, g - b);
+  const lumaGate = smoothstep3(0.2, 0.42, inputLuma) * (1 - smoothstep3(0.76, 0.94, inputLuma));
+  const saturationGuard = 1 - smoothstep3(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
   return warmOrder * lumaGate * saturationGuard;
 }
 function applyStonePalermoSignature(input, output) {
   const inputLuma = luma(input[0], input[1], input[2]);
   const inputChroma = Math.max(input[0], input[1], input[2]) - Math.min(input[0], input[1], input[2]);
-  const neutralMask = (1 - smoothstep2(0.025, 0.2, inputChroma)) * smoothstep2(0.12, 0.42, inputLuma) * (1 - smoothstep2(0.88, 1, inputLuma));
+  const neutralMask = (1 - smoothstep3(0.025, 0.2, inputChroma)) * smoothstep3(0.12, 0.42, inputLuma) * (1 - smoothstep3(0.88, 1, inputLuma));
   const skinMask = warmSkinMask(input[0], input[1], input[2], inputLuma);
   const skyMask = cyanSkyMask(input[0], input[1], input[2], inputLuma);
   const greenMask = dominantGreenMask(input[0], input[1], input[2], inputLuma);
@@ -3499,7 +3579,7 @@ function applyStoneDisplayPalermoTransform(sourceCube) {
         const signedPalermo = applyStonePalermoSignature(input, palermo);
         const safePalermo = protectShadowFloor(input, signedPalermo);
         const inputLuma = luma(r, g, b);
-        const strength = smoothstep2(0.025, 0.12, inputLuma);
+        const strength = smoothstep3(0.025, 0.12, inputLuma);
         data[idx + 0] = clamp014(mix3(r, safePalermo[0], strength));
         data[idx + 1] = clamp014(mix3(g, safePalermo[1], strength));
         data[idx + 2] = clamp014(mix3(b, safePalermo[2], strength));
@@ -3524,10 +3604,10 @@ function applyStoneFingerprintTransform(sourceCube) {
         const sourceB = sourceCube.data[idx + 2];
         const inputLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         const inputChroma = Math.max(r, g, b) - Math.min(r, g, b);
-        const neutralWeight = 1 - smoothstep2(0.025, 0.18, inputChroma);
-        const shadowWeight = 1 - smoothstep2(0.1, 0.42, inputLuma);
-        const midWeight = smoothstep2(0.18, 0.62, inputLuma) * (1 - smoothstep2(0.72, 0.95, inputLuma));
-        const highlightProtect = 1 - smoothstep2(0.76, 0.98, inputLuma);
+        const neutralWeight = 1 - smoothstep3(0.025, 0.18, inputChroma);
+        const shadowWeight = 1 - smoothstep3(0.1, 0.42, inputLuma);
+        const midWeight = smoothstep3(0.18, 0.62, inputLuma) * (1 - smoothstep3(0.72, 0.95, inputLuma));
+        const highlightProtect = 1 - smoothstep3(0.76, 0.98, inputLuma);
         const cool = neutralWeight * highlightProtect;
         data[idx + 0] = clamp014(sourceR * (1 - 0.012 * cool) - 2e-3 * shadowWeight);
         data[idx + 1] = clamp014(sourceG * (1 + 3e-3 * cool * midWeight));
@@ -3553,10 +3633,10 @@ function applyUrbanCoolDensityTransform(sourceCube) {
         const sourceB = sourceCube.data[idx + 2];
         const inputLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
         const inputChroma = Math.max(r, g, b) - Math.min(r, g, b);
-        const shadowWeight = 1 - smoothstep2(0.05, 0.45, inputLuma);
-        const midWeight = smoothstep2(0.18, 0.5, inputLuma) * (1 - smoothstep2(0.65, 0.92, inputLuma));
-        const highlightWeight = smoothstep2(0.78, 0.96, inputLuma);
-        const neutralMask = 1 - smoothstep2(0.02, 0.22, inputChroma);
+        const shadowWeight = 1 - smoothstep3(0.05, 0.45, inputLuma);
+        const midWeight = smoothstep3(0.18, 0.5, inputLuma) * (1 - smoothstep3(0.65, 0.92, inputLuma));
+        const highlightWeight = smoothstep3(0.78, 0.96, inputLuma);
+        const neutralMask = 1 - smoothstep3(0.02, 0.22, inputChroma);
         const coolStrength = shadowWeight * 0.12 + midWeight * neutralMask * 0.075;
         const greenCastStrength = midWeight * neutralMask * 0.035;
         const shadowLift = shadowWeight * 0.028;
@@ -3606,6 +3686,8 @@ var CREATIVE_PACK_01_LOOKS = [
       saturation: 1,
       temperature: 0,
       tint: 0,
+      toeContrast: 0,
+      blackPoint: 0,
       fade: 0,
       compressionAmount: 0,
       compressionRange: 0.5,
@@ -3641,6 +3723,8 @@ var CREATIVE_PACK_01_LOOKS = [
       saturation: 1,
       temperature: 0,
       tint: 0,
+      toeContrast: 0,
+      blackPoint: 0,
       fade: 0,
       compressionAmount: 0,
       compressionRange: 0.5,
@@ -3676,6 +3760,8 @@ var CREATIVE_PACK_01_LOOKS = [
       saturation: 0.012,
       temperature: 0.015,
       tint: -0.055,
+      toeContrast: 0,
+      blackPoint: 0,
       fade: 0.022,
       compressionAmount: 0.38,
       compressionRange: 0.56,
@@ -4149,7 +4235,7 @@ function clamp016(x) {
   if (x > 1) return 1;
   return x;
 }
-function smoothstep3(edge0, edge1, x) {
+function smoothstep4(edge0, edge1, x) {
   const t = clamp016((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
 }
@@ -4163,8 +4249,8 @@ function applyShadowLatitudeSample(rgb, amount, options = {}) {
   }
   const c = SHADOW_LATITUDE_CONSTANTS;
   const y = shadowLatitudeLuma(rgb);
-  const blackProtect = smoothstep3(c.blackAnchor, c.mainBandStart, y);
-  const release = 1 - smoothstep3(c.mainBandEnd, c.releaseEnd, y);
+  const blackProtect = smoothstep4(c.blackAnchor, c.mainBandStart, y);
+  const release = 1 - smoothstep4(c.mainBandEnd, c.releaseEnd, y);
   const band = blackProtect * release;
   if (band <= 1e-6) {
     return options.clampOutput ? { r: clamp016(rgb.r), g: clamp016(rgb.g), b: clamp016(rgb.b) } : rgb;

@@ -3,9 +3,16 @@
  *
  * Implements Stages 2 (baseGrade), 3 (filmCompression), and 9 (printStage) of
  * the Filmtone iOS export pipeline as a pure function on a single Rec.709 RGB
- * triple. 12 color-only ops total: exposure / contrast / saturation /
- * temperature / tint / fade / compressionAmount / compressionRange /
- * printContrast / cyan / magenta / yellow.
+ * triple. 14 color-only ops total: exposure / contrast / saturation /
+ * temperature / tint / toeContrast / blackPoint / fade / compressionAmount /
+ * compressionRange / printContrast / cyan / magenta / yellow.
+ *
+ * NOTE: this baker is an APPROXIMATION of baseGradeV2 — it does not implement
+ * the 3-piece contrast curve, the crosstalk split-tone, or the shadow-only
+ * fade mask. New ops (toeContrast / blackPoint) are inserted in the position
+ * matching the CIKL `baseGradeV2` (just before fade) but otherwise the baker's
+ * fidelity to the GPU pipeline is approximate. Full parity is tracked as a
+ * separate lane (see plans/worktree-recursive-badger.md "Follow-up").
  *
  * This TS implementation is the canonical reference for the Swift port shipped
  * via the v1.4 in-app "Look → .cube export" lane. Both must produce
@@ -41,6 +48,12 @@ function clamp01(x: number): number {
   return x;
 }
 
+/** GLSL-style smoothstep. Matches CIKL `smoothstep(edge0, edge1, x)`. */
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
 /** Rec.709 luminance. Matches `RGB.luma` extension in Swift. */
 function luma(rgb: RGB): number {
   return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
@@ -51,7 +64,7 @@ function clampedRGB(rgb: RGB): RGB {
 }
 
 /**
- * Pull only the 12 color-only fields from a full `Phase0Params`. Used to make
+ * Pull only the 14 color-only fields from a full `Phase0Params`. Used to make
  * the baker contract independent from spatial fields (halation / bloom /
  * grain / vignette) that cannot be expressed in a 3D color cube.
  */
@@ -61,6 +74,8 @@ export interface BakeColorParams {
   saturation: number;
   temperature: number;
   tint: number;
+  toeContrast: number;
+  blackPoint: number;
   fade: number;
   compressionAmount: number;
   compressionRange: number;
@@ -76,6 +91,8 @@ export const BAKE_COLOR_PARAM_KEYS = [
   "saturation",
   "temperature",
   "tint",
+  "toeContrast",
+  "blackPoint",
   "fade",
   "compressionAmount",
   "compressionRange",
@@ -96,6 +113,8 @@ export const BAKE_COLOR_IDENTITY: BakeColorParams = {
   saturation: 1,
   temperature: 0,
   tint: 0,
+  toeContrast: 0,
+  blackPoint: 0,
   fade: 0,
   compressionAmount: 0,
   compressionRange: 0.5,
@@ -114,6 +133,8 @@ export function pickBakeColorParams(
     saturation: params.saturation,
     temperature: params.temperature,
     tint: params.tint,
+    toeContrast: params.toeContrast,
+    blackPoint: params.blackPoint,
     fade: params.fade,
     compressionAmount: params.compressionAmount,
     compressionRange: params.compressionRange,
@@ -149,6 +170,41 @@ function applyBaseGrade(rgb: RGB, params: BakeColorParams): RGB {
   r += params.tint * 0.05;
   g -= params.tint * 0.08;
   b += params.tint * 0.05;
+
+  // === toe contrast → black point (fade 直前位置、CIKL baseGradeV2 と同位置) ===
+  // 順序: toe 先 → blackPoint 後。blackPoint=+1 と toe=1 を独立に操作可能にするため。
+  const lumaTB = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (params.toeContrast > 0.0001) {
+    const toeMaskAmt = (1 - smoothstep(0, 0.15, lumaTB)) * params.toeContrast;
+    if (toeMaskAmt > 0) {
+      const exponent = 1 + toeMaskAmt * 1.5;
+      const tR = Math.pow(Math.max(r, 0), exponent);
+      const tG = Math.pow(Math.max(g, 0), exponent);
+      const tB = Math.pow(Math.max(b, 0), exponent);
+      r = mix(r, tR, toeMaskAmt);
+      g = mix(g, tG, toeMaskAmt);
+      b = mix(b, tB, toeMaskAmt);
+    }
+  }
+  const bpPos = Math.max(params.blackPoint, 0);
+  const bpNeg = Math.max(-params.blackPoint, 0);
+  if (bpPos > 0.0001) {
+    const luma2 = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const shadowMaskBp = 1 - smoothstep(0, 0.35, luma2);
+    const lift = bpPos * 0.18 * shadowMaskBp;
+    r += lift;
+    g += lift;
+    b += lift;
+  }
+  if (bpNeg > 0.0001) {
+    const f = bpNeg * 0.15;
+    const xR = Math.max(r, 0);
+    const xG = Math.max(g, 0);
+    const xB = Math.max(b, 0);
+    r = (xR * xR * (1 + f)) / (xR + f);
+    g = (xG * xG * (1 + f)) / (xG + f);
+    b = (xB * xB * (1 + f)) / (xB + f);
+  }
 
   r = r + params.fade * (1 - r);
   g = g + params.fade * (1 - g);

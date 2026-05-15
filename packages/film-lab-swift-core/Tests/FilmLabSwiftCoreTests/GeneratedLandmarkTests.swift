@@ -6,7 +6,7 @@ import FilmLabSwiftCore
 /// or accidental hand-edits of the generated Swift artifact.
 final class GeneratedLandmarkTests: XCTestCase {
     func testParamKeysCountAndOrder() {
-        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 37)
+        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 39)
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.first, "exposure")
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.last, "grainIntensity")
 
@@ -17,6 +17,8 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("bloomStrength"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("halationIntensity"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("shadowLatitude"))
+        XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("blackPoint"))
+        XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("toeContrast"))
         XCTAssertTrue(FilmtonePhase0Generated.paramKeys.contains("vignette"))
 
         // detailSoftness lands immediately after lensSoftness in the canonical
@@ -37,6 +39,23 @@ final class GeneratedLandmarkTests: XCTestCase {
         if let shadowToneIndex, let shadowLatitudeIndex {
             XCTAssertEqual(shadowLatitudeIndex, shadowToneIndex + 1)
         }
+
+        // blackPoint / toeContrast land immediately after shadowLatitude:
+        // contiguous black-shaping group (床位置 + 黒の硬さ).
+        let blackPointIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "blackPoint")
+        let toeContrastIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "toeContrast")
+        XCTAssertNotNil(blackPointIndex)
+        XCTAssertNotNil(toeContrastIndex)
+        if let shadowLatitudeIndex, let blackPointIndex, let toeContrastIndex {
+            XCTAssertEqual(blackPointIndex, shadowLatitudeIndex + 1)
+            XCTAssertEqual(toeContrastIndex, blackPointIndex + 1)
+        }
+    }
+
+    func testResetParamsBlackPointAndToeContrastAreZero() {
+        let r = FilmtonePhase0Generated.resetParams
+        XCTAssertEqual(r.blackPoint, 0.0)
+        XCTAssertEqual(r.toeContrast, 0.0)
     }
 
     func testQuickAxisLandmarks() {

@@ -37,7 +37,7 @@ extension FilmtoneStrengthSheet {
             return .contrast
         case "saturation":
             return .saturation
-        case "temperature", "tint", "fade":
+        case "temperature", "tint", "fade", "blackPoint", "toeContrast":
             return .tone
         case "cyan", "magenta", "yellow":
             return .colorBalance
@@ -78,6 +78,8 @@ extension FilmtoneStrengthSheet {
                     control("temperature", range: -1...1),
                     control("tint", range: -1...1),
                     control("fade", range: 0...1),
+                    control("blackPoint", range: -1...1),
+                    control("toeContrast", range: 0...1),
                 ]
             ),
             .init(

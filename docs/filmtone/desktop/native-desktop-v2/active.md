@@ -1,119 +1,74 @@
-# Active — Twilight bundled built-in Look (iOS + macOS)
+# Active — Black Point + Toe Contrast 黒の床 / 黒の硬さ 2 key 追加 (iOS + macOS)
 
-Inserted 2026-05-12 as a short interrupt against M9 v1.7 release prep.
+Inserted 2026-05-15 JST as a short interrupt against the Twilight bundled
+Look lane (paused — see `paused/2026-05-15-twilight-bundled-look.md`).
 
 ## Goal
 
-Add a 4th bundled built-in Look — `Twilight` — to Filmtone's Look library
-on Native macOS Desktop AND iOS simultaneously. Twilight is a preset-only
-Look (no Creative LUT cube) sourced from
-`packages/film-lab-core/src/presets.ts:632-689` `vision3500t` (tungsten 500T
-blue-hour recipe). UI surface stays under the existing Look library
-(Stone / Urban / Noir + Twilight) — `Preset` is **not** exposed as a
-user-facing label per CLAUDE.md §6 term lock.
+Filmtone の baseGradeV2 grade pipeline に **黒浮き** 制御の 2 key を追加する:
 
-## Why a Look, not a "Preset" panel
+- `blackPoint` (Double, range `-1..+1`, default 0) — 黒の床位置。正で milky lift、負で Baselight Flare 型 `x²(1+f)/(x+f)` の深黒沈み込み。
+- `toeContrast` (Double, range `0..1`, default 0) — 黒 anchor 近傍 (0..0.15) の局所 power-curve。0 を anchor 保持で「黒の硬さ」を増やす。
 
-Internal classification: Twilight's body is a Preset (curve / grade
-foundation, not a Creative LUT Pack entry). But UI vocabulary is locked
-to `Look` for user-facing surfaces. Solution: bundled `SavedLookEntry`
-with `creativeLut: nil`, materialized into the existing Look strip /
-Look library menu. `EditorState.applySavedLook` keeps `lookSlug == nil`
-so the Creative LUT pipeline (`FilmtoneSidecarWriter` /
-`FilmtoneCreativeLutLoader` / `lookSlug` lookup sites) never sees
-Twilight.
+iOS + macOS 同時着地。preset 値は全 11 preset = `0, 0` で plumbing landing のみ。preset aesthetic tuning は別 lane。
 
-## Cross-Stream Visibility
+## Why this dial is missing today
 
-iOS and macOS land in one lane — no silent stream split. Twilight's
-canonical UUID `FB1A0001-0000-4000-8000-000000000011` is identical
-across both Swift catalogs; parity is verified with two independent
-greps (slug and UUID must each match in both `apps/` subtrees, since
-they sit on different lines in the Swift catalogs):
+- `fade` は white 加算で正方向のみ、黒を**沈める**方向にダイヤルが回せない
+- `shadowLatitude` は midtone separation、`compressionAmount` は意図的に shadows 保護、`printContrast` は global S-curve
+- 結果として深黒ルック (cinematic / bleach bypass / 高 contrast neg-print) は preset hardcode 依存 → user が dial で作れない
 
-```
-rg "filmtone-built-in-twilight" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos
-rg "FB1A0001-0000-4000-8000-000000000011" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos
-```
+業界調査: DaVinci Lift / Lightroom Blacks / **Baselight Base Grade Flare** (`y = x²(1+f)/(x+f)`、0 を smooth に anchor、x=1 不変、負値リスクなし) / Dehancer Print Density。実装は Lightroom 互換の命名で Baselight 級の数式品質を採用。
 
-## Native-supported subset (vs `vision3500t`)
+## Edit Targets
 
-`vision3500t` in `packages/film-lab-core/src/presets.ts:632-689` carries
-two keys that are **not** declared in
-`FilmtonePhase0Generated.paramKeys` and are therefore intentionally
-dropped from `twilightPatch` on both OSes:
+- `packages/film-lab-core/src/`: params, phase0-schema, schema, presets, creative-pack-01, bake-color-only, 4 tests
+- `packages/film-lab-swift-core/`: FilmtonePhase0Params + 2 tests
+- `apps/capacitor-film-lab-ios/`: kernel / pipeline / DTO / OpticsCompositor / sidecar / UI / strings / contract scripts / fixtures
+- `apps/filmtone-desktop-macos/`: kernel / pipeline / preset lerp / creative-pack catalog / sidecar / advanced adjust / strings / Verify
 
-- `highlights: -0.12`
-- `shadows: -0.16`
+詳細リストは `/Users/chibatakumi/.claude/plans/worktree-recursive-badger.md` の「触るファイル一覧」(~30 files) を参照。
 
-The native tone is reproduced via `shadowTone` / `highlightTone` /
-`compressionAmount` / `printContrast`. Extending Phase0 to carry
-`highlights` / `shadows` is **out of scope** for this bundled-Look lane
-(would touch the generated Phase0 contract, sidecar V1 readers, and
-every preset row). Track it under a separate lane if a future preset
-truly needs them.
+## Read-Only References
 
-## Edits landed
+- 業界調査と数式設計: 計画ファイル本文
+- `docs/filmtone/filmtone-copy-quality-harness.md` — UI string 文言 4 件追加時の guardrail
+- `apps/capacitor-film-lab-ios/CLAUDE.md` — pbxproj 4-section / Profile / Sidecar 不変条件
+- `paused/2026-05-15-twilight-bundled-look.md` — Twilight lane 復帰時の context
 
-- `apps/capacitor-film-lab-ios/ios/App/App/Look/FilmtoneBuiltInCatalog.swift`
-  — appended `BuiltInLook` (slug `filmtone-built-in-twilight`,
-  `creativeLut: nil`, `packId: nil`, `presetName: "reset"`) plus
-  `twilightPatch` static let and `BuiltInLookUUID.twilight`.
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneCreativePackCatalog.swift`
-  — added parallel `BuiltInPresetLook` struct + `presetOnlyLooks` array +
-  preset-only `materializeAsSavedLookEntry` overload + unified
-  `builtInSlug(canonicalUUID:)` and `materializeAnyBuiltIn(canonicalUUID:)`
-  helpers. Cube-bound `BuiltInLook` shape untouched.
-- `apps/filmtone-desktop-macos/FilmtoneDesktop/Color/FilmtoneSavedLookStore.swift`
-  — routed `deleteLook` / `renameLook` / `setFavorite` / `loadLook` /
-  `currentSnapshot` through the new unified helpers so Twilight is
-  immutable + favorite-able + loadable.
-- `apps/filmtone-desktop-macos/Verify/main.swift` — appended 5 Twilight
-  assertions (catalog registration, materialize creativeLut nil,
-  representative Phase0 values, unified helper resolution, sidecar
-  gradeParams + no creativeLut block).
+## Done Conditions
 
-## Stop conditions
+1. `bun run --cwd packages/film-lab-core test` green（既存 schema/payload テストが新 field を自動拾い + 明示 range/default test pass）
+2. `bun run generate:ios-swift --check` drift なし
+3. `swift test --package-path packages/film-lab-swift-core` green
+4. `bun run --cwd apps/capacitor-film-lab-ios verify:swift-contract` green
+5. `bun run --cwd apps/capacitor-film-lab-ios verify:baseGrade-v2` green
+6. `bun run verify:macos` green（CoreCatalogStoreStringTests の 32→34 controls 反映済み）
+7. `bun run verify:ios` green
+8. `bun run check:filmtone-context` green
+9. macOS / iOS Xcode で `blackPoint=±1` / `toeContrast=1` を回して視覚動作確認
 
-- iOS / macOS `canonicalUUID` mismatch (parity grep fails).
-- Cube-bound code path (`FilmtoneCreativeLutLoader` / `FilmtoneSidecarWriter`
-  `find(slug:)` sites) sees a Twilight slug.
-- `Verify/main.swift` Twilight assertions fail.
-- `bun run check:filmtone-context` flags doc / sync drift.
-- xcodebuild fails on either OS.
+## Verify Plan
 
-## Out of scope
+Step 6 終了時に上記 9 件を順次実行。途中で 1 件でも fail したら原因解決まで commit しない。視覚確認は user の最終判断。
 
-- New "Preset" UI label or panel.
-- `ios-preset-overrides.ts` edits / `FilmtonePhase0Generated.paramsByName`
-  expansion / `GeneratedLandmarkTests.swift` update.
-- iOS V2 capture / Gyroflow lane.
-- Web preset UI / Electron / legacy Desktop.
-- M9 release-prep scope change (logged as an Interrupt only).
-- portfolio submodule bump / App Store / release notes copy.
-- Native preview orientation bug.
+## Copy / History Impact
 
-## Unexpected / Follow-up
+UI string labels only — 「Black Point / 黒レベル」「Toe Contrast / 黒の硬さ」の 4 文字列追加（macOS + iOS）。release notes / blog / changelog は本 lane では作らない。
 
-- 2026-05-15 JST: Owner requested hiding the visible Desktop-only Imported
-  Grade / DaVinci PowerGrade import UI and the Twilight Look surface. Keep the
-  underlying runtime/catalog code available for internal compatibility, but
-  remove the current product entry points from Native Desktop UI.
-  Verification: `bash apps/filmtone-desktop-macos/Verify/run.sh` (144/144),
-  `bun run verify:desktop`, and `git diff --check` passed.
+## Article Opportunity
+
+Short post または Developer note 候補: 「黒の床」「fade と blackPoint の役割分担」「Baselight Flare の数式」。draft は本 lane では作らない、land 後に engaging-writing skill で。
+
+## Out of Scope
+
+- preset aesthetic tuning（cinematic / bw / portra 等の preset 値変更）
+- `FilmtoneExportSidecarBuilder.applyBaseGrade` の full baseGradeV2 parity 化
+- v1 kernel path への新 param 反映
+- Look catalog の **paramOverrides** / canonicalUUID / strength / sourceCubeTransform 変更（neutralization の `colorParams` のみ touch）
+- portfolio submodule bump（user 実行）
+- commit / push（CLAUDE.md §9 通り user 実行）
 
 ## Done
 
-Archive this file into `archive/2026-05-12-twilight-bundled-look.md` once
-both verification commands return clean:
-
-- `bash apps/filmtone-desktop-macos/Verify/run.sh`
-- `bun run check:filmtone-context`
-- Parity grep (run **both** — slug and UUID sit on different lines):
-  `rg "filmtone-built-in-twilight" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos`
-  and
-  `rg "FB1A0001-0000-4000-8000-000000000011" apps/capacitor-film-lab-ios apps/filmtone-desktop-macos`
-
-xcodebuild and Simulator visual confirmation are the user's call before
-the lane is fully closed (commit / push remains user-driven per
-CLAUDE.md §9).
+完了時は archive へ移動し、`strategy.md` に 1-3 行追記。Twilight Look lane (`paused/2026-05-15-twilight-bundled-look.md`) を active へ復帰させる。

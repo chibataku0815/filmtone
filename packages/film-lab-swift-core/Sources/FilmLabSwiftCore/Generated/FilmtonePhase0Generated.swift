@@ -5,7 +5,7 @@ public enum FilmtonePhase0Generated {
     public static let presetVersion = "v2"
     public static let presetDefault = "reset"
     public static let presetStrengthDefault = 1.0
-    public static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
+    public static let paramKeys: [String] = ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"]
     public static let quickAxisIds: [String] = ["filmCharacter", "era", "dynamics"]
     public static let quickAxisMin = -1.0
     public static let quickAxisMax = 1.0
@@ -61,6 +61,8 @@ public enum FilmtonePhase0Generated {
             fade: 0.0,
             shadowTone: 0.0,
             shadowLatitude: 0.0,
+            blackPoint: 0.0,
+            toeContrast: 0.0,
             highlightTone: 0.0,
             shadowHue: 180.0,
             highlightHue: 60.0,
@@ -101,6 +103,8 @@ public enum FilmtonePhase0Generated {
             fade: 0.0,
             shadowTone: 0.0,
             shadowLatitude: 0.0,
+            blackPoint: 0.0,
+            toeContrast: 0.0,
             highlightTone: 0.0,
             shadowHue: 180.0,
             highlightHue: 60.0,
@@ -140,6 +144,8 @@ public enum FilmtonePhase0Generated {
             fade: 0.04,
             shadowTone: 0.08,
             shadowLatitude: 0.0,
+            blackPoint: 0.0,
+            toeContrast: 0.0,
             highlightTone: 0.06,
             shadowHue: 220.0,
             highlightHue: 30.0,
@@ -179,6 +185,8 @@ public enum FilmtonePhase0Generated {
             fade: 0.1,
             shadowTone: 0.1,
             shadowLatitude: 0.0,
+            blackPoint: 0.0,
+            toeContrast: 0.0,
             highlightTone: 0.18,
             shadowHue: 30.0,
             highlightHue: 200.0,
@@ -218,6 +226,8 @@ public enum FilmtonePhase0Generated {
             fade: 0.04,
             shadowTone: 0.06,
             shadowLatitude: 0.0,
+            blackPoint: 0.0,
+            toeContrast: 0.0,
             highlightTone: 0.18,
             shadowHue: 30.0,
             highlightHue: 40.0,

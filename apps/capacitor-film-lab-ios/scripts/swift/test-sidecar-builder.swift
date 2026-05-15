@@ -599,7 +599,9 @@ struct TestSidecarBuilder {
                     compressionRange: 0, printContrast: 0, cyan: 0, magenta: 0,
                     yellow: 0, shutterAngle: 0, trailIntensity: 0,
                     fade: 0,
-                    shadowTone: 0, shadowLatitude: 0, highlightTone: 0,
+                    shadowTone: 0, shadowLatitude: 0,
+                    blackPoint: 0, toeContrast: 0,
+                    highlightTone: 0,
                     shadowHue: 225, highlightHue: 30,
                     vignette: 0.2, grainIntensity: 0.12
                 )
@@ -1259,7 +1261,9 @@ struct TestSidecarBuilder {
             compressionRange: 0, printContrast: 0, cyan: 0, magenta: 0,
             yellow: 0, shutterAngle: 0, trailIntensity: 0,
             fade: 0,
-            shadowTone: 0, shadowLatitude: 0, highlightTone: 0,
+            shadowTone: 0, shadowLatitude: 0,
+            blackPoint: 0, toeContrast: 0,
+            highlightTone: 0,
             shadowHue: 225, highlightHue: 30,
             vignette: 0, grainIntensity: 0
         )

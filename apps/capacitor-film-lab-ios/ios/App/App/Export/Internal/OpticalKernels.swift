@@ -40,7 +40,7 @@ kernel vec4 baseGrade(__sample image, float exposure, float contrast, float satu
     //   5) Fade: shadow-only mask (no highlight bleed) — strong fade only
     //      lifts the bottom of the curve, keeps highlight punch.
     static let baseGradeV2 = CIColorKernel(source: """
-kernel vec4 baseGradeV2(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade, float shadowTone, float highlightTone, float shadowHue, float highlightHue) {
+kernel vec4 baseGradeV2(__sample image, float exposure, float contrast, float saturation, float temperature, float tint, float fade, float shadowTone, float highlightTone, float shadowHue, float highlightHue, float blackPoint, float toeContrast) {
     vec4 color = image;
 
     // 1. Exposure
@@ -84,6 +84,27 @@ kernel vec4 baseGradeV2(__sample image, float exposure, float contrast, float sa
     ) * 0.3;
     color.rgb += shadowMaskCT * shadowTone * shadowChroma;
     color.rgb += highlightMaskCT * highlightTone * highlightChroma;
+
+    // 5.5 toeContrast → blackPoint (fade 直前位置)
+    // 順序: toe 先 → blackPoint 後。blackPoint=+1 と toe=1 を独立に操作可能にするため。
+    float lumaTB = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    if (toeContrast > 0.0001) {
+        float toeMaskAmt = (1.0 - smoothstep(0.0, 0.15, lumaTB)) * toeContrast;
+        vec3 toed = pow(max(color.rgb, vec3(0.0)), vec3(1.0 + toeMaskAmt * 1.5));
+        color.rgb = mix(color.rgb, toed, vec3(toeMaskAmt));
+    }
+    float bpPos = max(blackPoint, 0.0);
+    float bpNeg = max(-blackPoint, 0.0);
+    if (bpPos > 0.0001) {
+        float luma2 = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float shadowMaskBp = 1.0 - smoothstep(0.0, 0.35, luma2);
+        color.rgb += vec3(bpPos * 0.18 * shadowMaskBp);
+    }
+    if (bpNeg > 0.0001) {
+        float f = bpNeg * 0.15;
+        vec3 x = max(color.rgb, vec3(0.0));
+        color.rgb = x * x * (1.0 + f) / (x + vec3(f));
+    }
 
     // 6. Fade — shadow-only (no highlight bleed)
     float lumaFade = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));

@@ -254,6 +254,8 @@ enum FilmtonePresetCatalog {
             fade: mix(reset.fade, target.fade, t),
             shadowTone: mix(reset.shadowTone, target.shadowTone, t),
             shadowLatitude: mix(reset.shadowLatitude, target.shadowLatitude, t),
+            blackPoint: mix(reset.blackPoint, target.blackPoint, t),
+            toeContrast: mix(reset.toeContrast, target.toeContrast, t),
             highlightTone: mix(reset.highlightTone, target.highlightTone, t),
             shadowHue: mix(reset.shadowHue, target.shadowHue, t),
             highlightHue: mix(reset.highlightHue, target.highlightHue, t),

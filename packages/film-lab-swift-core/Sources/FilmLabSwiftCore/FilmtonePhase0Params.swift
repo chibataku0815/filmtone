@@ -33,6 +33,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
     public var fade: Double
     public var shadowTone: Double
     public var shadowLatitude: Double
+    public var blackPoint: Double
+    public var toeContrast: Double
     public var highlightTone: Double
     public var shadowHue: Double
     public var highlightHue: Double
@@ -72,6 +74,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         fade: Double,
         shadowTone: Double,
         shadowLatitude: Double,
+        blackPoint: Double,
+        toeContrast: Double,
         highlightTone: Double,
         shadowHue: Double,
         highlightHue: Double,
@@ -110,6 +114,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         self.fade = fade
         self.shadowTone = shadowTone
         self.shadowLatitude = shadowLatitude
+        self.blackPoint = blackPoint
+        self.toeContrast = toeContrast
         self.highlightTone = highlightTone
         self.shadowHue = shadowHue
         self.highlightHue = highlightHue
@@ -154,6 +160,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         "fade": \.fade,
         "shadowTone": \.shadowTone,
         "shadowLatitude": \.shadowLatitude,
+        "blackPoint": \.blackPoint,
+        "toeContrast": \.toeContrast,
         "highlightTone": \.highlightTone,
         "shadowHue": \.shadowHue,
         "highlightHue": \.highlightHue,

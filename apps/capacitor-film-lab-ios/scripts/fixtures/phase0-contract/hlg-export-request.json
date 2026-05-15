@@ -104,6 +104,8 @@
       "fade": 0.04,
       "shadowTone": 0,
       "shadowLatitude": 0,
+      "blackPoint": 0,
+      "toeContrast": 0,
       "highlightTone": 0,
       "shadowHue": 225,
       "highlightHue": 30,

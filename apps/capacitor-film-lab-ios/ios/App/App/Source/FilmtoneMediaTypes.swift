@@ -308,6 +308,8 @@ struct Phase0ParamsDTO: Codable {
     let fade: Double
     let shadowTone: Double
     let shadowLatitude: Double
+    let blackPoint: Double
+    let toeContrast: Double
     let highlightTone: Double
     let shadowHue: Double
     let highlightHue: Double

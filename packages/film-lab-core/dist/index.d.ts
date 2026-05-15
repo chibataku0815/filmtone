@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Film Lab のグレード数値パラメータ定義（ブラウザ・Remotion 共通の単一の真実）
  */
-declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail", "fade", "highlights", "shadows", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
+declare const PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainIntensity", "grainRadialMix", "grainSize", "vignette", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "depthMistGain", "depthGlowGain", "depthRayAngleGamma", "depthRayAngleInnerThreshold", "depthMistRayAngleGain", "depthBloomRayAngleGain", "depthHalationRayAngleGain", "depthMistFieldPsfGain", "depthBloomFieldPsfGain", "depthHalationFieldPsfGain", "depthMistFieldPsfRadiusPx", "depthBloomFieldPsfRadiusPx", "depthHalationFieldPsfRadiusPx", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "opticalDirectTransmission", "opticalBlackRetention", "opticalScatterStrength", "opticalHighlightReactivity", "opticalWarmScatter", "opticalSpectralTail", "fade", "highlights", "shadows", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "motionBlurAmount", "shutterAngle", "trailIntensity", "dustAmount", "scratchAmount", "shaftIntensity", "shaftDecay", "shaftOriginX", "shaftOriginY", "crossFilterStrength", "crossFilterSpikes", "crossFilterAngle", "crossFilterLength", "crossFilterThreshold", "crossFilterChromatic", "crossFilterSizeLimit", "crossFilterRandomness", "crossFilterHardMode", "crossFilterMinSpacing", "crossFilterDepthGain", "crossFilterAngleGain", "crossFilterAngleGamma", "crossFilterAngleInnerThreshold", "crossFilterEdgeLengthGain", "crossFilterEdgeStrengthGain", "haloPrismStrength", "haloPrismRadius", "haloPrismWidth", "haloPrismChromatic", "haloPrismThreshold", "haloPrismSplit", "haloPrismAngle", "haloPrismSourceReactivity"];
 type ParamKey = (typeof PARAM_KEYS)[number];
 declare const FILM_GRAIN_INTENSITY_MAX = 0.1;
 declare function clampGrainIntensity(value: number): number;
@@ -84,6 +84,10 @@ interface Params {
     shadowTone: number;
     /** 黒の芯を固定したまま暗部中間の分離を戻す toe separation（0〜1）。 */
     shadowLatitude: number;
+    /** 黒の床位置（-1=深黒 Baselight Flare、0=neutral、+1=milky lift）。range: -1..+1 */
+    blackPoint: number;
+    /** 黒 anchor 近傍の局所 power-curve（0=off、1=max）。0 anchor 保持。range: 0..1 */
+    toeContrast: number;
     highlightTone: number;
     /** シャドウスプリットトーンの色相（度 0〜360） */
     shadowHue: number;
@@ -251,7 +255,7 @@ declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 declare const PHASE0_SCHEMA_VERSION: 2;
 declare const PHASE0_PRESET_DEFAULT = "reset";
 declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
-declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
 declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
@@ -303,6 +307,8 @@ declare const phase0ParamsSchema: z.ZodObject<{
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
     shadowLatitude: z.ZodDefault<z.ZodNumber>;
+    blackPoint: z.ZodDefault<z.ZodNumber>;
+    toeContrast: z.ZodDefault<z.ZodNumber>;
     highlightTone: z.ZodDefault<z.ZodNumber>;
     shadowHue: z.ZodDefault<z.ZodNumber>;
     highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -365,6 +371,8 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         fade: z.ZodOptional<z.ZodNumber>;
         shadowTone: z.ZodOptional<z.ZodNumber>;
         shadowLatitude: z.ZodOptional<z.ZodNumber>;
+        blackPoint: z.ZodOptional<z.ZodNumber>;
+        toeContrast: z.ZodOptional<z.ZodNumber>;
         highlightTone: z.ZodOptional<z.ZodNumber>;
         shadowHue: z.ZodOptional<z.ZodNumber>;
         highlightHue: z.ZodOptional<z.ZodNumber>;
@@ -473,6 +481,8 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         fade?: number | undefined;
         shadowTone?: number | undefined;
         shadowLatitude?: number | undefined;
+        blackPoint?: number | undefined;
+        toeContrast?: number | undefined;
         highlightTone?: number | undefined;
         shadowHue?: number | undefined;
         highlightHue?: number | undefined;
@@ -861,6 +871,8 @@ declare const filmLabParamsSchema: z.ZodObject<{
     shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    blackPoint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+    toeContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
     highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -989,6 +1001,8 @@ declare const filmLookGradeInputSchema: z.ZodObject<{
         shadows: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowLatitude: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        blackPoint: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
+        toeContrast: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightTone: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         shadowHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
         highlightHue: z.ZodType<number, unknown, z.core.$ZodTypeInternals<number, unknown>>;
@@ -1692,7 +1706,7 @@ declare const FILMTONE_IOS_PRESET_NAMES: readonly ["reset", "iphone", "softBlue"
 type FilmtoneIosPresetName = (typeof FILMTONE_IOS_PRESET_NAMES)[number];
 
 declare const IOS_PHASE0_SCHEMA_VERSION: 2;
-declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type IosPhase0ParamKey = Phase0ParamKey;
 type IosPhase0Params = Phase0Params;
 declare const iosPhase0ParamsSchema: z.ZodObject<{
@@ -1728,6 +1742,8 @@ declare const iosPhase0ParamsSchema: z.ZodObject<{
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
     shadowLatitude: z.ZodDefault<z.ZodNumber>;
+    blackPoint: z.ZodDefault<z.ZodNumber>;
+    toeContrast: z.ZodDefault<z.ZodNumber>;
     highlightTone: z.ZodDefault<z.ZodNumber>;
     shadowHue: z.ZodDefault<z.ZodNumber>;
     highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -1889,6 +1905,8 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
         shadowLatitude: z.ZodDefault<z.ZodNumber>;
+        blackPoint: z.ZodDefault<z.ZodNumber>;
+        toeContrast: z.ZodDefault<z.ZodNumber>;
         highlightTone: z.ZodDefault<z.ZodNumber>;
         shadowHue: z.ZodDefault<z.ZodNumber>;
         highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -2123,6 +2141,8 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
         shadowLatitude: z.ZodDefault<z.ZodNumber>;
+        blackPoint: z.ZodDefault<z.ZodNumber>;
+        toeContrast: z.ZodDefault<z.ZodNumber>;
         highlightTone: z.ZodDefault<z.ZodNumber>;
         shadowHue: z.ZodDefault<z.ZodNumber>;
         highlightHue: z.ZodDefault<z.ZodNumber>;
@@ -2252,9 +2272,16 @@ declare function getIosPhase0SourceCapViolations(source: Pick<IosPhase0SourceInf
  *
  * Implements Stages 2 (baseGrade), 3 (filmCompression), and 9 (printStage) of
  * the Filmtone iOS export pipeline as a pure function on a single Rec.709 RGB
- * triple. 12 color-only ops total: exposure / contrast / saturation /
- * temperature / tint / fade / compressionAmount / compressionRange /
- * printContrast / cyan / magenta / yellow.
+ * triple. 14 color-only ops total: exposure / contrast / saturation /
+ * temperature / tint / toeContrast / blackPoint / fade / compressionAmount /
+ * compressionRange / printContrast / cyan / magenta / yellow.
+ *
+ * NOTE: this baker is an APPROXIMATION of baseGradeV2 — it does not implement
+ * the 3-piece contrast curve, the crosstalk split-tone, or the shadow-only
+ * fade mask. New ops (toeContrast / blackPoint) are inserted in the position
+ * matching the CIKL `baseGradeV2` (just before fade) but otherwise the baker's
+ * fidelity to the GPU pipeline is approximate. Full parity is tracked as a
+ * separate lane (see plans/worktree-recursive-badger.md "Follow-up").
  *
  * This TS implementation is the canonical reference for the Swift port shipped
  * via the v1.4 in-app "Look → .cube export" lane. Both must produce
@@ -2286,6 +2313,8 @@ interface BakeColorParams {
     saturation: number;
     temperature: number;
     tint: number;
+    toeContrast: number;
+    blackPoint: number;
     fade: number;
     compressionAmount: number;
     compressionRange: number;
@@ -2294,7 +2323,7 @@ interface BakeColorParams {
     magenta: number;
     yellow: number;
 }
-declare const BAKE_COLOR_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "fade", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow"];
+declare const BAKE_COLOR_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "toeContrast", "blackPoint", "fade", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow"];
 /**
  * Neutral (identity) color params. Baking with these yields the identity cube
  * within float64 precision. Used by Phase 1 placeholder cubes and as the test
