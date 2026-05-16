@@ -9,8 +9,9 @@ entry points stay visible.
 - Public App Store version: `1.9` as of the 2026-05-16 truth refresh.
 - Local Xcode / TestFlight candidate: `1.10` build `13`.
 - Current TestFlight: `1.10 (13)` processed and distributed to Internal
-  testers on 2026-05-16 JST. No App Store review submission has been made for
-  `1.10`.
+  testers on 2026-05-16 JST.
+- App Store review: `1.10 (13)` submitted for review on 2026-05-16 JST with
+  automatic release disabled.
 - Release handoff for the pre-public submission state:
   [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
   and the current 1.10 candidate:

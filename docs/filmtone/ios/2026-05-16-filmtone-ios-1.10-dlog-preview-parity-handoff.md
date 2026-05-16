@@ -9,7 +9,9 @@ Date: 2026-05-16 JST
 - TestFlight build: `1.10 (13)` was archived, uploaded, processed, and
   distributed to Internal testers on 2026-05-16 JST, superseding the prior
   internal `1.10 (11)` candidate.
-- App Store public review submission has not been performed for `1.10`.
+- App Store review: `1.10 (13)` was submitted for review on 2026-05-16 JST
+  using `APP_VERSION=1.10 BUILD_NUMBER=13 bun run release:submit-review`.
+  `automatic_release` was `false`.
 
 ## What Changed
 
@@ -55,6 +57,11 @@ Date: 2026-05-16 JST
 - Build `13`: `IPA_PATH=build/fastlane/Filmtone.ipa bun run release:beta` succeeded.
   - App Store Connect processing completed for `1.10 (13)`.
   - Distributed to Internal testers.
+- Build `13`: `APP_VERSION=1.10 BUILD_NUMBER=13 bun run release:submit-review` succeeded.
+  - Metadata and review information synced.
+  - Precheck passed.
+  - Existing build `1.10 (13)` was selected.
+  - App submitted for review.
 - Historical build `11`: `bun run --cwd apps/capacitor-film-lab-ios release:archive` succeeded.
   - IPA: `apps/capacitor-film-lab-ios/build/fastlane/Filmtone.ipa`
   - IPA Info.plist: `CFBundleShortVersionString = 1.10`, `CFBundleVersion = 11`
@@ -65,6 +72,6 @@ Date: 2026-05-16 JST
 
 ## Remaining Risk
 
-- Build `13` is available to Internal testers on TestFlight, but `1.10` has not
-  been submitted for App Store review.
+- Build `13` is submitted for App Store review, but public App Store lookup
+  still reports `1.9` until Apple review approval and release complete.
 - Desktop and iOS source-profile D-Log math share the same constants by inspection. Desktop preview/export was reported correct on the same source, so the remaining visual sign-off should focus on the iOS preview/export split.
