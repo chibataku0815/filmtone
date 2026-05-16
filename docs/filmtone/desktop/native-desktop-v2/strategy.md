@@ -526,6 +526,11 @@ Rec.709/unknown display sources while Log / explicit Source Profiles and
 imported/package LUTs keep existing behavior. Archive
 `archive/2026-05-16-rec709-safe-built-in-look-application.md`.
 
+2026-05-16: Codex Grade Repair Phase 0 metrics proof landed. The Automation
+CLI / Verify harness now has deterministic still-image luma, channel ceiling,
+chroma stress, and black-floor metrics for future repair analysis. Archive
+`archive/2026-05-16-codex-grade-repair-metrics-proof.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
