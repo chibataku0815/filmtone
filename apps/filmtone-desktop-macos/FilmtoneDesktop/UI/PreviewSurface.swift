@@ -37,7 +37,7 @@ struct PreviewSurface: View {
     /// so a source swap doesn't flash the prior source's last frame on
     /// top of the new source's black backdrop while the new render is in
     /// flight. Same-source param changes (preset / strength / Look /
-    /// Quick / overrides / scrub) keep this URL equal to `sourceURL`,
+    /// legacy Quick / overrides / scrub) keep this URL equal to `sourceURL`,
     /// so the previous frame stays visible until the new one lands —
     /// the user never sees an intentional black flash mid-edit.
     @State private var renderedSourceURL: URL?

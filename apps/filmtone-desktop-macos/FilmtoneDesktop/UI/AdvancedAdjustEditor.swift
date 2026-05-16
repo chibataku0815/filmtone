@@ -1,28 +1,56 @@
 import FilmLabSwiftCore
 import SwiftUI
 
-// M5-C.3b: Popover content for the right-rail "Adjust…" button. Direct
-// per-key editing of `paramOverrides` matching the iOS canonical
+// M5-C.3b: Direct per-key editing of `paramOverrides` matching the iOS canonical
 // `FilmtoneStrengthSheet` advanced section. Recipe chips stay visible
 // at the group level; each group can expand into rows of (label, value,
 // slider, per-row reset). The popover frame is sized once (480×600) so the user can scroll
-// through the full catalog without the window jumping.
+// through the full catalog without the window jumping; the right rail uses
+// the same controls inline at 220pt.
 //
 // M5-I.1: every user-facing string flows through `FilmtoneDesktopStrings`
 // so JA/EN host locale picks up the iOS canonical 階調 / なし / 標準 /
 // 強め / 爽やか / 夕景 / 深み labels without per-call branching here.
 struct AdvancedAdjustEditor: View {
+    enum Presentation: Equatable {
+        case popover
+        case inline
+    }
+
     @Bindable var state: EditorState
     var strings: FilmtoneDesktopStrings = .current
-    var onClose: () -> Void
+    var presentation: Presentation = .popover
+    var onClose: (() -> Void)?
 
     @State private var expandedGroupIds: Set<String> = []
+
+    init(
+        state: EditorState,
+        strings: FilmtoneDesktopStrings = .current,
+        presentation: Presentation = .popover,
+        onClose: (() -> Void)? = nil
+    ) {
+        self.state = state
+        self.strings = strings
+        self.presentation = presentation
+        self.onClose = onClose
+        self._expandedGroupIds = State(initialValue: [])
+    }
 
     private var groups: [AdvancedAdjustCatalog.Group] {
         AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video, strings: strings)
     }
 
     var body: some View {
+        switch presentation {
+        case .popover:
+            popoverBody
+        case .inline:
+            inlineBody
+        }
+    }
+
+    private var popoverBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
                 .padding(.horizontal, 16)
@@ -50,25 +78,47 @@ struct AdvancedAdjustEditor: View {
         .preferredColorScheme(.dark)
     }
 
+    private var inlineBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            Divider()
+                .background(Color.white.opacity(0.10))
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(groups) { group in
+                    groupSection(group)
+                }
+            }
+            Divider()
+                .background(Color.white.opacity(0.10))
+            footer
+        }
+        .frame(width: 220, alignment: .leading)
+        .preferredColorScheme(.dark)
+    }
+
     private var header: some View {
         HStack(spacing: 12) {
-            Text(strings.advancedTitle)
-                .font(.title3.weight(.semibold))
+            Text(presentation == .inline ? strings.adjustTitle : strings.advancedTitle)
+                .font((presentation == .inline ? Font.callout : Font.title3).weight(.semibold))
                 .foregroundStyle(.white)
             Spacer()
             Text(activeBadge)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.72))
-            Button {
-                onClose()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.body.weight(.medium))
-                    .frame(width: 14, height: 14)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            if presentation == .popover {
+                Button {
+                    onClose?()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.medium))
+                        .frame(width: 14, height: 14)
+                }
+                .buttonStyle(FilmtoneGlassIconButtonStyle())
+                .help(strings.advancedClose)
+                .filmtonePointingHandCursor()
             }
-            .buttonStyle(FilmtoneGlassIconButtonStyle())
-            .help(strings.advancedClose)
-            .filmtonePointingHandCursor()
         }
     }
 
@@ -97,6 +147,7 @@ struct AdvancedAdjustEditor: View {
                     Text(group.title)
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(.white)
+                        .lineLimit(1)
                     Text("(\(group.controls.count))")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.white.opacity(0.5))
@@ -145,11 +196,23 @@ struct AdvancedAdjustEditor: View {
     @ViewBuilder
     private func recipeChipRow(for group: AdvancedAdjustCatalog.Group) -> some View {
         let activeId = state.activeRecipeId(in: group)
-        HStack(spacing: 8) {
-            ForEach(group.recipes) { recipe in
-                recipeChip(recipe, in: group, isActive: recipe.id == activeId)
+        if presentation == .inline {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 58), spacing: 6)],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                ForEach(group.recipes) { recipe in
+                    recipeChip(recipe, in: group, isActive: recipe.id == activeId)
+                }
             }
-            Spacer(minLength: 0)
+        } else {
+            HStack(spacing: 8) {
+                ForEach(group.recipes) { recipe in
+                    recipeChip(recipe, in: group, isActive: recipe.id == activeId)
+                }
+                Spacer(minLength: 0)
+            }
         }
     }
 
@@ -168,9 +231,7 @@ struct AdvancedAdjustEditor: View {
             Button {
                 state.applyAdvancedRecipe(recipe, in: group)
             } label: {
-                Text(recipe.label)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 4)
+                recipeChipLabel(recipe)
             }
             .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: true))
             .help(helpText)
@@ -179,14 +240,21 @@ struct AdvancedAdjustEditor: View {
             Button {
                 state.applyAdvancedRecipe(recipe, in: group)
             } label: {
-                Text(recipe.label)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 4)
+                recipeChipLabel(recipe)
             }
             .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
             .help(helpText)
             .filmtonePointingHandCursor()
         }
+    }
+
+    private func recipeChipLabel(_ recipe: AdvancedAdjustCatalog.Recipe) -> some View {
+        Text(recipe.label)
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .padding(.horizontal, 4)
+            .frame(maxWidth: presentation == .inline ? .infinity : nil)
     }
 
     @ViewBuilder
@@ -211,11 +279,14 @@ struct AdvancedAdjustEditor: View {
                 Text(control.label)
                     .font(.callout)
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
                 Text(AdvancedAdjustCatalog.formatValue(valueBinding.wrappedValue, digits: control.digits))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.72))
-                    .frame(minWidth: 48, alignment: .trailing)
+                    .lineLimit(1)
+                    .frame(minWidth: presentation == .inline ? 40 : 48, alignment: .trailing)
                 Button {
                     state.clearParamOverride(for: control.key)
                 } label: {
@@ -241,6 +312,8 @@ struct AdvancedAdjustEditor: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.counterclockwise")
                     Text(strings.advancedResetAllOverrides)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
             .buttonStyle(FilmtoneGlassSecondaryButtonStyle())
