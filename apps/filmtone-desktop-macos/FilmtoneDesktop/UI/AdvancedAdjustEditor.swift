@@ -34,10 +34,7 @@ struct AdvancedAdjustEditor: View {
         self.strings = strings
         self.presentation = presentation
         self.onClose = onClose
-        let expanded = presentation == .inline
-            ? Set(AdvancedAdjustCatalog.groups(forVideo: state.sourceKind == .video, strings: strings).map(\.id))
-            : []
-        self._expandedGroupIds = State(initialValue: expanded)
+        self._expandedGroupIds = State(initialValue: [])
     }
 
     private var groups: [AdvancedAdjustCatalog.Group] {
@@ -97,12 +94,6 @@ struct AdvancedAdjustEditor: View {
         }
         .frame(width: 220, alignment: .leading)
         .preferredColorScheme(.dark)
-        .onAppear {
-            expandedGroupIds.formUnion(groups.map(\.id))
-        }
-        .onChange(of: state.sourceKind) { _, _ in
-            expandedGroupIds = Set(groups.map(\.id))
-        }
     }
 
     private var header: some View {
