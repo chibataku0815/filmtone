@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import CoreVideo
 import Foundation
 
@@ -359,6 +360,10 @@ struct TestSourceColorClassifier {
         try expect(p3Contract.outputColorPrimariesID == "bt709", "color pipeline: primaries id")
         try expect(p3Contract.outputColorTransferID == "bt709", "color pipeline: transfer id")
         try expect(p3Contract.outputColorSpaceID == "bt709", "color pipeline: matrix/space id")
+        try expect(
+            p3Contract.destinationColorSpace.name == CGColorSpace.sRGB,
+            "color pipeline: raster output should render in sRGB for preview/export parity"
+        )
 
         try expect(
             p3Contract.writerColorProperties[AVVideoColorPrimariesKey] as? String == AVVideoColorPrimaries_ITU_R_709_2,
@@ -389,6 +394,10 @@ struct TestSourceColorClassifier {
         try expect(
             readerSettings[AVVideoAllowWideColorKey] as? Bool == true,
             "color pipeline: reader must allow wide color before mapping to Rec.709 output"
+        )
+        try expect(
+            readerSettings[AVVideoColorPropertiesKey] == nil,
+            "color pipeline: reader should preserve source color attachments"
         )
         try expect(
             readerSettings[kCVPixelBufferPixelFormatTypeKey as String] as? Int == Int(kCVPixelFormatType_32BGRA),

@@ -170,6 +170,10 @@ enum FilmtoneStillExporter {
         )
 
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedProfile,
+                probedColorClass: probe.colorClass
+            )
         let params = resolvedGrade.params
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString

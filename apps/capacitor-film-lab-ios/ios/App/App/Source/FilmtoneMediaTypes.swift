@@ -351,6 +351,8 @@ struct Phase0ParamsDTO: Codable {
         fade: Double,
         shadowTone: Double,
         shadowLatitude: Double,
+        blackPoint: Double = 0,
+        toeContrast: Double = 0,
         highlightTone: Double,
         shadowHue: Double,
         highlightHue: Double,
@@ -390,6 +392,8 @@ struct Phase0ParamsDTO: Codable {
         self.fade = fade
         self.shadowTone = shadowTone
         self.shadowLatitude = shadowLatitude
+        self.blackPoint = blackPoint
+        self.toeContrast = toeContrast
         self.highlightTone = highlightTone
         self.shadowHue = shadowHue
         self.highlightHue = highlightHue
@@ -405,7 +409,8 @@ struct Phase0ParamsDTO: Codable {
         case bloomSoftKnee, halationSoftKnee, compressionAmount, compressionRange
         case printContrast, cyan, magenta, yellow
         case shutterAngle, trailIntensity, filmBreathAmount
-        case fade, shadowTone, shadowLatitude, highlightTone, shadowHue, highlightHue
+        case fade, shadowTone, shadowLatitude, blackPoint, toeContrast
+        case highlightTone, shadowHue, highlightHue
         case vignette, grainIntensity
     }
 
@@ -444,6 +449,8 @@ struct Phase0ParamsDTO: Codable {
         self.fade = try c.decode(Double.self, forKey: .fade)
         self.shadowTone = try c.decode(Double.self, forKey: .shadowTone)
         self.shadowLatitude = try c.decode(Double.self, forKey: .shadowLatitude)
+        self.blackPoint = try c.decodeIfPresent(Double.self, forKey: .blackPoint) ?? 0
+        self.toeContrast = try c.decodeIfPresent(Double.self, forKey: .toeContrast) ?? 0
         self.highlightTone = try c.decode(Double.self, forKey: .highlightTone)
         self.shadowHue = try c.decode(Double.self, forKey: .shadowHue)
         self.highlightHue = try c.decode(Double.self, forKey: .highlightHue)

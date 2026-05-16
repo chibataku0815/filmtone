@@ -506,6 +506,12 @@ marketplace: `chibataku0815/filmtone-codex-marketplace`; clean Codex
 app-server verification installed `filmtone-codex@filmtone` and listed the 7
 MCP tools. Helper distribution/signing remains a follow-up lane.
 
+2026-05-16: Rec.709-safe built-in Look application shipped for Creative Pack
+01. Stone / Urban / Noir now clamp effective built-in intensity for
+Rec.709/unknown display sources while Log / explicit Source Profiles and
+imported/package LUTs keep existing behavior. Archive
+`archive/2026-05-16-rec709-safe-built-in-look-application.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

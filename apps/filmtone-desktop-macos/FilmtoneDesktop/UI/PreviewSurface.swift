@@ -241,6 +241,10 @@ struct PreviewSurface: View {
             entry: resolvedProfile
         )
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedProfile,
+                probedColorClass: probedColorClass
+            )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: sourceURL.absoluteString
         )

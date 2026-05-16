@@ -307,6 +307,9 @@ final class EditorCaptureRelay: ObservableObject {
                     sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                         probe: probe,
                         cameraProfile: store.project.cameraProfile
+                    ),
+                    sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
+                        probe: probe
                     )
                 ) {
                     for (key, value) in adaptation.paramOverrides.values {

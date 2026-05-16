@@ -833,6 +833,9 @@ final class FilmtoneEditorStore: ObservableObject {
                 sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                     probe: effectiveProbe,
                     cameraProfile: project.cameraProfile
+                ),
+                sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
+                    probe: effectiveProbe
                 )
             ) {
                 for (key, value) in adaptation.paramOverrides.values {
@@ -1046,17 +1049,25 @@ final class FilmtoneEditorStore: ObservableObject {
         forwardedCameraProfile: CameraProfileSelection?
     ) -> FilmtoneLivePreviewDiagnostics {
         let creative = request.creativeLut
-        // Mirrors the auto-detection path inside
-        // `ExportInputLutBuilder.makeAutomaticInputLut(for:)`: when
-        // the runtime falls back to `.auto` (which it does for live
-        // preview because cameraProfile isn't passed), the input LUT
-        // is built from `probe?.inputTransformPolicy.strategy`.
+        // Mirrors the input-LUT selection inside
+        // `ExportInputLutBuilder.makeActiveInputLut(for:probe:)`: explicit
+        // built-in Camera Profiles use the catalog, while Auto falls back
+        // to the probe's native inputTransformPolicy.
         let detectedTransform =
             probe?.inputTransformPolicy?.strategy.rawValue
             ?? probe?.sourceVideoMetadata?.inputTransformPolicy?.strategy.rawValue
 
         let inputLutWillApply: Bool = {
             if request.inputLut != nil { return true }
+            if case .builtIn(let catalogId) = forwardedCameraProfile,
+               let entry = FilmtoneSourceProfileCatalog.entry(forCatalogId: catalogId) {
+                switch entry.impl {
+                case .nilProfile:
+                    return false
+                case .nativePolicy, .synthesized, .bundledCube:
+                    return true
+                }
+            }
             switch detectedTransform {
             case "appleLogToRec709", "appleLog2ToRec709":
                 return true
@@ -1696,6 +1707,9 @@ final class FilmtoneEditorStore: ObservableObject {
             sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                 probe: probe,
                 cameraProfile: project.cameraProfile
+            ),
+            sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
+                probe: probe
             )
         )
 

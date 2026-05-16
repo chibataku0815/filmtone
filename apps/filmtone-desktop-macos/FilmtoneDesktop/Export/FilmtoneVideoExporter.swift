@@ -336,6 +336,10 @@ enum FilmtoneVideoExporter {
         try reader.start()
 
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedProfile,
+                probedColorClass: probe.colorClass
+            )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
@@ -520,6 +524,10 @@ enum FilmtoneVideoExporter {
         resolvedProfile: CameraProfileCatalogEntry?
     ) -> VideoFrameRenderContext {
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedProfile,
+                probedColorClass: probe.colorClass
+            )
         return VideoFrameRenderContext(
             contract: contract,
             resolvedProfile: resolvedProfile,

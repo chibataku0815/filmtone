@@ -69,9 +69,13 @@ enum FilmtoneColorPipeline {
     }
 
     static func outputColorSpace() -> CGColorSpace {
+        // Render BGRA frames in display-referred sRGB and carry Rec.709 as
+        // writer/composition metadata. Rendering directly to itur_709 legalizes
+        // the raster values before AVAssetWriter's YUV conversion and makes
+        // saved videos look lifted compared with the AVVideoComposition preview.
         for name in [
-            CGColorSpace.itur_709,
             CGColorSpace.sRGB,
+            CGColorSpace.itur_709,
         ] {
             if let colorSpace = CGColorSpace(name: name), colorSpace.supportsOutput {
                 return colorSpace

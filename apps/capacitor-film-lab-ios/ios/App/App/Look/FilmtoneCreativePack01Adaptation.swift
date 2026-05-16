@@ -23,7 +23,8 @@ enum FilmtoneCreativePack01Adaptation {
             slug: slug,
             descriptor: descriptor,
             sourceProfileId: nil,
-            sourceDetailBias: nil
+            sourceDetailBias: nil,
+            sourceColorClassRaw: nil
         )
     }
 
@@ -35,13 +36,15 @@ enum FilmtoneCreativePack01Adaptation {
         slug: String,
         descriptor: FilmtoneSourceToneDescriptor?,
         sourceProfileId: String?,
-        sourceDetailBias: Double?
+        sourceDetailBias: Double?,
+        sourceColorClassRaw: String? = nil
     ) -> Resolved? {
         return FilmtoneLookDirector.resolveCreativePack01(
             slug: slug,
             descriptor: descriptor,
             sourceProfileId: sourceProfileId,
-            sourceDetailBias: sourceDetailBias
+            sourceDetailBias: sourceDetailBias,
+            sourceColorClassRaw: sourceColorClassRaw
         )
     }
 }

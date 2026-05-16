@@ -6,7 +6,10 @@ import {
   BAKE_COLOR_IDENTITY,
   BAKE_COLOR_PARAM_KEYS,
 } from "./bake-color-only";
-import { CREATIVE_PACK_01_LOOKS } from "./creative-pack-01";
+import {
+  CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+  CREATIVE_PACK_01_LOOKS,
+} from "./creative-pack-01";
 import { parseCube, type CubeLUT } from "./cube-parser";
 
 type SamplePoint = readonly [number, number, number];
@@ -96,6 +99,32 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
       expect(look.paramOverrides.shadowTone).toBe(0);
       expect(look.paramOverrides.highlightTone).toBe(0);
     }
+  });
+
+  test("every Look declares Rec.709-safe source policy", () => {
+    expect(
+      CREATIVE_PACK_01_LOOKS.map((look) => [
+        look.slug,
+        look.expectedProcessSpace,
+        look.rec709SafeIntensityCeiling,
+      ]),
+    ).toEqual([
+      [
+        "filmtone-creative-pack-01-stone",
+        CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+        0.86,
+      ],
+      [
+        "filmtone-creative-pack-01-urban",
+        CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+        0.84,
+      ],
+      [
+        "filmtone-creative-pack-01-noir",
+        CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+        0.92,
+      ],
+    ]);
   });
 
   test("runtime toe separation stays neutral until an authored pass adopts it", () => {

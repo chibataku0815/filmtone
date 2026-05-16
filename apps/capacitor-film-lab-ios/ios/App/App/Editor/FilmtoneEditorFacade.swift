@@ -120,9 +120,13 @@ final class FilmtoneEditorFacade {
     }
 
     func renderPreview(
-        request: Phase0ExportRequestDTO
+        request: Phase0ExportRequestDTO,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> Phase0PreviewRenderResultDTO {
-        try await runtime.renderPreview(request: request)
+        try await runtime.renderPreview(
+            request: request,
+            cameraProfile: cameraProfile
+        )
     }
 
     func makeOriginalPreviewItem(
@@ -132,9 +136,13 @@ final class FilmtoneEditorFacade {
     }
 
     func makeGradedPreviewItem(
-        request: Phase0ExportRequestDTO
+        request: Phase0ExportRequestDTO,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> FilmtonePreparedVideoPreviewItem {
-        try await runtime.makeGradedPreviewItem(request: request)
+        try await runtime.makeGradedPreviewItem(
+            request: request,
+            cameraProfile: cameraProfile
+        )
     }
 
     /// Live capture preview entrypoint (M10 / S8-F F3 / F3-Fix #1).
@@ -169,11 +177,13 @@ final class FilmtoneEditorFacade {
 
     func makeGradedPreviewComposition(
         request: Phase0ExportRequestDTO,
-        asset: AVAsset
+        asset: AVAsset,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> FilmtonePreparedVideoPreviewComposition {
         try await runtime.makeGradedPreviewComposition(
             request: request,
-            asset: asset
+            asset: asset,
+            cameraProfile: cameraProfile
         )
     }
 

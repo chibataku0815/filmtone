@@ -59,7 +59,12 @@ enum FilmtoneSidecarWriter {
         let gradeRecipe = request.gradeRecipe
         let strength = gradeRecipe.presetStrength
         let liveQuickState = gradeRecipe.quickState
+        let probedColorClass = sourceInterpretation.flatMap { SourceColorClassDTO(rawValue: $0) }
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedSourceProfile,
+                probedColorClass: probedColorClass
+            )
         let params = resolvedGrade.params
         let lookVersion = FilmtonePresetCatalog.presetVersion
 

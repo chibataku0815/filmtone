@@ -18,11 +18,14 @@ import Foundation
 enum FilmtoneCreativePackCatalog {
     static let cubeSize = 65
     static let packId = "creative-pack-01"
+    static let expectedProcessSpace = "display-rec709-normalized"
 
     struct BuiltInLook: Equatable {
         let slug: String
         let canonicalUUID: UUID
         let englishName: String
+        let expectedProcessSpace: String
+        let rec709SafeIntensityCeiling: Double
         /// Bundled cube filename inside `Resources/CreativeLuts/`. Always
         /// resolved via `Bundle.main.url(forResource:withExtension:
         /// subdirectory:"CreativeLuts")` so a yellow-folder PBXGroup is
@@ -112,6 +115,8 @@ enum FilmtoneCreativePackCatalog {
             slug: "filmtone-creative-pack-01-stone",
             canonicalUUID: UUID(uuidString: "FB1A0001-0000-4000-8000-000000000006")!,
             englishName: "Stone",
+            expectedProcessSpace: expectedProcessSpace,
+            rec709SafeIntensityCeiling: 0.86,
             bundledFilename: "filmtone-creative-pack-01-stone.cube",
             pinnedSha256: "2f9e0240450b1b5fe1e78ca88017509eb1c50a050c4a02723a36ac651c9393c4",
             intensity: 1.0,
@@ -122,6 +127,8 @@ enum FilmtoneCreativePackCatalog {
             slug: "filmtone-creative-pack-01-urban",
             canonicalUUID: UUID(uuidString: "FB1A0001-0000-4000-8000-000000000007")!,
             englishName: "Urban",
+            expectedProcessSpace: expectedProcessSpace,
+            rec709SafeIntensityCeiling: 0.84,
             bundledFilename: "filmtone-creative-pack-01-urban.cube",
             pinnedSha256: "fefd48a796ff724fb23b2741ac14ed0c4453b24215ca7535680ad4ca043aaa44",
             intensity: 1.0,
@@ -132,6 +139,8 @@ enum FilmtoneCreativePackCatalog {
             slug: "filmtone-creative-pack-01-noir",
             canonicalUUID: UUID(uuidString: "FB1A0001-0000-4000-8000-000000000010")!,
             englishName: "Noir",
+            expectedProcessSpace: expectedProcessSpace,
+            rec709SafeIntensityCeiling: 0.92,
             bundledFilename: "filmtone-creative-pack-01-noir.cube",
             pinnedSha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
             intensity: 1.0,

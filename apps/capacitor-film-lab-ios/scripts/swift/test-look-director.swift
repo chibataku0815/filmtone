@@ -20,6 +20,7 @@ struct TestLookDirector {
         try runLowSaturationCase()
         try runLogProfileCase()
         try runOrdinaryCase()
+        try runUnknownDisplaySourceCase()
         try runLegacyDescriptorCase()
         try runPersistedRefreshCase()
         print("Look Director resolver tests passed")
@@ -179,35 +180,36 @@ struct TestLookDirector {
     }
 
     /// High-key source — bright, sustained highlights, few shadows.
-    /// Resolver should compress highlights, push print, and AVOID lifting
-    /// bloom into the sky.
+    /// Rec.709-safe resolver should still compress highlights, but hold the
+    /// knee and print density below the Log/profile branch.
     static func runHighKeyCase() throws {
         let descriptor = highKeyDescriptor()
         guard let resolved = FilmtoneLookDirector.resolveCreativePack01(
             slug: "filmtone-creative-pack-01-stone",
             descriptor: descriptor,
             sourceProfileId: nil,
-            sourceDetailBias: 0
+            sourceDetailBias: 0,
+            sourceColorClassRaw: "sdr-bt709"
         ) else {
             throw LookDirectorCheckError(message: "Stone high-key returned nil")
         }
         let values = resolved.paramOverrides.values
         try expect(
-            (values["compressionAmount"] ?? 0) > 0.36,
-            "M2 high-key Stone must add strong compressionAmount, got \(values["compressionAmount"] ?? -1)"
+            (values["compressionAmount"] ?? 0) <= 0.30,
+            "Rec.709 high-key Stone compression must stay capped, got \(values["compressionAmount"] ?? -1)"
         )
         try expect(
-            (values["compressionRange"] ?? 1.0) < 0.36,
-            "M2 high-key Stone must pull compression into mid/high tones, got \(values["compressionRange"] ?? -1)"
+            (values["compressionRange"] ?? 0) >= 0.36,
+            "Rec.709 high-key Stone must not pull the knee below 0.36, got \(values["compressionRange"] ?? -1)"
         )
         let stonePrintBase = FilmtoneCreativePack01Patches.stonePatch.values["printContrast", default: 0]
         try expect(
-            (values["printContrast"] ?? 0) > stonePrintBase + 0.22,
-            "M2 high-key Stone must add visible print density, got \(values["printContrast"] ?? -1)"
+            (values["printContrast"] ?? 0) <= stonePrintBase + 0.12 + 1e-9,
+            "Rec.709 high-key Stone print density must stay capped, got \(values["printContrast"] ?? -1)"
         )
         try expect(
-            (values["contrast"] ?? 1.0) > 1.10,
-            "M2 high-key Stone must add visible contrast bite, got \(values["contrast"] ?? -1)"
+            (values["contrast"] ?? 1.0) <= 1.10,
+            "Rec.709 high-key Stone contrast must stay capped, got \(values["contrast"] ?? -1)"
         )
         try expect(
             values["fade"] == nil,
@@ -234,46 +236,46 @@ struct TestLookDirector {
         )
     }
 
-    /// Low-saturation flat material that did not match a profile id.
-    /// Director should add visible compression / print density / saturation
-    /// and a mild diffusion texture, while avoiding practical-light bloom.
+    /// Rec.709 low-saturation flat material — do not treat display-referred
+    /// flatness as Log latitude. Keep tone/color additions inside safe caps.
     static func runLowSaturationCase() throws {
         let descriptor = lowSaturationDescriptor()
         guard let resolved = FilmtoneLookDirector.resolveCreativePack01(
             slug: "filmtone-creative-pack-01-stone",
             descriptor: descriptor,
             sourceProfileId: nil,
-            sourceDetailBias: 0
+            sourceDetailBias: 0,
+            sourceColorClassRaw: "sdr-bt709"
         ) else {
             throw LookDirectorCheckError(message: "Stone low-sat returned nil")
         }
         try expect(
-            resolved.intensity >= 1.0 - 1e-9,
-            "low-sat Stone intensity should reach 1.0, got \(resolved.intensity)"
+            resolved.intensity <= FilmtoneLookDirector.rec709SafeIntensityCeiling(slug: "filmtone-creative-pack-01-stone") + 1e-9,
+            "Rec.709 low-sat Stone intensity must use the safe ceiling, got \(resolved.intensity)"
         )
         let values = resolved.paramOverrides.values
         try expect(
-            (values["compressionAmount"] ?? 0) > 0.36,
-            "M2 low-sat Stone must add strong compression to give the flat frame shape, got \(values["compressionAmount"] ?? -1)"
+            (values["compressionAmount"] ?? 0) <= 0.22,
+            "Rec.709 low-sat Stone compression must stay capped, got \(values["compressionAmount"] ?? -1)"
         )
         let stonePrintBase = FilmtoneCreativePack01Patches.stonePatch.values["printContrast", default: 0]
         try expect(
-            (values["printContrast"] ?? 0) > stonePrintBase + 0.28,
-            "M2 low-sat Stone must add visible print density, got \(values["printContrast"] ?? -1)"
+            (values["printContrast"] ?? 0) <= stonePrintBase + 0.12 + 1e-9,
+            "Rec.709 low-sat Stone print density must stay capped, got \(values["printContrast"] ?? -1)"
         )
         try expect(
-            (values["saturation"] ?? 1.0) > 1.16,
-            "M2 low-sat Stone must restore color separation, got \(values["saturation"] ?? -1)"
+            (values["saturation"] ?? 1.0) <= 1.08,
+            "Rec.709 low-sat Stone saturation restore must stay capped, got \(values["saturation"] ?? -1)"
         )
         try expect(
-            (values["contrast"] ?? 1.0) > 1.08,
-            "M2 low-sat Stone must add contrast shape, got \(values["contrast"] ?? -1)"
+            (values["contrast"] ?? 1.0) <= 1.10,
+            "Rec.709 low-sat Stone contrast must stay capped, got \(values["contrast"] ?? -1)"
         )
         let diffusionBase = FilmtoneCreativePack01Patches.stonePatch.values["diffusion", default: 0]
         let diffusionDelta = (values["diffusion"] ?? diffusionBase) - diffusionBase
         try expect(
-            diffusionDelta > 0.01 && diffusionDelta < 0.035,
-            "low-sat Stone diffusion must stay mild but visible, got \(diffusionDelta)"
+            diffusionDelta <= 0.012 + 1e-9,
+            "Rec.709 low-sat Stone diffusion delta must stay capped, got \(diffusionDelta)"
         )
         let bloomBase = FilmtoneCreativePack01Patches.stonePatch.values["bloomStrength", default: 0]
         let bloomDelta = (values["bloomStrength"] ?? bloomBase) - bloomBase
@@ -337,13 +339,14 @@ struct TestLookDirector {
             slug: "filmtone-creative-pack-01-stone",
             descriptor: descriptor,
             sourceProfileId: nil,
-            sourceDetailBias: 0
+            sourceDetailBias: 0,
+            sourceColorClassRaw: "sdr-bt709"
         )
         if let resolved {
             let values = resolved.paramOverrides.values
             try expect(
-                abs(resolved.intensity - 1.0) < 0.05,
-                "ordinary Stone intensity stays near 1.0, got \(resolved.intensity)"
+                abs(resolved.intensity - FilmtoneLookDirector.rec709SafeIntensityCeiling(slug: "filmtone-creative-pack-01-stone")) < 1e-9,
+                "ordinary Rec.709 Stone intensity uses the safe ceiling, got \(resolved.intensity)"
             )
             // M2: ordinary now hits the new 0.105 * scale floor plus tiny
             // descriptor terms. Stay clearly below the high-key / low-sat /
@@ -367,6 +370,34 @@ struct TestLookDirector {
                 "ordinary Stone must not emit fade either"
             )
         }
+    }
+
+    /// Unknown / display-referred sources should be conservative. Display P3 SDR
+    /// and missing metadata arrive through the same non-Log fallback.
+    static func runUnknownDisplaySourceCase() throws {
+        let descriptor = lowSaturationDescriptor()
+        guard let resolved = FilmtoneLookDirector.resolveCreativePack01(
+            slug: "filmtone-creative-pack-01-stone",
+            descriptor: descriptor,
+            sourceProfileId: nil,
+            sourceDetailBias: 0,
+            sourceColorClassRaw: "unknown"
+        ) else {
+            throw LookDirectorCheckError(message: "Stone unknown display source returned nil")
+        }
+        let values = resolved.paramOverrides.values
+        try expect(
+            abs(resolved.intensity - FilmtoneLookDirector.rec709SafeIntensityCeiling(slug: "filmtone-creative-pack-01-stone")) < 1e-9,
+            "unknown display Stone intensity must use the Rec.709-safe ceiling, got \(resolved.intensity)"
+        )
+        try expect(
+            (values["compressionAmount"] ?? 0) <= 0.22,
+            "unknown display Stone compression must stay in the safe branch, got \(values["compressionAmount"] ?? -1)"
+        )
+        try expect(
+            (values["compressionRange"] ?? 0) >= 0.36,
+            "unknown display Stone compression range must stay in the safe branch, got \(values["compressionRange"] ?? -1)"
+        )
     }
 
     /// Legacy descriptor with no optional scores — resolver should

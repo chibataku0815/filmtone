@@ -44,11 +44,18 @@ import type { Phase0ParamKey } from "./phase0-schema";
 export const CREATIVE_PACK_01_ID = "creative-pack-01" as const;
 export const CREATIVE_PACK_01_BAKER_VERSION = "1.5.0-stone-palermo-signature" as const;
 export const CREATIVE_PACK_01_CUBE_SIZE = 65 as const;
+export const CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE =
+  "display-rec709-normalized" as const;
+
+export type CreativePack01ExpectedProcessSpace =
+  typeof CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE;
 
 export interface CreativePackLook {
   readonly slug: string;
   readonly englishName: string;
   readonly canonicalUUID: string;
+  readonly expectedProcessSpace: CreativePack01ExpectedProcessSpace;
+  readonly rec709SafeIntensityCeiling: number;
   readonly basePreset: FilmtoneIosPresetName;
   readonly colorParams: BakeColorParams;
   readonly paramOverrides: Partial<Record<Phase0ParamKey, number>>;
@@ -91,6 +98,8 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
     slug: "filmtone-creative-pack-01-stone",
     englishName: "Stone",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.86,
     basePreset: "reset",
     colorParams: {
       exposure: 0,
@@ -128,6 +137,8 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
     slug: "filmtone-creative-pack-01-urban",
     englishName: "Urban",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.84,
     basePreset: "reset",
     colorParams: {
       exposure: 0,
@@ -165,6 +176,8 @@ export const CREATIVE_PACK_01_LOOKS: readonly CreativePackLook[] = [
     slug: "filmtone-creative-pack-01-noir",
     englishName: "Noir",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000010",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.92,
     basePreset: "reset",
     colorParams: {
       exposure: -0.24,

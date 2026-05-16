@@ -3758,6 +3758,7 @@ function applyCreativePack01SourceTransform(sourceCube, transformName) {
 var CREATIVE_PACK_01_ID = "creative-pack-01";
 var CREATIVE_PACK_01_BAKER_VERSION = "1.5.0-stone-palermo-signature";
 var CREATIVE_PACK_01_CUBE_SIZE = 65;
+var CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE = "display-rec709-normalized";
 function buildLookParamOverrides(spatial) {
   const out = { ...spatial };
   for (const key of BAKE_COLOR_PARAM_KEYS) {
@@ -3772,6 +3773,8 @@ var CREATIVE_PACK_01_LOOKS = [
     slug: "filmtone-creative-pack-01-stone",
     englishName: "Stone",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000006",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.86,
     basePreset: "reset",
     colorParams: {
       exposure: 0,
@@ -3809,6 +3812,8 @@ var CREATIVE_PACK_01_LOOKS = [
     slug: "filmtone-creative-pack-01-urban",
     englishName: "Urban",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000007",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.84,
     basePreset: "reset",
     colorParams: {
       exposure: 0,
@@ -3846,6 +3851,8 @@ var CREATIVE_PACK_01_LOOKS = [
     slug: "filmtone-creative-pack-01-noir",
     englishName: "Noir",
     canonicalUUID: "FB1A0001-0000-4000-8000-000000000010",
+    expectedProcessSpace: CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
+    rec709SafeIntensityCeiling: 0.92,
     basePreset: "reset",
     colorParams: {
       exposure: -0.24,
@@ -4520,6 +4527,7 @@ export {
   CREATIVE_CUBE_DEFAULT_SIZE,
   CREATIVE_PACK_01_BAKER_VERSION,
   CREATIVE_PACK_01_CUBE_SIZE,
+  CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
   CREATIVE_PACK_01_ID,
   CREATIVE_PACK_01_LOOKS,
   CREATIVE_PACK_01_STONE_TRANSFORM,

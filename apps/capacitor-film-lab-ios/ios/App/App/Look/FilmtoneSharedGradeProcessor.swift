@@ -1,5 +1,7 @@
 import AVFoundation
+import CoreGraphics
 import CoreImage
+import CoreVideo
 import Foundation
 
 /// Live capture preview / in-app composition grade processor extracted
@@ -55,6 +57,11 @@ final class FilmtoneSharedGradeProcessor {
         videoTrack _: AVAssetTrack,
         outputSize: CGSize
     ) -> AVMutableVideoComposition {
+        let previewRasterizer = FilmtoneCompositionPreviewRasterizer(
+            ciContext: session.ciContext,
+            colorPipeline: session.colorPipeline,
+            outputSize: outputSize
+        )
         let composition = AVMutableVideoComposition(
             asset: asset,
             applyingCIFiltersWithHandler: { [session] request in
@@ -66,7 +73,8 @@ final class FilmtoneSharedGradeProcessor {
                         timeSeconds: timeSeconds.isFinite ? timeSeconds : 0,
                         motionAccumulator: self.motionBlurAccumulator
                     )
-                    request.finish(with: processed, context: session.ciContext)
+                    let rasterized = try previewRasterizer.rasterizedImage(from: processed)
+                    request.finish(with: rasterized, context: session.ciContext)
                 } catch {
                     filmtonePreviewCompositionDebugLog(
                         "live composition frame failed at \(CMTimeGetSeconds(request.compositionTime))s: \(error.localizedDescription)"
@@ -82,5 +90,62 @@ final class FilmtoneSharedGradeProcessor {
         )
         session.colorPipeline.applyOutputMetadata(to: composition)
         return composition
+    }
+}
+
+private final class FilmtoneCompositionPreviewRasterizer {
+    private let ciContext: CIContext
+    private let colorPipeline: FilmtoneColorPipelineContract
+    private let outputColorSpace: CGColorSpace
+    private let outputSize: CGSize
+    private let pixelBufferPool: CVPixelBufferPool?
+
+    init(
+        ciContext: CIContext,
+        colorPipeline: FilmtoneColorPipelineContract,
+        outputSize: CGSize
+    ) {
+        self.ciContext = ciContext
+        self.colorPipeline = colorPipeline
+        self.outputColorSpace = colorPipeline.destinationColorSpace
+        self.outputSize = outputSize
+
+        var pool: CVPixelBufferPool?
+        let attributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferWidthKey as String: max(2, Int(outputSize.width.rounded())),
+            kCVPixelBufferHeightKey as String: max(2, Int(outputSize.height.rounded())),
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+        ]
+        CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool)
+        self.pixelBufferPool = pool
+    }
+
+    func rasterizedImage(from image: CIImage) throws -> CIImage {
+        guard let pixelBufferPool else {
+            throw FilmtoneMediaError.exportFailed("The video preview raster buffer pool could not be created.")
+        }
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &pixelBuffer)
+        guard status == kCVReturnSuccess, let pixelBuffer else {
+            throw FilmtoneMediaError.exportFailed("The video preview raster buffer could not be created.")
+        }
+
+        let bounds = CGRect(origin: .zero, size: outputSize)
+        ciContext.render(
+            image,
+            to: pixelBuffer,
+            bounds: bounds,
+            colorSpace: outputColorSpace
+        )
+        colorPipeline.applyOutputMetadata(to: pixelBuffer)
+
+        return CIImage(
+            cvPixelBuffer: pixelBuffer,
+            options: [.colorSpace: outputColorSpace]
+        )
+        .cropped(to: bounds)
     }
 }

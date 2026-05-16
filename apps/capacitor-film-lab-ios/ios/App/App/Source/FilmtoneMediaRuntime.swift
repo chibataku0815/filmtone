@@ -93,11 +93,13 @@ final class FilmtoneMediaRuntime {
 
     func renderPreview(
         request: Phase0ExportRequestDTO,
-        sourceURL: URL? = nil
+        sourceURL: URL? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> Phase0PreviewRenderResultDTO {
         let session = try makeExportSession(
             request: request,
-            sourceURL: sourceURL
+            sourceURL: sourceURL,
+            cameraProfile: cameraProfile
         )
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -180,7 +182,8 @@ final class FilmtoneMediaRuntime {
 
     func makeGradedPreviewItem(
         request: Phase0ExportRequestDTO,
-        sourceURL: URL? = nil
+        sourceURL: URL? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> FilmtonePreparedVideoPreviewItem {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         return try await withCheckedThrowingContinuation { continuation in
@@ -196,7 +199,8 @@ final class FilmtoneMediaRuntime {
                     )
                     let processor = try self.makeSharedGradeProcessor(
                         request: request,
-                        sourceURL: resolvedSourceURL
+                        sourceURL: resolvedSourceURL,
+                        cameraProfile: cameraProfile
                     )
                     let item = AVPlayerItem(asset: asset)
                     item.videoComposition = processor.makeVideoComposition(
@@ -222,7 +226,8 @@ final class FilmtoneMediaRuntime {
     func makeGradedPreviewComposition(
         request: Phase0ExportRequestDTO,
         asset: AVAsset,
-        sourceURL: URL? = nil
+        sourceURL: URL? = nil,
+        cameraProfile: CameraProfileSelection? = nil
     ) async throws -> FilmtonePreparedVideoPreviewComposition {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         return try await withCheckedThrowingContinuation { continuation in
@@ -237,7 +242,8 @@ final class FilmtoneMediaRuntime {
                     )
                     let processor = try self.makeSharedGradeProcessor(
                         request: request,
-                        sourceURL: resolvedSourceURL
+                        sourceURL: resolvedSourceURL,
+                        cameraProfile: cameraProfile
                     )
                     let composition = processor.makeVideoComposition(
                         asset: asset,

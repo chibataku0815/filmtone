@@ -1,5 +1,5 @@
-This release restores audio through iPhone capture and normal video export. Filmtone records microphone audio for clips captured in the app, keeps audio from imported videos during normal exports, and checks the completed output file before treating audio as preserved. Highlight-reel exports remain silent by design.
+Creative Look Pack previews now carry the selected Source Profile into the preview renderer. Stone and Urban on D-Log footage use the same input conversion in preview that export uses. Preview and export color handling were also aligned further, reducing cases where saved videos looked lifted or faded compared with the in-app preview.
 
-Advanced controls now include Texture softness. It reduces hard fine detail and digital edge acutance separately from lens/periphery softness, with conservative source-aware tuning when metadata identifies iPhone, Apple Log, or similar sources.
+Advanced controls now include Film Breath, Black Point, and Toe Contrast, so iPhone edits can tune motion variation, the black floor, and toe hardness.
 
-The capture, editor, and export internals were also tightened, including stronger capture package persistence, sidecar audio diagnostics, and clearer export failures.
+24fps Slow Mode was added for supported videos, making slower 24fps exports easier to create from the iPhone workflow.

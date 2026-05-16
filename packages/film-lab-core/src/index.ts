@@ -240,10 +240,12 @@ export {
 export {
   CREATIVE_PACK_01_BAKER_VERSION,
   CREATIVE_PACK_01_CUBE_SIZE,
+  CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
   CREATIVE_PACK_01_ID,
   CREATIVE_PACK_01_LOOKS,
   buildLookParamOverrides,
   findCreativePack01Look,
+  type CreativePack01ExpectedProcessSpace,
   type CreativePackLook,
 } from "./creative-pack-01";
 export {

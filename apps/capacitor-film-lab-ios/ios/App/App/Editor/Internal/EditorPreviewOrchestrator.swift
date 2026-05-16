@@ -384,7 +384,7 @@ final class FilmtoneVideoPreviewSession {
 /// preview state, the per-source `previewTask`, and the
 /// `FilmtoneVideoPreviewSession` handle. Hosts the render dispatch
 /// (`schedule()`), the AVAssetReader / AVAssetWriter-free preview path
-/// (`facade.renderPreview(request:)`), the video preview session
+/// (`facade.renderPreview(request:cameraProfile:)`), the video preview session
 /// preparation, the still fallback, the compare-frame render, and the
 /// preview error projection.
 ///
@@ -555,7 +555,10 @@ final class EditorPreviewOrchestrator: ObservableObject {
                 case .image:
                     self.videoPreviewSession = nil
                     self.markStillPreviewRendering()
-                    let result = try await self.facade.renderPreview(request: request)
+                    let result = try await self.facade.renderPreview(
+                        request: request,
+                        cameraProfile: project.cameraProfile
+                    )
                     try Task.checkCancellation()
                     self.preview = .still(.init(
                         originalPosterURI: result.originalUri,
@@ -571,7 +574,11 @@ final class EditorPreviewOrchestrator: ObservableObject {
 
                 case .video:
                     do {
-                        try await self.prepareVideoPreview(request: request, source: source)
+                        try await self.prepareVideoPreview(
+                            request: request,
+                            source: source,
+                            cameraProfile: project.cameraProfile
+                        )
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {
@@ -581,6 +588,7 @@ final class EditorPreviewOrchestrator: ObservableObject {
                         )
                         try await self.renderStillFallbackPreview(
                             request: request,
+                            cameraProfile: project.cameraProfile,
                             errorMessage: fallbackError
                         )
                     }
@@ -595,10 +603,15 @@ final class EditorPreviewOrchestrator: ObservableObject {
 
     private func prepareVideoPreview(
         request: Phase0ExportRequestDTO,
-        source: SourceInfoDTO
+        source: SourceInfoDTO,
+        cameraProfile: CameraProfileSelection
     ) async throws {
         if let videoPreviewSession, videoPreviewSession.sourceURI == source.uri {
-            try await refreshExistingVideoPreviewSession(videoPreviewSession, request: request)
+            try await refreshExistingVideoPreviewSession(
+                videoPreviewSession,
+                request: request,
+                cameraProfile: cameraProfile
+            )
             return
         }
 
@@ -607,7 +620,10 @@ final class EditorPreviewOrchestrator: ObservableObject {
         preview = .still(.init(isRendering: true))
 
         async let originalPrepared = facade.makeOriginalPreviewItem(request: request)
-        async let gradedPrepared = facade.makeGradedPreviewItem(request: request)
+        async let gradedPrepared = facade.makeGradedPreviewItem(
+            request: request,
+            cameraProfile: cameraProfile
+        )
 
         let original = try await originalPrepared
         let graded = try await gradedPrepared
@@ -621,12 +637,16 @@ final class EditorPreviewOrchestrator: ObservableObject {
         session.applyVideoTimingPolicy(request.videoTimingPolicy)
         videoPreviewSession = session
         syncPreviewFromVideoSession()
-        try await renderComparePreviewFrame(request: request)
+        try await renderComparePreviewFrame(
+            request: request,
+            cameraProfile: cameraProfile
+        )
     }
 
     private func refreshExistingVideoPreviewSession(
         _ videoPreviewSession: FilmtoneVideoPreviewSession,
-        request: Phase0ExportRequestDTO
+        request: Phase0ExportRequestDTO,
+        cameraProfile: CameraProfileSelection
     ) async throws {
         FilmtonePreviewRefreshDebug.log("refreshing existing graded video preview item")
         videoPreviewSession.beginPreparing()
@@ -640,17 +660,22 @@ final class EditorPreviewOrchestrator: ObservableObject {
 
         let composition = try await facade.makeGradedPreviewComposition(
             request: request,
-            asset: videoPreviewSession.gradedItem.asset
+            asset: videoPreviewSession.gradedItem.asset,
+            cameraProfile: cameraProfile
         )
         try Task.checkCancellation()
         videoPreviewSession.applyVideoTimingPolicy(request.videoTimingPolicy)
         await videoPreviewSession.refreshPreparedGradedComposition(composition)
         syncPreviewFromVideoSession()
-        try await renderComparePreviewFrame(request: request)
+        try await renderComparePreviewFrame(
+            request: request,
+            cameraProfile: cameraProfile
+        )
     }
 
     private func renderStillFallbackPreview(
         request: Phase0ExportRequestDTO,
+        cameraProfile: CameraProfileSelection,
         errorMessage: String
     ) async throws {
         let hadDisplayablePreview = hasDisplayablePreviewContent
@@ -660,7 +685,10 @@ final class EditorPreviewOrchestrator: ObservableObject {
         }
 
         do {
-            let result = try await facade.renderPreview(request: request)
+            let result = try await facade.renderPreview(
+                request: request,
+                cameraProfile: cameraProfile
+            )
             try Task.checkCancellation()
             videoPreviewSession = nil
             preview = .still(.init(
@@ -681,9 +709,15 @@ final class EditorPreviewOrchestrator: ObservableObject {
         }
     }
 
-    private func renderComparePreviewFrame(request: Phase0ExportRequestDTO) async throws {
+    private func renderComparePreviewFrame(
+        request: Phase0ExportRequestDTO,
+        cameraProfile: CameraProfileSelection
+    ) async throws {
         do {
-            let result = try await facade.renderPreview(request: request)
+            let result = try await facade.renderPreview(
+                request: request,
+                cameraProfile: cameraProfile
+            )
             try Task.checkCancellation()
             comparePreviewFrame = makeCompareFrame(from: result)
             store?.reclaimCacheForCurrentState()

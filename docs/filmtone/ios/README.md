@@ -6,12 +6,15 @@ entry points stay visible.
 
 ## Release State
 
-- Public App Store version: `1.8` as of the 2026-05-12 truth refresh.
-- Local Xcode candidate: `1.9` build `8`.
+- Public App Store version: `1.9` as of the 2026-05-16 truth refresh.
+- Local Xcode / TestFlight candidate: `1.10` build `13`.
+- Current TestFlight: `1.10 (13)` processed and distributed to Internal
+  testers on 2026-05-16 JST. No App Store review submission has been made for
+  `1.10`.
 - Release handoff for the pre-public submission state:
   [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
-  and the current 1.9 candidate:
-  [`2026-05-12-filmtone-ios-1.9-release-handoff.md`](./2026-05-12-filmtone-ios-1.9-release-handoff.md)
+  and the current 1.10 candidate:
+  [`2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md`](./2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md)
 
 ## Current Truth
 

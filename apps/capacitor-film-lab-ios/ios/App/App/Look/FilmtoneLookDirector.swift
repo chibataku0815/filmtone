@@ -94,13 +94,19 @@ enum FilmtoneLookDirector {
         vignetteGain: 0.0
     )
 
+    private enum SourceBranch {
+        case full
+        case rec709Safe
+    }
+
     /// Slug must match a Creative Pack 01 built-in. Returns nil for
     /// unknown slugs so the catalog keeps the static patch unmodified.
     static func resolveCreativePack01(
         slug: String,
         descriptor: FilmtoneSourceToneDescriptor?,
         sourceProfileId: String?,
-        sourceDetailBias: Double?
+        sourceDetailBias: Double?,
+        sourceColorClassRaw: String? = nil
     ) -> FilmtoneCreativePack01Adaptation.Resolved? {
         let weights: LookWeights
         switch slug {
@@ -114,6 +120,11 @@ enum FilmtoneLookDirector {
             return nil
         }
 
+        let sourceBranch = resolveSourceBranch(
+            sourceProfileId: sourceProfileId,
+            sourceColorClassRaw: sourceColorClassRaw
+        )
+        let isRec709SafeBranch = sourceBranch == .rec709Safe
         let descriptor = descriptor
         let night = clamp01(descriptor?.nightPracticalScore ?? 0)
         let highKey = clamp01(descriptor?.highKeyScore ?? 0)
@@ -126,13 +137,10 @@ enum FilmtoneLookDirector {
         // Treat explicit Log / profile catalog ids as low-saturation-flat
         // confirmation. The descriptor heuristic alone can miss flat
         // material when a tone-mapping path already brightened the frame.
-        let isLogProfile: Bool = {
-            guard let id = sourceProfileId else { return false }
-            return id.hasPrefix("built-in:source-profile.") &&
-                id != "built-in:source-profile.rec709"
-        }()
-        if isLogProfile {
+        if sourceBranch == .full {
             lowSatFlat = max(lowSatFlat, 0.6)
+        } else {
+            lowSatFlat = min(lowSatFlat, 0.25)
         }
 
         // Intensity — the bundled cube already ships at the schema maximum
@@ -144,6 +152,9 @@ enum FilmtoneLookDirector {
             intensity = max(0.82, intensity - 0.10 * night)
         } else {
             intensity = max(0.9, 1.0 - 0.08 * night)
+        }
+        if isRec709SafeBranch {
+            intensity = min(intensity, rec709SafeIntensityCeiling(slug: slug))
         }
 
         // Build the overlay patch — only keys we actually touch are
@@ -161,13 +172,20 @@ enum FilmtoneLookDirector {
             weights.logFlatCompression * lowSatFlat +
             0.105 * weights.scale
         if compressionAdd > 0.005 {
-            values["compressionAmount"] = clamp(0.0, 0.68, compressionAdd)
+            let compressionUpper: Double
+            if isRec709SafeBranch {
+                compressionUpper = highKey >= 0.5 ? 0.30 : 0.22
+            } else {
+                compressionUpper = 0.68
+            }
+            values["compressionAmount"] = clamp(0.0, compressionUpper, compressionAdd)
             // Pull the compression knee earlier on flat / high-key material
             // so compression reaches mid tones, not just highlights. Night
             // intentionally leaves the knee at default so the natural
             // shadow→highlight ramp keeps its contour.
             let kneeShift = -0.28 * lowSatFlat - 0.16 * highKey
-            values["compressionRange"] = clamp(0.20, 0.6, 0.5 + kneeShift)
+            let compressionRangeLower = isRec709SafeBranch ? 0.36 : 0.20
+            values["compressionRange"] = clamp(compressionRangeLower, 0.6, 0.5 + kneeShift)
         }
 
         // Print curve — useful on high-key / Log material, but not a night
@@ -182,9 +200,9 @@ enum FilmtoneLookDirector {
             ) * nightPrintGuard +
             0.014 * weights.scale
         if printAdd > 0.005 {
-            values["printContrast"] = clamp(0.0, 0.42,
-                catalogValue(slug: slug, key: "printContrast") + printAdd
-            )
+            let printBase = catalogValue(slug: slug, key: "printContrast")
+            let printUpper = isRec709SafeBranch ? min(0.42, printBase + 0.12) : 0.42
+            values["printContrast"] = clamp(0.0, printUpper, printBase + printAdd)
         }
 
         // Contrast — keep the punch on flat or high-key material; on night,
@@ -195,7 +213,7 @@ enum FilmtoneLookDirector {
             night * 0.5
         )
         if contrastAdd > 0.005 {
-            values["contrast"] = clamp(1.0, 1.22,
+            values["contrast"] = clamp(1.0, isRec709SafeBranch ? 1.10 : 1.22,
                 catalogValue(slug: slug, key: "contrast") + contrastAdd
             )
         }
@@ -211,7 +229,7 @@ enum FilmtoneLookDirector {
             night * 0.5
         )
         if saturationAdd > 0.005 {
-            values["saturation"] = clamp(1.0, 1.24,
+            values["saturation"] = clamp(1.0, isRec709SafeBranch ? 1.08 : 1.24,
                 catalogValue(slug: slug, key: "saturation") + saturationAdd
             )
         }
@@ -283,9 +301,14 @@ enum FilmtoneLookDirector {
         // M1C corrects.
         let diffusionAdd = 0.030 * lowSatFlat * opticsScale
         if diffusionAdd > 0.005 {
-            values["diffusion"] = clamp(0.0, 0.28,
-                catalogValue(slug: slug, key: "diffusion") + diffusionAdd
-            )
+            let diffusionBase = catalogValue(slug: slug, key: "diffusion")
+            let diffusionUpper: Double
+            if isRec709SafeBranch {
+                diffusionUpper = min(0.28, diffusionBase + 0.012)
+            } else {
+                diffusionUpper = 0.28
+            }
+            values["diffusion"] = clamp(0.0, diffusionUpper, diffusionBase + diffusionAdd)
         }
 
         // Vignette — only deepen on night frames with strong shadow
@@ -318,6 +341,40 @@ enum FilmtoneLookDirector {
 
     private static func clamp01(_ value: Double) -> Double {
         return max(0, min(1, value))
+    }
+
+    private static func resolveSourceBranch(
+        sourceProfileId: String?,
+        sourceColorClassRaw: String?
+    ) -> SourceBranch {
+        if let sourceProfileId {
+            if sourceProfileId == "built-in:source-profile.rec709" {
+                return .rec709Safe
+            }
+            if sourceProfileId.hasPrefix("built-in:source-profile.") {
+                return .full
+            }
+        }
+
+        switch sourceColorClassRaw {
+        case "apple-log", "apple-log2":
+            return .full
+        default:
+            return .rec709Safe
+        }
+    }
+
+    static func rec709SafeIntensityCeiling(slug: String) -> Double {
+        switch slug {
+        case "filmtone-creative-pack-01-stone":
+            return 0.86
+        case "filmtone-creative-pack-01-urban":
+            return 0.84
+        case "filmtone-creative-pack-01-noir":
+            return 0.92
+        default:
+            return 1.0
+        }
     }
 
     private static func catalogValue(slug: String, key: String) -> Double {

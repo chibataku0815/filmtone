@@ -40,6 +40,31 @@ func registerDBM13GradeResolutionTests() {
         )
     }
 
+    func makeResolvedBuiltIn(
+        slug: String,
+        intensity: Double = 1.0,
+        sourceHash: String? = nil
+    ) throws -> FilmtoneResolvedGrade {
+        guard let look = FilmtoneCreativePackCatalog.find(slug: slug) else {
+            throw AssertionError(description: "missing built-in look \(slug)")
+        }
+        let lut = PreparedCreativeLut(
+            slug: look.slug,
+            size: 2,
+            intensity: 1.0,
+            cubeData: Data(),
+            sourceHash: sourceHash ?? look.pinnedSha256
+        )
+        return FilmtoneResolvedGrade(
+            params: FilmtonePhase0Generated.resetParams,
+            creativeLut: lut,
+            lutIntensity: intensity,
+            source: .builtIn(lookSlug: slug),
+            sourceGraph: nil,
+            unsupportedMetadata: []
+        )
+    }
+
     runner.test("DB-M13 GradeResolution resolves imported grade source + unsupported metadata") {
         let id = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
         let imported = makeImportedGrade(id: id)
@@ -115,6 +140,34 @@ func registerDBM13GradeResolutionTests() {
             paramOverrides: patch
         )
         try assertParamsEqual(resolved.params, expected, "built-in GradeResolution parity")
+    }
+
+    runner.test("DB-M13 source policy clamps bundled built-in Looks only on Rec.709 sources") {
+        let rec709 = FilmtoneSourceProfileCatalog.entry(forCatalogId: "built-in:source-profile.rec709")
+        let dlogM = FilmtoneSourceProfileCatalog.entry(forCatalogId: "built-in:source-profile.dji-dlog-m")
+        let cases: [(String, Double)] = [
+            ("filmtone-creative-pack-01-stone", 0.86),
+            ("filmtone-creative-pack-01-urban", 0.84),
+            ("filmtone-creative-pack-01-noir", 0.92),
+        ]
+
+        for (slug, ceiling) in cases {
+            let rec709Resolved = try makeResolvedBuiltIn(slug: slug)
+                .applyingSourcePolicy(resolvedProfile: rec709, probedColorClass: .sdrBt709)
+            try assertClose(rec709Resolved.lutIntensity, ceiling, "\(slug) Rec.709 ceiling")
+
+            let unknownResolved = try makeResolvedBuiltIn(slug: slug)
+                .applyingSourcePolicy(resolvedProfile: nil, probedColorClass: .unknown)
+            try assertClose(unknownResolved.lutIntensity, ceiling, "\(slug) unknown display ceiling")
+
+            let logResolved = try makeResolvedBuiltIn(slug: slug)
+                .applyingSourcePolicy(resolvedProfile: dlogM, probedColorClass: nil)
+            try assertClose(logResolved.lutIntensity, 1.0, "\(slug) Log/profile branch")
+
+            let packageResolved = try makeResolvedBuiltIn(slug: slug, sourceHash: "package-local")
+                .applyingSourcePolicy(resolvedProfile: rec709, probedColorClass: .sdrBt709)
+            try assertClose(packageResolved.lutIntensity, 1.0, "\(slug) package LUT exclusion")
+        }
     }
 
     runner.test("DB-M13 sidecar emits importedGrade block instead of built-in look claim") {

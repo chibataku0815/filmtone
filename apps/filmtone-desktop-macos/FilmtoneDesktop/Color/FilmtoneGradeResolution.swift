@@ -30,6 +30,52 @@ struct FilmtoneResolvedGrade: Equatable, Sendable {
             ]
         }
     }
+
+    func applyingSourcePolicy(
+        resolvedProfile: CameraProfileCatalogEntry?,
+        probedColorClass: SourceColorClassDTO?
+    ) -> FilmtoneResolvedGrade {
+        guard isRec709SafeSource(resolvedProfile: resolvedProfile, probedColorClass: probedColorClass),
+              case .builtIn(let optionalLookSlug) = source,
+              let lookSlug = optionalLookSlug,
+              let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
+              let creativeLut,
+              creativeLut.slug == look.slug,
+              creativeLut.sourceHash == look.pinnedSha256
+        else {
+            return self
+        }
+
+        let nextIntensity = min(lutIntensity, look.rec709SafeIntensityCeiling)
+        guard abs(nextIntensity - lutIntensity) > 1e-9 else {
+            return self
+        }
+
+        return FilmtoneResolvedGrade(
+            params: params,
+            creativeLut: creativeLut,
+            lutIntensity: nextIntensity,
+            source: source,
+            sourceGraph: sourceGraph,
+            unsupportedMetadata: unsupportedMetadata
+        )
+    }
+
+    private func isRec709SafeSource(
+        resolvedProfile: CameraProfileCatalogEntry?,
+        probedColorClass: SourceColorClassDTO?
+    ) -> Bool {
+        if let resolvedProfile {
+            return resolvedProfile.id == "built-in:source-profile.rec709"
+        }
+
+        switch probedColorClass {
+        case .appleLog, .appleLog2:
+            return false
+        default:
+            return true
+        }
+    }
 }
 
 enum FilmtoneGradeResolution {

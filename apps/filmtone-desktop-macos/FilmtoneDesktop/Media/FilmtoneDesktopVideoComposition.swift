@@ -110,11 +110,15 @@ enum FilmtoneDesktopVideoComposition {
 
         // Resolve invariants once per composition build so the handler
         // closure does not redo them per frame.
-        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: inputs.gradeRecipe)
         let resolvedProfileEntry = FilmtoneSourceInputTransform.resolve(
             selection: inputs.sourceProfileSelection,
             probedColorClass: inputs.probedColorClass
         )
+        let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: inputs.gradeRecipe)
+            .applyingSourcePolicy(
+                resolvedProfile: resolvedProfileEntry,
+                probedColorClass: inputs.probedColorClass
+            )
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: inputs.sourceURL.absoluteString
         )

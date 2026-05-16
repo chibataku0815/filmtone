@@ -395,6 +395,9 @@ final class EditorProjectMutationCoordinator {
                         sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                             probe: store.probe,
                             cameraProfile: store.project.cameraProfile
+                        ),
+                        sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
+                            probe: store.probe
                         )
                     )
                 } else {
