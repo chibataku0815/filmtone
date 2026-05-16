@@ -76,6 +76,7 @@ SOURCES=(
   "$SRC_ROOT/State/FilmtoneImportedGradePackageImport.swift"
   "$SRC_ROOT/State/FilmtoneDrxImport.swift"
   "$APP_ROOT/AutomationCLI/FilmtoneAutomationCore.swift"
+  "$APP_ROOT/AutomationCLI/FilmtoneFrameMetricsHarness.swift"
   "$HERE/TestSupport.swift"
   "$HERE/CoreQuickSidecarStateTests.swift"
   "$HERE/CoreCatalogStoreStringTests.swift"
@@ -84,6 +85,7 @@ SOURCES=(
   "$HERE/DBM13GradeResolutionTests.swift"
   "$HERE/DBM13DrxImportTests.swift"
   "$HERE/AutomationRuntimeTests.swift"
+  "$HERE/FrameMetricsHarnessTests.swift"
   "$HERE/main.swift"
 )
 

@@ -60,6 +60,7 @@ SOURCES=(
   "$SRC_ROOT/Media/FilmtoneVideoReader.swift"
   "$SRC_ROOT/Media/FilmtoneVideoWriter.swift"
   "$AUTOMATION_ROOT/FilmtoneAutomationCore.swift"
+  "$AUTOMATION_ROOT/FilmtoneFrameMetricsHarness.swift"
   "$AUTOMATION_ROOT/FilmtoneAutomationCLI.swift"
 )
 

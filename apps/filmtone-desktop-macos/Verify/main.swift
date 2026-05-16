@@ -7,5 +7,6 @@ registerImportedGradeRuntimeTests()
 registerDBM13GradeResolutionTests()
 registerDBM13DrxImportTests()
 registerAutomationRuntimeTests()
+registerFrameMetricsHarnessTests()
 
 exit(runner.summary())

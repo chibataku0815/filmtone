@@ -502,6 +502,11 @@ marketplace: `chibataku0815/filmtone-codex-marketplace`; clean Codex
 app-server verification installed `filmtone-codex@filmtone` and listed the 7
 MCP tools. Helper distribution/signing remains a follow-up lane.
 
+2026-05-16: Codex Grade Repair Phase 0 metrics proof landed. The Automation
+CLI / Verify harness now has deterministic still-image luma, channel ceiling,
+chroma stress, and black-floor metrics for future repair analysis. Archive
+`archive/2026-05-16-codex-grade-repair-metrics-proof.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
