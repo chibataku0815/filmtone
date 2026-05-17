@@ -11,15 +11,13 @@ entry points stay visible.
 - Public storefront lookup is country-specific during propagation:
   US / GB / CA / AU / DE / FR / KR return `1.10`, while JP still returns `1.9`
   from the iTunes lookup used by `check-filmtone-ios-truth.sh`.
-- Local Xcode version fields: `1.11` build `14`, but the working tree now
-  contains post-upload Rec.709-safe color cube changes that are not in the
-  uploaded binary.
+- Local Xcode version fields: `1.11` build `15`; this is the post-owner-QA
+  release candidate that includes the Rec.709-safe color cube changes.
 - Current TestFlight reference build: `1.11 (14)` processed and distributed to
   Internal testers on 2026-05-17 JST. Treat it as superseded for App Review.
-- Next iOS release candidate must bump `CURRENT_PROJECT_VERSION` to `15` or
-  later before archive/upload.
-- App Store review: `1.11` has not been submitted. Submission is gated on owner
-  visual QA for real Rec.709 / Log footage, then a fresh archive/upload.
+- App Store review: `1.11 (15)` was submitted for review on 2026-05-17 JST
+  after owner visual QA passed on `千葉工のiPhone (7)`. It is the current App
+  Review candidate; `1.11 (14)` remains superseded.
 - Release handoff for the pre-public submission state:
   [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
   and the current 1.10 candidate:

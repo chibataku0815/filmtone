@@ -69,6 +69,34 @@ release path is now: visual QA on current source -> bump iOS build number ->
 archive -> upload a new TestFlight build -> submit only after that build is
 accepted.
 
+Post-owner-QA update on 2026-05-17 JST: owner confirmed the current source on
+`千葉工のiPhone (7)`. Xcode `CURRENT_PROJECT_VERSION` was bumped to `15` for
+the release archive. `1.11 (15)` is the App Store review candidate; `1.11 (14)`
+remains superseded.
+
+## 1.11 (15) Release Verification
+
+- `bun run verify:ios` passed after the build bump.
+- `git diff --check` passed after the build bump.
+- `bun run check:filmtone-copy` passed after the build bump.
+- `bun run check:filmtone-context` passed after the build bump.
+- `check-filmtone-ios-truth.sh` reports local Xcode candidate `1.11` build
+  `15`.
+- `bun run --cwd apps/capacitor-film-lab-ios release:archive` produced a signed
+  IPA and dSYM for `1.11 (15)`.
+- Exported IPA plist confirmed:
+  - `CFBundleIdentifier = com.chibatakumi.film.lab.ios`
+  - `CFBundleShortVersionString = 1.11`
+  - `CFBundleVersion = 15`
+- IPA SHA-256:
+  `bce71093564f4921430cfd3ebb5eb75841eead149a5f458f11f6858fb1fd4c2c`
+- `IPA_PATH=build/fastlane/Filmtone.ipa bun run --cwd apps/capacitor-film-lab-ios release:appstore-binary`
+  uploaded `1.11 (15)` to App Store Connect.
+- `bun run --cwd apps/capacitor-film-lab-ios release:release-notes` synced the
+  `1.11` release notes for `ja`, `en-US`, and `en-GB`.
+- `BUILD_NUMBER=15 bun run --cwd apps/capacitor-film-lab-ios release:submit-review-notes`
+  selected build `1.11 (15)` and submitted it for App Review.
+
 ## Copy / History Impact
 
 Copy / History Impact: App Store release notes changed for the 1.11 candidate.
