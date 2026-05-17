@@ -37,6 +37,10 @@ enum FilmtoneBuiltInCatalog {
         /// carry a `.bundled` binding with the resource filename and the
         /// pinned SHA-256 of the cube bytes.
         let creativeLut: CreativeLutBinding?
+        /// Source-aware Rec.709 / unknown-display safe color variant.
+        /// Optical / glow parameters stay in `paramOverrides`; this binding
+        /// changes only the color cube selected for display-referred sources.
+        let rec709SafeCreativeLut: CreativeLutBinding?
         /// v1.4 Creative LUT Pack 01: pack identifier (e.g.
         /// `"creative-pack-01"`) used by `FilmtoneExportSidecarBuilder` to
         /// stamp `bundledPackId` onto the sidecar's `creativeLut` ref. nil
@@ -96,6 +100,12 @@ enum FilmtoneBuiltInCatalog {
                 sha256: "b533a08cdc7ad7f563865bce758ec589bad966860d539d39b9d08165ee6e37ad",
                 intensity: 1.0
             ),
+            rec709SafeCreativeLut: .bundled(
+                slug: "filmtone-creative-pack-01-stone",
+                filename: "filmtone-creative-pack-01-stone-rec709-safe.cube",
+                sha256: "65aa4c8294361cf1c55fcb9c5c7bb357b9e6ead08778c043885e86d336e49dbe",
+                intensity: 1.0
+            ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
         ),
         BuiltInLook(
@@ -112,6 +122,12 @@ enum FilmtoneBuiltInCatalog {
                 sha256: "880737a9f73f2e171779328707daef92a98bce3c612fa83c9817fc0980105760",
                 intensity: 1.0
             ),
+            rec709SafeCreativeLut: .bundled(
+                slug: "filmtone-creative-pack-01-urban",
+                filename: "filmtone-creative-pack-01-urban-rec709-safe.cube",
+                sha256: "e958a500f0d7f9ffe4c77143be60691b248ccf688a727c8ee4b8b09110805505",
+                intensity: 1.0
+            ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
         ),
         BuiltInLook(
@@ -126,6 +142,12 @@ enum FilmtoneBuiltInCatalog {
                 slug: "filmtone-creative-pack-01-noir",
                 filename: "filmtone-creative-pack-01-noir.cube",
                 sha256: "50f4d1d14b4cec964c6e100d86af5777a32c6dd976a13e9fc6b4b261bf7a72fa",
+                intensity: 1.0
+            ),
+            rec709SafeCreativeLut: .bundled(
+                slug: "filmtone-creative-pack-01-noir",
+                filename: "filmtone-creative-pack-01-noir-rec709-safe.cube",
+                sha256: "f8f321d576f17045861e81441c0e17d303ec31b6243c26b59c31734c7d6057ea",
                 intensity: 1.0
             ),
             packId: FilmtoneBuiltInCatalog.creativePack01Id
@@ -156,10 +178,57 @@ enum FilmtoneBuiltInCatalog {
         return allLooks.first { $0.canonicalUUID == id }
     }
 
+    static func look(matchingSlug slug: String) -> BuiltInLook? {
+        return allLooks.first { $0.slug == slug }
+    }
+
     /// Returns the slug for a built-in Look's canonical UUID, or `nil`
     /// for non-built-in ids.
     static func slug(for id: UUID) -> String? {
         return look(matching: id)?.slug
+    }
+
+    static func creativeLutBinding(
+        for builtIn: BuiltInLook,
+        sourceProfileId: String?,
+        sourceColorClassRaw: String?
+    ) -> CreativeLutBinding? {
+        if FilmtoneLookDirector.isRec709SafeSource(
+            sourceProfileId: sourceProfileId,
+            sourceColorClassRaw: sourceColorClassRaw
+        ) {
+            return builtIn.rec709SafeCreativeLut ?? builtIn.creativeLut
+        }
+        return builtIn.creativeLut
+    }
+
+    static func creativeLutBinding(
+        forSlug slug: String,
+        defaultBinding: CreativeLutBinding,
+        sourceProfileId: String?,
+        sourceColorClassRaw: String?
+    ) -> CreativeLutBinding {
+        guard let builtIn = look(matchingSlug: slug) else {
+            return defaultBinding
+        }
+        guard let selected = creativeLutBinding(
+            for: builtIn,
+            sourceProfileId: sourceProfileId,
+            sourceColorClassRaw: sourceColorClassRaw
+        ) else {
+            return defaultBinding
+        }
+        guard case let .bundled(_, _, _, requestedIntensity) = defaultBinding,
+              case let .bundled(selectedSlug, selectedFilename, selectedSha256, _) = selected
+        else {
+            return selected
+        }
+        return .bundled(
+            slug: selectedSlug,
+            filename: selectedFilename,
+            sha256: selectedSha256,
+            intensity: requestedIntensity
+        )
     }
 
     /// Materialize a `BuiltInLook` into a `SavedLookEntry` so the library

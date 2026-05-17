@@ -6,20 +6,26 @@ entry points stay visible.
 
 ## Release State
 
-- App Store Connect: `1.10 (13)` is `READY_FOR_DISTRIBUTION` as of the
-  2026-05-17 release check.
+- App Store Connect public release: `1.10 (13)` is
+  `READY_FOR_DISTRIBUTION` as of the 2026-05-17 release check.
 - Public storefront lookup is country-specific during propagation:
   US / GB / CA / AU / DE / FR / KR return `1.10`, while JP still returns `1.9`
   from the iTunes lookup used by `check-filmtone-ios-truth.sh`.
-- Local Xcode / TestFlight candidate: `1.10` build `13`.
-- Current TestFlight: `1.10 (13)` processed and distributed to Internal
-  testers on 2026-05-16 JST.
-- App Store review: `1.10 (13)` was submitted for review on 2026-05-16 JST and
-  is now released / ready for distribution in App Store Connect.
+- Local Xcode version fields: `1.11` build `14`, but the working tree now
+  contains post-upload Rec.709-safe color cube changes that are not in the
+  uploaded binary.
+- Current TestFlight reference build: `1.11 (14)` processed and distributed to
+  Internal testers on 2026-05-17 JST. Treat it as superseded for App Review.
+- Next iOS release candidate must bump `CURRENT_PROJECT_VERSION` to `15` or
+  later before archive/upload.
+- App Store review: `1.11` has not been submitted. Submission is gated on owner
+  visual QA for real Rec.709 / Log footage, then a fresh archive/upload.
 - Release handoff for the pre-public submission state:
   [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
   and the current 1.10 candidate:
   [`2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md`](./2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md)
+  plus the current 1.11 release check:
+  [`2026-05-17-filmtone-ios-1.11-rec709-safe-look-release-check.md`](./2026-05-17-filmtone-ios-1.11-rec709-safe-look-release-check.md)
 
 ## Current Truth
 
@@ -55,7 +61,7 @@ move to `<lane>/archive/`.
 | React / Capacitor purge | **Closed + merged into main as `47a1d76d` (2026-05-09)** | [`react-capacitor-purge/strategy.md`](./react-capacitor-purge/strategy.md) | Stages A → E archived. Worktree + branch removed post-merge. |
 | Meta Before/After DaVinci shell | Asset directory, not a lane | [`meta-before-after-davinci-shell/README.md`](./meta-before-after-davinci-shell/README.md) | Placeholder Resolve project + Lua helpers for ad production. Not active product work. |
 | Feature Architecture Refactor | **Closed + merged into main (2026-05-12)** | [`feature-architecture-refactor/strategy.md`](./feature-architecture-refactor/strategy.md) | Reorganized the flat App source root into feature folders and split the capture, editor, and export collaborators. Final smoke passed on device before the 1.9 release candidate. |
-| Max Quality Look Director | **Active M1 pilot** | [`max-quality-look-director/strategy.md`](./max-quality-look-director/strategy.md) | Source-aware built-in Look adaptation for higher iOS image ceiling, with minimal visual/performance verification in [`max-quality-look-director/active.md`](./max-quality-look-director/active.md). |
+| Max Quality Look Director | **No active subtask** | [`max-quality-look-director/strategy.md`](./max-quality-look-director/strategy.md) | Source-aware built-in Look adaptation archives include the Rec.709-safe color variant follow-up in [`max-quality-look-director/archive/2026-05-17-rec709-safe-built-in-look-color-variants.md`](./max-quality-look-director/archive/2026-05-17-rec709-safe-built-in-look-color-variants.md). |
 
 ## Idea Notes
 

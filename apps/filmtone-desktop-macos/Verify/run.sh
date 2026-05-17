@@ -95,4 +95,5 @@ swiftc \
   -o "$OUT" \
   "${SOURCES[@]}" \
   "${PKG_OBJECTS[@]}"
+export FILMTONE_CREATIVE_LUT_ROOT="$SRC_ROOT/Resources/CreativeLuts"
 "$OUT"

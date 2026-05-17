@@ -1,7 +1,7 @@
 # Filmtone iOS Max Quality Look Director Strategy
 
 Date opened: 2026-05-13 JST
-Last updated: 2026-05-13 JST
+Last updated: 2026-05-17 JST
 
 This lane is the iOS product-quality lane for raising the rendered image
 ceiling from source-aware grade decisions, not a conservative cleanup lane.
@@ -74,9 +74,10 @@ and follow-up acceleration rather than by reducing the visual target upfront.
 
 ## Current Active
 
-No current `active.md` after M2 archive. M3 / M4 (optics performance escalation
-or depth-aware stills) remain planned/gated; open a fresh `active.md` if and
-when the owner decides to proceed.
+No current `active.md` after the 2026-05-17 Rec.709-safe color variant
+follow-up archive. M3 / M4 (optics performance escalation or depth-aware
+stills) remain planned/gated; open a fresh `active.md` if and when the owner
+decides to proceed.
 
 ## Dependencies And Evidence
 
@@ -160,3 +161,6 @@ visual/performance check, likely classification is:
 - 2026-05-13 JST: M2.2 replaced Stone's whole-lattice identity mix with a
   Palermo-primary display-domain cube; only deepest shadows blend back toward
   identity for black-floor safety. iOS Debug build installed on iPhone 17 Pro.
+- 2026-05-17 JST: Rec.709-safe color cube variants for Stone / Urban / Noir
+  landed across Core, iOS, and native Desktop. Optical/glow controls remain
+  active; display-referred color risk is handled by source-aware cube selection.

@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "packId": "creative-pack-01",
   "bakerVersion": "1.5.0-stone-palermo-signature",
   "cubeSize": 65,
-  "generatedAtIso": "2026-05-13T10:21:47.764Z",
-  "generatedFromCommit": null,
+  "generatedAtIso": "2026-05-17T07:48:21.570Z",
+  "generatedFromCommit": "66d59a88188703e54f4cc234ab9b57ffd11ebc32",
   "bakeMode": "real",
   "looks": [
     {
@@ -23,6 +23,8 @@
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,
@@ -48,6 +50,8 @@
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,
@@ -61,7 +65,13 @@
       "strength": 1,
       "bakeMode": "real",
       "sourceCubePath": "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube",
-      "sourceCubeTransform": "filmtone-stone-dlogm-palermo-display-v2"
+      "sourceCubeTransform": "filmtone-stone-dlogm-palermo-display-v2",
+      "rec709SafeCubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-stone-rec709-safe.cube",
+      "rec709SafeCubeSize": 65,
+      "rec709SafeCubeSha256": "65aa4c8294361cf1c55fcb9c5c7bb357b9e6ead08778c043885e86d336e49dbe",
+      "rec709SafeCubeBytes": 7415145,
+      "rec709SafeDiagonalMaxDelta": 0.16218042373657227,
+      "rec709SafeSourceCubeTransform": "filmtone-rec709-safe-color-v1"
     },
     {
       "slug": "filmtone-creative-pack-01-urban",
@@ -79,6 +89,8 @@
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,
@@ -104,6 +116,8 @@
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,
@@ -117,7 +131,13 @@
       "strength": 1,
       "bakeMode": "real",
       "sourceCubePath": "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/LUT + Extras/Palermo + Colour Density + Green Density.cube",
-      "sourceCubeTransform": "filmtone-urban-palermo-green-density-v1"
+      "sourceCubeTransform": "filmtone-urban-palermo-green-density-v1",
+      "rec709SafeCubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban-rec709-safe.cube",
+      "rec709SafeCubeSize": 65,
+      "rec709SafeCubeSha256": "e958a500f0d7f9ffe4c77143be60691b248ccf688a727c8ee4b8b09110805505",
+      "rec709SafeCubeBytes": 7415145,
+      "rec709SafeDiagonalMaxDelta": 0.16450530290603638,
+      "rec709SafeSourceCubeTransform": "filmtone-rec709-safe-color-v1"
     },
     {
       "slug": "filmtone-creative-pack-01-noir",
@@ -135,6 +155,8 @@
         "saturation": 0.012,
         "temperature": 0.015,
         "tint": -0.055,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0.022,
         "compressionAmount": 0.38,
         "compressionRange": 0.56,
@@ -161,6 +183,8 @@
         "saturation": 1,
         "temperature": 0,
         "tint": 0,
+        "toeContrast": 0,
+        "blackPoint": 0,
         "fade": 0,
         "compressionAmount": 0,
         "compressionRange": 0.5,
@@ -172,7 +196,13 @@
         "highlightTone": 0
       },
       "strength": 1,
-      "bakeMode": "real"
+      "bakeMode": "real",
+      "rec709SafeCubeRelPath": "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir-rec709-safe.cube",
+      "rec709SafeCubeSize": 65,
+      "rec709SafeCubeSha256": "f8f321d576f17045861e81441c0e17d303ec31b6243c26b59c31734c7d6057ea",
+      "rec709SafeCubeBytes": 7415143,
+      "rec709SafeDiagonalMaxDelta": 0.22212404012680054,
+      "rec709SafeSourceCubeTransform": "filmtone-rec709-safe-color-v1"
     }
   ]
 }

@@ -4,6 +4,8 @@ export const CREATIVE_PACK_01_STONE_TRANSFORM =
   "filmtone-stone-dlogm-palermo-display-v2" as const;
 export const CREATIVE_PACK_01_URBAN_TRANSFORM =
   "filmtone-urban-palermo-green-density-v1" as const;
+export const CREATIVE_PACK_01_REC709_SAFE_TRANSFORM =
+  "filmtone-rec709-safe-color-v1" as const;
 
 export type CreativePack01SourceTransform =
   | typeof CREATIVE_PACK_01_STONE_TRANSFORM
@@ -26,6 +28,54 @@ function luma(r: number, g: number, b: number): number {
 
 function mix(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+function channelChroma(rgb: [number, number, number]): number {
+  return Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]);
+}
+
+function compressRgbDistanceFromNeutral(
+  rgb: [number, number, number],
+  threshold: number,
+  limit: number,
+): [number, number, number] {
+  const y = luma(rgb[0], rgb[1], rgb[2]);
+  const distances = [rgb[0] - y, rgb[1] - y, rgb[2] - y] as const;
+  const maxDistance = Math.max(
+    Math.abs(distances[0]),
+    Math.abs(distances[1]),
+    Math.abs(distances[2]),
+  );
+  if (maxDistance <= threshold || maxDistance <= 1e-8) {
+    return rgb;
+  }
+
+  const t = Math.min(threshold, limit);
+  const excess = maxDistance - t;
+  const compressed = t + excess / (1 + excess / Math.max(1e-4, limit - t));
+  const scale = Math.min(1, compressed / maxDistance);
+  return [
+    clamp01(y + distances[0] * scale),
+    clamp01(y + distances[1] * scale),
+    clamp01(y + distances[2] * scale),
+  ];
+}
+
+function preserveInputLuma(
+  input: [number, number, number],
+  output: [number, number, number],
+  amount: number,
+): [number, number, number] {
+  if (amount <= 0) return output;
+  const inputY = luma(input[0], input[1], input[2]);
+  const outputY = luma(output[0], output[1], output[2]);
+  const targetY = mix(outputY, inputY, clamp01(amount));
+  const delta = targetY - outputY;
+  return [
+    clamp01(output[0] + delta),
+    clamp01(output[1] + delta),
+    clamp01(output[2] + delta),
+  ];
 }
 
 function rec709Decode(encoded: number): number {
@@ -149,6 +199,116 @@ function warmSkinMask(r: number, g: number, b: number, inputLuma: number): numbe
   const lumaGate = smoothstep(0.20, 0.42, inputLuma) * (1 - smoothstep(0.76, 0.94, inputLuma));
   const saturationGuard = 1 - smoothstep(0.52, 0.9, Math.max(r, g, b) - Math.min(r, g, b));
   return warmOrder * lumaGate * saturationGuard;
+}
+
+function saturatedDisplayRiskMask(
+  input: [number, number, number],
+  output: [number, number, number],
+): number {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const inputChroma = channelChroma(input);
+  const outputChroma = channelChroma(output);
+  const highSat =
+    smoothstep(0.28, 0.72, inputChroma) *
+    smoothstep(0.22, 0.60, outputChroma);
+  const highKey = smoothstep(0.58, 0.92, inputLuma);
+  const midKey = smoothstep(0.18, 0.42, inputLuma) * (1 - smoothstep(0.80, 0.98, inputLuma));
+  return clamp01(highSat * (0.45 + 0.55 * highKey + 0.20 * midKey));
+}
+
+function rec709SafeLookOutput(
+  slug: string,
+  input: [number, number, number],
+  output: [number, number, number],
+): [number, number, number] {
+  const inputLuma = luma(input[0], input[1], input[2]);
+  const risk = saturatedDisplayRiskMask(input, output);
+  const skin = warmSkinMask(input[0], input[1], input[2], inputLuma);
+  const sky = cyanSkyMask(input[0], input[1], input[2], inputLuma);
+  const green = dominantGreenMask(input[0], input[1], input[2], inputLuma);
+  const neutral = 1 - smoothstep(0.035, 0.18, channelChroma(input));
+
+  let threshold = 0.30;
+  let limit = 0.50;
+  let compressionMix = risk;
+  let lumaProtect = risk * 0.18;
+
+  switch (slug) {
+    case "filmtone-creative-pack-01-stone":
+      threshold = 0.245;
+      limit = 0.40;
+      compressionMix = clamp01(risk * 0.88 + sky * 0.30 + green * 0.18 - skin * 0.20);
+      lumaProtect = clamp01(risk * 0.22 + sky * 0.12);
+      break;
+    case "filmtone-creative-pack-01-urban":
+      threshold = 0.255;
+      limit = 0.42;
+      compressionMix = clamp01(risk * 0.78 + green * 0.22 + sky * 0.18 - skin * 0.12);
+      lumaProtect = clamp01(risk * 0.18);
+      break;
+    case "filmtone-creative-pack-01-noir":
+      threshold = 0.08;
+      limit = 0.16;
+      compressionMix = clamp01(0.72 + risk * 0.20);
+      lumaProtect = clamp01(smoothstep(0.60, 0.95, inputLuma) * 0.16);
+      break;
+  }
+
+  const compressed = compressRgbDistanceFromNeutral(output, threshold, limit);
+  let safe: [number, number, number] = [
+    mix(output[0], compressed[0], compressionMix),
+    mix(output[1], compressed[1], compressionMix),
+    mix(output[2], compressed[2], compressionMix),
+  ];
+
+  // Keep ordinary neutrals and skin from drifting toward the protective
+  // compression. The safe variant should cure display-referred color failures,
+  // not erase the intended photographic color on trustworthy colors.
+  const trust = clamp01(neutral * 0.35 + skin * 0.45);
+  safe = [
+    mix(safe[0], output[0], trust),
+    mix(safe[1], output[1], trust),
+    mix(safe[2], output[2], trust),
+  ];
+
+  safe = preserveInputLuma(input, safe, lumaProtect);
+  return [
+    clamp01(safe[0]),
+    clamp01(safe[1]),
+    clamp01(safe[2]),
+  ];
+}
+
+export function applyRec709SafeCreativePack01Transform(
+  cube: CreativeCube,
+  slug: string,
+): CreativeCube {
+  const { size } = cube;
+  const data = new Float32Array(cube.data.length);
+  const denom = size - 1;
+
+  for (let bi = 0; bi < size; bi++) {
+    const b = bi / denom;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi / denom;
+      for (let ri = 0; ri < size; ri++) {
+        const r = ri / denom;
+        const idx = (bi * size * size + gi * size + ri) * 3;
+        const input: [number, number, number] = [r, g, b];
+        const output: [number, number, number] = [
+          cube.data[idx + 0],
+          cube.data[idx + 1],
+          cube.data[idx + 2],
+        ];
+        const safe = rec709SafeLookOutput(slug, input, output);
+        data[idx + 0] = safe[0];
+        data[idx + 1] = safe[1];
+        data[idx + 2] = safe[2];
+      }
+    }
+  }
+
+  return { size, data };
 }
 
 /**

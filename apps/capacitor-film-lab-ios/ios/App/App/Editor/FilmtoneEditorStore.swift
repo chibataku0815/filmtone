@@ -815,28 +815,29 @@ final class FilmtoneEditorStore: ObservableObject {
 
             var paramOverrides = builtIn.paramOverrides
             var resolvedCreativeLut: ParsedCubeLutDTO?
-            if case let .bundled(slug, filename, pinnedSha256, intensity) = builtIn.creativeLut {
-                resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
-                    slug: slug,
-                    filename: filename,
-                    pinnedSha256: pinnedSha256,
-                    intensity: intensity,
-                    packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
-                )
-            }
+            let sourceProfileId = FilmtoneLookDirector.sourceProfileId(
+                for: project.cameraProfile
+            )
+            let sourceColorClassRaw = FilmtoneLookDirector.sourceColorClassRaw(
+                probe: effectiveProbe
+            )
+            resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
+                binding: FilmtoneBuiltInCatalog.creativeLutBinding(
+                    for: builtIn,
+                    sourceProfileId: sourceProfileId,
+                    sourceColorClassRaw: sourceColorClassRaw
+                ),
+                packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
+            )
             if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
                 slug: builtIn.slug,
                 descriptor: effectiveProbe?.sourceToneDescriptor,
-                sourceProfileId: FilmtoneLookDirector.sourceProfileId(
-                    for: project.cameraProfile
-                ),
+                sourceProfileId: sourceProfileId,
                 sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                     probe: effectiveProbe,
                     cameraProfile: project.cameraProfile
                 ),
-                sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
-                    probe: effectiveProbe
-                )
+                sourceColorClassRaw: sourceColorClassRaw
             ) {
                 for (key, value) in adaptation.paramOverrides.values {
                     paramOverrides.values[key] = value
@@ -1492,6 +1493,22 @@ final class FilmtoneEditorStore: ObservableObject {
         )
     }
 
+    static func loadBundledCreativeLut(
+        binding: CreativeLutBinding?,
+        packId: String
+    ) -> ParsedCubeLutDTO? {
+        guard case let .bundled(slug, filename, pinnedSha256, intensity) = binding else {
+            return nil
+        }
+        return loadBundledCreativeLut(
+            slug: slug,
+            filename: filename,
+            pinnedSha256: pinnedSha256,
+            intensity: intensity,
+            packId: packId
+        )
+    }
+
     func renameSavedLook(id: UUID, name: String) async {
         await libraryController.renameLook(id: id, name: name)
         await refreshLibrarySnapshot()
@@ -1693,24 +1710,36 @@ final class FilmtoneEditorStore: ObservableObject {
     fileprivate func refreshCreativePack01AdaptationIfApplicable() -> Bool {
         guard
             let creativeLut = project.creativeLut,
-            let slug = creativeLut.bundledSlug
+            let slug = creativeLut.bundledSlug,
+            let builtIn = FilmtoneBuiltInCatalog.look(matchingSlug: slug)
         else {
             return false
         }
 
+        let sourceProfileId = FilmtoneLookDirector.sourceProfileId(
+            for: project.cameraProfile
+        )
+        let sourceColorClassRaw = FilmtoneLookDirector.sourceColorClassRaw(
+            probe: probe
+        )
         let adaptation = FilmtoneCreativePack01Adaptation.resolve(
             slug: slug,
             descriptor: probe?.sourceToneDescriptor,
-            sourceProfileId: FilmtoneLookDirector.sourceProfileId(
-                for: project.cameraProfile
-            ),
+            sourceProfileId: sourceProfileId,
             sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                 probe: probe,
                 cameraProfile: project.cameraProfile
             ),
-            sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
-                probe: probe
-            )
+            sourceColorClassRaw: sourceColorClassRaw
+        )
+        let selectedBinding = FilmtoneBuiltInCatalog.creativeLutBinding(
+            for: builtIn,
+            sourceProfileId: sourceProfileId,
+            sourceColorClassRaw: sourceColorClassRaw
+        )
+        let selectedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
+            binding: selectedBinding,
+            packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
         )
 
         guard let mergedValues = FilmtoneCreativePack01Patches.refreshedParamOverrides(
@@ -1725,14 +1754,20 @@ final class FilmtoneEditorStore: ObservableObject {
         nextOverrides.values = mergedValues
 
         let nextIntensity = adaptation?.intensity ?? 1.0
+        let nextCreativeLut = selectedCreativeLut?.withIntensity(nextIntensity)
         let intensityChanged = abs(creativeLut.intensity - nextIntensity) > 1e-6
+        let lutVariantChanged = nextCreativeLut.map {
+            $0.title != creativeLut.title ||
+            $0.size != creativeLut.size ||
+            $0.data.count != creativeLut.data.count
+        } ?? false
         let overridesChanged = nextOverrides.values != project.paramOverrides.values
-        guard intensityChanged || overridesChanged else {
+        guard intensityChanged || overridesChanged || lutVariantChanged else {
             return false
         }
 
         project.paramOverrides = nextOverrides
-        project.creativeLut = creativeLut.withIntensity(nextIntensity)
+        project.creativeLut = nextCreativeLut ?? creativeLut.withIntensity(nextIntensity)
         recomputeProjectParamsPreservingOpticsGlow()
         return true
     }

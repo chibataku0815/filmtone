@@ -1,5 +1,5 @@
-Creative Look Pack の Stone / Urban を、D-Log など手動 Source Profile を選んだプレビューでも書き出しと同じ入力変換で確認できるようにしました。プレビューと書き出しの色合わせも見直し、出力後に黒が持ち上がってフェードが掛かったように見える差分を抑えています。
+Built-in Look の Stone / Urban / Noir を、素材の Source Profile に合わせて適用するようにしました。
 
-Advanced に Film Breath、Black Point、Toe Contrast を追加しました。動きのあるゆらぎ、黒の床、暗部の硬さを iPhone 側でも調整できます。
+Rec.709、SDR BT.709、Display P3 SDR、profile 未確定の表示基準素材では、Look の強さと contrast / compression の押し出しを控えめにします。白飛び、彩度の破綻、黒浮きが出やすい素材で扱いやすくするための更新です。
 
-24fps Slow Mode を追加しました。対応する動画を 24fps のゆっくりした書き出しとして扱いやすくしています。
+D-Log など camera profile を選んだ素材では、これまでの強い creative Look の方向を保ちます。preview と export でも同じ Built-in Look policy を使うようにしています。

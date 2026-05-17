@@ -289,28 +289,31 @@ final class EditorCaptureRelay: ObservableObject {
 
                 var paramOverrides = builtIn.paramOverrides
                 var resolvedCreativeLut: ParsedCubeLutDTO?
-                if case let .bundled(slug, filename, pinnedSha256, intensity) = builtIn.creativeLut {
+                let sourceProfileId = FilmtoneLookDirector.sourceProfileId(
+                    for: store.project.cameraProfile
+                )
+                let sourceColorClassRaw = FilmtoneLookDirector.sourceColorClassRaw(
+                    probe: probe
+                )
+                if let binding = FilmtoneBuiltInCatalog.creativeLutBinding(
+                    for: builtIn,
+                    sourceProfileId: sourceProfileId,
+                    sourceColorClassRaw: sourceColorClassRaw
+                ) {
                     resolvedCreativeLut = FilmtoneEditorStore.loadBundledCreativeLut(
-                        slug: slug,
-                        filename: filename,
-                        pinnedSha256: pinnedSha256,
-                        intensity: intensity,
+                        binding: binding,
                         packId: builtIn.packId ?? FilmtoneBuiltInCatalog.creativePack01Id
                     )
                 }
                 if let adaptation = FilmtoneCreativePack01Adaptation.resolve(
                     slug: builtIn.slug,
                     descriptor: probe.sourceToneDescriptor,
-                    sourceProfileId: FilmtoneLookDirector.sourceProfileId(
-                        for: store.project.cameraProfile
-                    ),
+                    sourceProfileId: sourceProfileId,
                     sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                         probe: probe,
                         cameraProfile: store.project.cameraProfile
                     ),
-                    sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
-                        probe: probe
-                    )
+                    sourceColorClassRaw: sourceColorClassRaw
                 ) {
                     for (key, value) in adaptation.paramOverrides.values {
                         paramOverrides.values[key] = value

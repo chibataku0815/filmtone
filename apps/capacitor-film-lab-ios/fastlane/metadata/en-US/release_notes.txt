@@ -1,5 +1,5 @@
-Creative Look Pack previews now carry the selected Source Profile into the preview renderer. Stone and Urban on D-Log footage use the same input conversion in preview that export uses. Preview and export color handling were also aligned further, reducing cases where saved videos looked lifted or faded compared with the in-app preview.
+Built-in Stone, Urban, and Noir now apply with source-aware handling.
 
-Advanced controls now include Film Breath, Black Point, and Toe Contrast, so iPhone edits can tune motion variation, the black floor, and toe hardness.
+On Rec.709, SDR BT.709, Display P3 SDR, and unknown display-referred sources, Filmtone uses a safer Look policy that reins in Look strength and the strongest contrast / compression pushes. This helps reduce clipping, harsh saturation, and lifted-looking shadows on footage that is already display-rendered.
 
-24fps Slow Mode was added for supported videos, making slower 24fps exports easier to create from the iPhone workflow.
+On camera-profile sources such as D-Log, the stronger creative Look behavior is preserved. Preview and export now resolve the same Built-in Look policy.

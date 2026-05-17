@@ -28,42 +28,26 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         captureSourceProbeLoading()
     }
 
-    func testPresetCatalogDisplaysFourIosPresets() throws {
+    func testFullscreenBuiltInLookCarouselDisplaysCreativePack01Looks() throws {
         let app = launch(scene: .presets)
         waitForAppToSettle(app)
 
-        let presetCards = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "filmtone.preset.card.")
-        )
-        XCTAssertEqual(presetCards.count, 4)
-
-        for presetName in ["reset", "iphone", "softBlue", "amberGlow"] {
-            XCTAssertTrue(app.buttons["filmtone.preset.card.\(presetName)"].exists)
-        }
-
-        for legacyPresetName in ["portra", "pro400h", "superia400", "gold200", "cinestill800t", "velvia50", "ektar100", "cinematic", "bw"] {
-            XCTAssertFalse(app.buttons["filmtone.preset.card.\(legacyPresetName)"].exists)
-        }
+        assertFullscreenEditorReady(in: app)
+        assertCreativePack01LookChips(in: app)
 
         app.terminate()
     }
 
-    func testPresetDefaultRestoresCustomizedActivePreset() throws {
+    func testBuiltInLookChipSelectionKeepsFullscreenControlsReady() throws {
         let app = launch(scene: .presets)
         waitForAppToSettle(app)
 
-        let activePresetCard = app.buttons["filmtone.preset.card.amberGlow"]
-        XCTAssertTrue(activePresetCard.waitForExistence(timeout: 5))
-        XCTAssertEqual(activePresetCard.value as? String, "Selected")
+        let urban = app.descendants(matching: .any)["filmtone.fullscreen.lookChip.fb1a0001-0000-4000-8000-000000000007"]
+        XCTAssertTrue(urban.waitForExistence(timeout: 10))
+        urban.tap()
 
-        let defaultButton = app.descendants(matching: .any)["filmtone.preset.default"]
-        XCTAssertTrue(defaultButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(defaultButton.isEnabled)
-        defaultButton.tap()
-
-        XCTAssertTrue(activePresetCard.waitForExistence(timeout: 5))
-        XCTAssertEqual(activePresetCard.value as? String, "Selected")
-        XCTAssertTrue(waitForElementToDisappear(defaultButton, timeout: 5))
+        assertFullscreenEditorReady(in: app)
+        assertFullscreenCreativeControls(in: app)
 
         app.terminate()
     }
@@ -71,9 +55,10 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
     func testCameraProfileShowsInputAndCreativeLutControls() throws {
         let app = launch(scene: .camera)
         waitForAppToSettle(app)
-        app.swipeUp()
-        pauseForLayout()
-        assertDualLutMenus(in: app)
+        assertFullscreenEditorReady(in: app)
+        assertFullscreenCreativeControls(in: app)
+        openSourceProfileSheet(in: app)
+        assertSourceProfileControls(in: app)
         app.terminate()
     }
 
@@ -81,9 +66,10 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
         let app = launch(scene: .export)
         waitForAppToSettle(app)
 
-        let prompt = app.descendants(matching: .any)["filmtone.export.unsavedPrompt"]
-        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["filmtone.export.unsavedPrompt.save"].exists)
+        assertFullscreenEditorReady(in: app)
+        openExportSheet(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.export.finished.saveToPhotos"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.export.finished.share"].exists)
 
         app.terminate()
     }
@@ -307,33 +293,83 @@ final class FilmtoneSnapshotsUITests: XCTestCase {
     private func captureCameraProfile() {
         let app = launch(scene: .camera)
         waitForAppToSettle(app)
-        app.swipeUp()
-        pauseForLayout()
-        assertDualLutMenus(in: app)
+        assertFullscreenEditorReady(in: app)
+        openSourceProfileSheet(in: app)
+        assertSourceProfileControls(in: app)
         snapshot("04_camera_profile_route", timeWaitingForIdle: 0)
         app.terminate()
     }
 
-    private func assertDualLutMenus(in app: XCUIApplication) {
+    private func assertFullscreenEditorReady(in app: XCUIApplication) {
+        XCTAssertTrue(fullscreenCameraButton(in: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(fullscreenAdjustButton(in: app).waitForExistence(timeout: 10))
+        XCTAssertTrue(fullscreenExportButton(in: app).waitForExistence(timeout: 10))
+    }
+
+    private func assertCreativePack01LookChips(in app: XCUIApplication) {
+        let stone = app.descendants(matching: .any)["filmtone.fullscreen.lookChip.fb1a0001-0000-4000-8000-000000000006"]
+        let urban = app.descendants(matching: .any)["filmtone.fullscreen.lookChip.fb1a0001-0000-4000-8000-000000000007"]
+        let noir = app.descendants(matching: .any)["filmtone.fullscreen.lookChip.fb1a0001-0000-4000-8000-000000000010"]
+        XCTAssertTrue(stone.waitForExistence(timeout: 10))
+        XCTAssertTrue(urban.waitForExistence(timeout: 5))
+        XCTAssertTrue(noir.waitForExistence(timeout: 5))
+    }
+
+    private func assertFullscreenCreativeControls(in app: XCUIApplication) {
+        assertCreativePack01LookChips(in: app)
+        let lookMixSlider = app.sliders.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Look")
+        ).firstMatch
+        XCTAssertTrue(lookMixSlider.waitForExistence(timeout: 5))
+    }
+
+    private func openSourceProfileSheet(in app: XCUIApplication) {
+        let sourceTrigger = fullscreenCameraButton(in: app)
+        XCTAssertTrue(sourceTrigger.waitForExistence(timeout: 5))
+        sourceTrigger.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.sheet.source"].waitForExistence(timeout: 5))
+    }
+
+    private func assertSourceProfileControls(in app: XCUIApplication) {
         let inputLutMenu = app.descendants(matching: .any)["filmtone.lut.input.menu"]
-        let creativeLutMenu = app.descendants(matching: .any)["filmtone.lut.creative.menu"]
         let inputIntensitySlider = app.descendants(matching: .any)["filmtone.lut.input.intensity.slider"]
-        let creativeIntensitySlider = app.descendants(matching: .any)["filmtone.lut.creative.intensity.slider"]
-        reveal(inputLutMenu, in: app, maxSwipes: 2)
         XCTAssertTrue(inputLutMenu.waitForExistence(timeout: 5))
-        XCTAssertTrue(creativeLutMenu.waitForExistence(timeout: 5))
         XCTAssertTrue(inputIntensitySlider.waitForExistence(timeout: 5))
-        XCTAssertTrue(creativeIntensitySlider.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.lut.creative.import"].waitForExistence(timeout: 5))
     }
 
     private func captureExportFlow() {
         let app = launch(scene: .export)
         waitForAppToSettle(app)
-        app.swipeUp()
-        app.swipeUp()
-        pauseForLayout()
+        assertFullscreenEditorReady(in: app)
+        openExportSheet(in: app)
         snapshot("05_export_save_share", timeWaitingForIdle: 0)
         app.terminate()
+    }
+
+    private func openExportSheet(in app: XCUIApplication) {
+        let exportButton = fullscreenExportButton(in: app)
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 5))
+        exportButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["filmtone.section.export"].waitForExistence(timeout: 5))
+    }
+
+    private func fullscreenCameraButton(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@", "Camera", "カメラ")
+        ).firstMatch
+    }
+
+    private func fullscreenAdjustButton(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@", "Adjust", "調整")
+        ).firstMatch
+    }
+
+    private func fullscreenExportButton(in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(
+            NSPredicate(format: "label == %@", "Export")
+        ).firstMatch
     }
 
     private func captureSourceImportLoading() {

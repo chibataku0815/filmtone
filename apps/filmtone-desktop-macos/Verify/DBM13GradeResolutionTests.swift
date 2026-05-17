@@ -142,7 +142,7 @@ func registerDBM13GradeResolutionTests() {
         try assertParamsEqual(resolved.params, expected, "built-in GradeResolution parity")
     }
 
-    runner.test("DB-M13 source policy clamps bundled built-in Looks only on Rec.709 sources") {
+    runner.test("DB-M13 source policy selects safe bundled cubes only on Rec.709 sources") {
         let rec709 = FilmtoneSourceProfileCatalog.entry(forCatalogId: "built-in:source-profile.rec709")
         let dlogM = FilmtoneSourceProfileCatalog.entry(forCatalogId: "built-in:source-profile.dji-dlog-m")
         let cases: [(String, Double)] = [
@@ -152,21 +152,44 @@ func registerDBM13GradeResolutionTests() {
         ]
 
         for (slug, ceiling) in cases {
+            guard let look = FilmtoneCreativePackCatalog.find(slug: slug) else {
+                throw AssertionError(description: "missing built-in look \(slug)")
+            }
             let rec709Resolved = try makeResolvedBuiltIn(slug: slug)
                 .applyingSourcePolicy(resolvedProfile: rec709, probedColorClass: .sdrBt709)
             try assertClose(rec709Resolved.lutIntensity, ceiling, "\(slug) Rec.709 ceiling")
+            try assertEqual(
+                rec709Resolved.creativeLut?.sourceHash,
+                look.rec709SafePinnedSha256,
+                "\(slug) Rec.709 safe cube"
+            )
 
             let unknownResolved = try makeResolvedBuiltIn(slug: slug)
                 .applyingSourcePolicy(resolvedProfile: nil, probedColorClass: .unknown)
             try assertClose(unknownResolved.lutIntensity, ceiling, "\(slug) unknown display ceiling")
+            try assertEqual(
+                unknownResolved.creativeLut?.sourceHash,
+                look.rec709SafePinnedSha256,
+                "\(slug) unknown display safe cube"
+            )
 
             let logResolved = try makeResolvedBuiltIn(slug: slug)
                 .applyingSourcePolicy(resolvedProfile: dlogM, probedColorClass: nil)
             try assertClose(logResolved.lutIntensity, 1.0, "\(slug) Log/profile branch")
+            try assertEqual(
+                logResolved.creativeLut?.sourceHash,
+                look.pinnedSha256,
+                "\(slug) Log/profile full cube"
+            )
 
             let packageResolved = try makeResolvedBuiltIn(slug: slug, sourceHash: "package-local")
                 .applyingSourcePolicy(resolvedProfile: rec709, probedColorClass: .sdrBt709)
             try assertClose(packageResolved.lutIntensity, 1.0, "\(slug) package LUT exclusion")
+            try assertEqual(
+                packageResolved.creativeLut?.sourceHash,
+                "package-local",
+                "\(slug) package LUT unchanged"
+            )
         }
     }
 

@@ -21,10 +21,15 @@ struct PreparedCreativeLut: Sendable, Equatable {
 /// SHA-256 (fail-closed), parsing the triples, and packing them into the
 /// Float32 RGBA Data buffer that Core Image expects.
 ///
-/// The result is cached per slug in an `NSCache` so video export's frame
-/// loop does not re-parse the ~7 MB cube on every frame. The cache also
-/// survives Look picker toggles during a still preview session.
+/// The result is cached per slug + cube variant in an `NSCache` so video
+/// export's frame loop does not re-parse the ~7 MB cube on every frame. The
+/// cache also survives Look picker toggles during a still preview session.
 enum FilmtoneCreativeLutLoader {
+    enum Variant: Sendable {
+        case full
+        case rec709Safe
+    }
+
     // NSCache is internally thread-safe; opt out of Swift 6 isolation
     // checking so preview / still / video pipelines can hit the same
     // cache from any actor.
@@ -41,8 +46,13 @@ enum FilmtoneCreativeLutLoader {
     /// the SHA-256 does not match the pinned hash, or the parse fails.
     /// Pipeline integration treats nil as a silent skip (cube stage is
     /// gated off, the rest of the grade still runs).
-    static func load(look: FilmtoneCreativePackCatalog.BuiltInLook) -> PreparedCreativeLut? {
-        if let cached = cache.object(forKey: look.slug as NSString) {
+    static func load(
+        look: FilmtoneCreativePackCatalog.BuiltInLook,
+        variant: Variant = .full
+    ) -> PreparedCreativeLut? {
+        let resource = cubeResource(for: look, variant: variant)
+        let cacheKey = "\(look.slug)|\(resource.filename)|\(resource.sha256)"
+        if let cached = cache.object(forKey: cacheKey as NSString) {
             return cached.prepared
         }
 
@@ -52,23 +62,30 @@ enum FilmtoneCreativeLutLoader {
         // at build time. Resolve by name + extension only — `subdirectory:`
         // would return nil because the folder structure is not preserved
         // inside the .app bundle.
-        guard let url = bundledCubeURL(for: look) else {
-            print("[FilmtoneCreativeLutLoader] missing bundle resource for slug=\(look.slug)")
+        guard let url = bundledCubeURL(filename: resource.filename) else {
+            print(
+                "[FilmtoneCreativeLutLoader] missing bundle resource for "
+                + "slug=\(look.slug) filename=\(resource.filename)"
+            )
             return nil
         }
 
         guard let data = try? Data(contentsOf: url) else {
-            print("[FilmtoneCreativeLutLoader] failed to read cube data for slug=\(look.slug)")
+            print(
+                "[FilmtoneCreativeLutLoader] failed to read cube data for "
+                + "slug=\(look.slug) filename=\(resource.filename)"
+            )
             return nil
         }
 
         let actualHash = SHA256.hash(data: data)
             .map { String(format: "%02x", $0) }
             .joined()
-        guard actualHash == look.pinnedSha256 else {
+        guard actualHash == resource.sha256 else {
             print(
                 "[FilmtoneCreativeLutLoader] sha256 mismatch for slug=\(look.slug) "
-                + "expected=\(look.pinnedSha256) actual=\(actualHash) — fail-closed"
+                + "filename=\(resource.filename) expected=\(resource.sha256) "
+                + "actual=\(actualHash) — fail-closed"
             )
             return nil
         }
@@ -94,14 +111,26 @@ enum FilmtoneCreativeLutLoader {
             size: parsed.size,
             intensity: look.intensity,
             cubeData: cubeData,
-            sourceHash: look.pinnedSha256
+            sourceHash: resource.sha256
         )
-        cache.setObject(CachedEntry(prepared), forKey: look.slug as NSString)
+        cache.setObject(CachedEntry(prepared), forKey: cacheKey as NSString)
         return prepared
     }
 
-    private static func bundledCubeURL(for look: FilmtoneCreativePackCatalog.BuiltInLook) -> URL? {
-        let resourceName = (look.bundledFilename as NSString).deletingPathExtension
+    private static func cubeResource(
+        for look: FilmtoneCreativePackCatalog.BuiltInLook,
+        variant: Variant
+    ) -> (filename: String, sha256: String) {
+        switch variant {
+        case .full:
+            return (look.bundledFilename, look.pinnedSha256)
+        case .rec709Safe:
+            return (look.rec709SafeBundledFilename, look.rec709SafePinnedSha256)
+        }
+    }
+
+    private static func bundledCubeURL(filename: String) -> URL? {
+        let resourceName = (filename as NSString).deletingPathExtension
         if let bundleURL = Bundle.main.url(forResource: resourceName, withExtension: "cube") {
             return bundleURL
         }
@@ -111,13 +140,13 @@ enum FilmtoneCreativeLutLoader {
             return nil
         }
         let rootURL = URL(fileURLWithPath: root, isDirectory: true)
-        let directURL = rootURL.appendingPathComponent(look.bundledFilename)
+        let directURL = rootURL.appendingPathComponent(filename)
         if FileManager.default.fileExists(atPath: directURL.path) {
             return directURL
         }
         let nestedURL = rootURL
             .appendingPathComponent("CreativeLuts", isDirectory: true)
-            .appendingPathComponent(look.bundledFilename)
+            .appendingPathComponent(filename)
         return FileManager.default.fileExists(atPath: nestedURL.path) ? nestedURL : nil
     }
 

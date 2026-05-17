@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-16 JST
+Last updated: 2026-05-17 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -55,6 +55,7 @@ content layer stays glass-free so color judgment is not compromised.
 | M10 | Native Desktop v1.8 Release | M9 | Released 2026-05-16 | Public update metadata reports Desktop `1.8`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M11 | Native Desktop v1.9 Release | M10 | Released 2026-05-16 | Public update metadata reports Desktop `1.9`, and the fixed Desktop download rail points to the notarized Native DMG. |
 | M12 | Native Desktop v1.10 Release | M11 | Released 2026-05-16 | Public update metadata reports Desktop `1.10`, and the fixed Desktop download rail points to the notarized Native DMG. |
+| M13 | Native Desktop v1.12 Release | M12 | Released 2026-05-17 | Public update metadata reports Desktop `1.12`, and the fixed Desktop download rail points to the notarized Native DMG. |
 
 ## Current Strategic State
 
@@ -67,13 +68,13 @@ content layer stays glass-free so color judgment is not compromised.
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.10` via update metadata.
+- Public Desktop latest from truth script: `1.12` via update metadata.
 - iOS truth script reports separate public and local axes: public App Store
   version `1.9`; local Xcode candidate `1.10` build `10`.
-- Native Desktop v2 public release is Desktop v1.10. Desktop release truth and
+- Native Desktop v2 public release is Desktop v1.12. Desktop release truth and
   iOS App Store truth are separate public axes; rerun truth scripts before
   making release/version claims.
-- No Native Desktop release `active.md` remains open after the v1.10 public
+- No Native Desktop release `active.md` remains open after the v1.12 public
   release.
 
 ## Interrupt / Decision Log
@@ -138,6 +139,11 @@ content layer stays glass-free so color judgment is not compromised.
   the fixed download page returns `Filmtone-1.10.dmg`, and the release DMG
   sha256 is
   `009d82ed75e80458b4e027c1981031965337fec5dd32365f1bfd1e8aa7314f5a`.
+- 2026-05-17 JST: Native Desktop v1.12 public release completed for the
+  Rec.709-safe Built-in Look color variants. Public update metadata reports
+  `latestVersion: "1.12"`, the fixed download page returns
+  `Filmtone-1.12.dmg`, and the release DMG sha256 is
+  `bafaed774a08f2679f44cdb21ebcbfe3b8339592b0534f4822fe81f9877c00b7`.
 
 M1 and M2 are closed. M3 and M4 stay open for parity hardening and shared-core
 promotion, but they no longer block M5 UI validation. M5-C P0, M5-G
@@ -215,7 +221,7 @@ release run completed from code HEAD `4f2e5eba`.
 
 Current public state:
 
-- update metadata reports `latestVersion: "1.4"`
+- update metadata reports `latestVersion: "1.12"`
 - fixed download page:
   `https://www.chibatakumi.studio/film-lab/download`
 - active DMG:

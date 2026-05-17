@@ -28,7 +28,11 @@ import {
   CREATIVE_PACK_01_LOOKS,
   type CreativePackLook,
 } from "../packages/film-lab-core/src/creative-pack-01";
-import { applyCreativePack01SourceTransform } from "../packages/film-lab-core/src/creative-pack-01-generator";
+import {
+  CREATIVE_PACK_01_REC709_SAFE_TRANSFORM,
+  applyCreativePack01SourceTransform,
+  applyRec709SafeCreativePack01Transform,
+} from "../packages/film-lab-core/src/creative-pack-01-generator";
 import {
   diagonalMaxDelta,
   makeCreativeCube,
@@ -48,7 +52,7 @@ const FIXTURES_DIR = resolve(
   "apps/capacitor-film-lab-ios/Tests/Fixtures/creative-pack-01",
 );
 const MANIFEST_PATH = resolve(FIXTURES_DIR, "manifest.json");
-const MANIFEST_SCHEMA_VERSION = 1 as const;
+const MANIFEST_SCHEMA_VERSION = 2 as const;
 const CREATIVE_PACK_01_STONE_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube" as const;
 const CREATIVE_PACK_01_URBAN_SOURCE =
@@ -79,6 +83,12 @@ interface ManifestLookEntry {
   bakeMode: "real" | "identity";
   sourceCubePath?: string;
   sourceCubeTransform?: string;
+  rec709SafeCubeRelPath: string;
+  rec709SafeCubeSize: number;
+  rec709SafeCubeSha256: string;
+  rec709SafeCubeBytes: number;
+  rec709SafeDiagonalMaxDelta: number;
+  rec709SafeSourceCubeTransform: string;
 }
 
 interface ManifestFile {
@@ -162,6 +172,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
   cubeSize: number;
   sourceCubePath?: string;
   sourceCubeTransform?: string;
+  cube: CreativeCube;
 } {
   const sourceCubePath = look.sourceCubeTransform
     ? CREATIVE_PACK_01_SOURCE_CUBE_BY_SLUG[look.slug]
@@ -194,6 +205,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
         cubeSize: cube.size,
         sourceCubePath,
         sourceCubeTransform: look.sourceCubeTransform,
+        cube,
       };
     }
 
@@ -207,6 +219,7 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
       cubeSize: cube.size,
       sourceCubePath,
       sourceCubeTransform: look.sourceCubeTransform,
+      cube,
     };
   }
 
@@ -236,6 +249,37 @@ function bakeLook(look: CreativePackLook, mode: Mode): {
     paramsUsed,
     bakeMode: mode === "regenerate-identity" ? "identity" : "real",
     cubeSize: cube.size,
+    cube,
+  };
+}
+
+function bakeRec709SafeLook(look: CreativePackLook, source: CreativeCube): {
+  text: string;
+  bytes: Uint8Array;
+  sha256: string;
+  diagonal: number;
+  cubeSize: number;
+  transformName: string;
+} {
+  const cube = applyRec709SafeCreativePack01Transform(source, look.slug);
+  const text = serializeCreativeCubeToText(cube, {
+    title: `${cubeTitle(look)} Rec.709 Safe`,
+    comments: [
+      `pack=${CREATIVE_PACK_01_ID}`,
+      `slug=${look.slug}`,
+      `variant=rec709-safe`,
+      `bakerVersion=${CREATIVE_PACK_01_BAKER_VERSION}`,
+      `generator=${CREATIVE_PACK_01_REC709_SAFE_TRANSFORM}`,
+    ],
+  });
+  const bytes = new TextEncoder().encode(text);
+  return {
+    text,
+    bytes,
+    sha256: sha256Hex(bytes),
+    diagonal: diagonalMaxDelta(cube),
+    cubeSize: cube.size,
+    transformName: CREATIVE_PACK_01_REC709_SAFE_TRANSFORM,
   };
 }
 
@@ -294,6 +338,9 @@ async function runRegenerate(mode: Mode): Promise<void> {
 
     const cubePath = resolve(RESOURCES_DIR, `${look.slug}.cube`);
     writeFileSync(cubePath, baked.bytes);
+    const safeBaked = bakeRec709SafeLook(look, baked.cube);
+    const safeCubePath = resolve(RESOURCES_DIR, `${look.slug}-rec709-safe.cube`);
+    writeFileSync(safeCubePath, safeBaked.bytes);
 
     entries.push({
       slug: look.slug,
@@ -311,6 +358,12 @@ async function runRegenerate(mode: Mode): Promise<void> {
       bakeMode: baked.bakeMode,
       sourceCubePath: baked.sourceCubePath,
       sourceCubeTransform: baked.sourceCubeTransform,
+      rec709SafeCubeRelPath: relPath(safeCubePath),
+      rec709SafeCubeSize: safeBaked.cubeSize,
+      rec709SafeCubeSha256: safeBaked.sha256,
+      rec709SafeCubeBytes: safeBaked.bytes.length,
+      rec709SafeDiagonalMaxDelta: safeBaked.diagonal,
+      rec709SafeSourceCubeTransform: safeBaked.transformName,
     });
 
     console.log(
@@ -318,6 +371,12 @@ async function runRegenerate(mode: Mode): Promise<void> {
         0,
         12,
       )}…  bytes=${baked.bytes.length}  mode=${baked.bakeMode}`,
+    );
+    console.log(
+      `[creative-luts] wrote ${relPath(safeCubePath)}  sha256=${safeBaked.sha256.slice(
+        0,
+        12,
+      )}…  bytes=${safeBaked.bytes.length}  variant=rec709-safe`,
     );
   }
 
@@ -374,6 +433,27 @@ async function runVerify(): Promise<void> {
       failures.push(
         `${look.slug}: re-bake sha256 ${fresh.sha256} != manifest ${expected.cubeSha256}` +
           " (baker drift — Pack 01 cubes are byte-pinned; bump bakerVersion + re-run --regenerate if intentional)",
+      );
+    }
+    const safeCubePath = resolve(RESOURCES_DIR, `${look.slug}-rec709-safe.cube`);
+    let safeOnDisk: Buffer;
+    try {
+      safeOnDisk = readFileSync(safeCubePath);
+    } catch {
+      failures.push(`safe cube missing on disk: ${relPath(safeCubePath)}`);
+      continue;
+    }
+    const safeOnDiskHash = sha256Hex(safeOnDisk);
+    if (safeOnDiskHash !== expected.rec709SafeCubeSha256) {
+      failures.push(
+        `${look.slug}: shipped Rec.709-safe cube sha256 ${safeOnDiskHash} != manifest ${expected.rec709SafeCubeSha256}`,
+      );
+      continue;
+    }
+    const freshSafe = bakeRec709SafeLook(look, fresh.cube);
+    if (freshSafe.sha256 !== expected.rec709SafeCubeSha256) {
+      failures.push(
+        `${look.slug}: re-bake Rec.709-safe sha256 ${freshSafe.sha256} != manifest ${expected.rec709SafeCubeSha256}`,
       );
     }
   }

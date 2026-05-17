@@ -40,20 +40,30 @@ struct FilmtoneResolvedGrade: Equatable, Sendable {
               let lookSlug = optionalLookSlug,
               let look = FilmtoneCreativePackCatalog.find(slug: lookSlug),
               let creativeLut,
-              creativeLut.slug == look.slug,
-              creativeLut.sourceHash == look.pinnedSha256
+              creativeLut.slug == look.slug
         else {
+            return self
+        }
+        let isCatalogFullCube = creativeLut.sourceHash == look.pinnedSha256
+        let isCatalogSafeCube = creativeLut.sourceHash == look.rec709SafePinnedSha256
+        guard isCatalogFullCube || isCatalogSafeCube else {
             return self
         }
 
         let nextIntensity = min(lutIntensity, look.rec709SafeIntensityCeiling)
-        guard abs(nextIntensity - lutIntensity) > 1e-9 else {
+        let nextCreativeLut = isCatalogSafeCube
+            ? creativeLut
+            : (FilmtoneCreativeLutLoader.load(look: look, variant: .rec709Safe) ?? creativeLut)
+        guard
+            abs(nextIntensity - lutIntensity) > 1e-9 ||
+            nextCreativeLut.sourceHash != creativeLut.sourceHash
+        else {
             return self
         }
 
         return FilmtoneResolvedGrade(
             params: params,
-            creativeLut: creativeLut,
+            creativeLut: nextCreativeLut,
             lutIntensity: nextIntensity,
             source: source,
             sourceGraph: sourceGraph,

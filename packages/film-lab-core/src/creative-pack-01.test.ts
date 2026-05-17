@@ -10,6 +10,7 @@ import {
   CREATIVE_PACK_01_EXPECTED_PROCESS_SPACE,
   CREATIVE_PACK_01_LOOKS,
 } from "./creative-pack-01";
+import { CREATIVE_PACK_01_REC709_SAFE_TRANSFORM } from "./creative-pack-01-generator";
 import { parseCube, type CubeLUT } from "./cube-parser";
 
 type SamplePoint = readonly [number, number, number];
@@ -26,6 +27,22 @@ const URBAN_CUBE_PATH = resolve(
 const NOIR_CUBE_PATH = resolve(
   REPO_ROOT,
   "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir.cube",
+);
+const STONE_REC709_SAFE_CUBE_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-stone-rec709-safe.cube",
+);
+const URBAN_REC709_SAFE_CUBE_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban-rec709-safe.cube",
+);
+const NOIR_REC709_SAFE_CUBE_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir-rec709-safe.cube",
+);
+const CREATIVE_PACK_01_MANIFEST_PATH = resolve(
+  REPO_ROOT,
+  "apps/capacitor-film-lab-ios/Tests/Fixtures/creative-pack-01/manifest.json",
 );
 const PALERMO_DLOGM_SOURCE =
   "/Volumes/SamsungPortableSSDX5001/filmtone/Palermo_Powergrade & LUTs/Palermo Standalone LUTs/DJI_DLOG-M-Palermo.cube";
@@ -69,6 +86,10 @@ function sampleCube(cube: CubeLUT, rgb: SamplePoint): SamplePoint {
 
 function luma(rgb: SamplePoint): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+}
+
+function spread(rgb: SamplePoint): number {
+  return Math.max(...rgb) - Math.min(...rgb);
 }
 
 describe("Creative LUT Pack 01 — runtime color neutralization", () => {
@@ -154,6 +175,56 @@ describe("Creative LUT Pack 01 — runtime color neutralization", () => {
 });
 
 describe("Creative LUT Pack 01 — generated cubes", () => {
+  test("manifest pins Rec.709-safe color variants next to the full cubes", () => {
+    const manifest = JSON.parse(readFileSync(CREATIVE_PACK_01_MANIFEST_PATH, "utf8"));
+    expect(manifest.schemaVersion).toBe(2);
+    expect(
+      manifest.looks.map((look: Record<string, unknown>) => ({
+        slug: look.slug,
+        rec709SafeCubeRelPath: look.rec709SafeCubeRelPath,
+        rec709SafeCubeSize: look.rec709SafeCubeSize,
+        rec709SafeCubeSha256: look.rec709SafeCubeSha256,
+        rec709SafeSourceCubeTransform: look.rec709SafeSourceCubeTransform,
+      })),
+    ).toEqual([
+      {
+        slug: "filmtone-creative-pack-01-stone",
+        rec709SafeCubeRelPath:
+          "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-stone-rec709-safe.cube",
+        rec709SafeCubeSize: 65,
+        rec709SafeCubeSha256:
+          "65aa4c8294361cf1c55fcb9c5c7bb357b9e6ead08778c043885e86d336e49dbe",
+        rec709SafeSourceCubeTransform: CREATIVE_PACK_01_REC709_SAFE_TRANSFORM,
+      },
+      {
+        slug: "filmtone-creative-pack-01-urban",
+        rec709SafeCubeRelPath:
+          "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-urban-rec709-safe.cube",
+        rec709SafeCubeSize: 65,
+        rec709SafeCubeSha256:
+          "e958a500f0d7f9ffe4c77143be60691b248ccf688a727c8ee4b8b09110805505",
+        rec709SafeSourceCubeTransform: CREATIVE_PACK_01_REC709_SAFE_TRANSFORM,
+      },
+      {
+        slug: "filmtone-creative-pack-01-noir",
+        rec709SafeCubeRelPath:
+          "apps/capacitor-film-lab-ios/ios/App/App/Resources/CreativeLuts/filmtone-creative-pack-01-noir-rec709-safe.cube",
+        rec709SafeCubeSize: 65,
+        rec709SafeCubeSha256:
+          "f8f321d576f17045861e81441c0e17d303ec31b6243c26b59c31734c7d6057ea",
+        rec709SafeSourceCubeTransform: CREATIVE_PACK_01_REC709_SAFE_TRANSFORM,
+      },
+    ]);
+
+    for (const look of manifest.looks) {
+      const safePath = resolve(
+        REPO_ROOT,
+        look.rec709SafeCubeRelPath as string,
+      );
+      expect(sha256Hex(readFileSync(safePath))).toBe(look.rec709SafeCubeSha256);
+    }
+  });
+
   test("source-derived Stone and Urban cubes are originalized, not Palermo byte copies", () => {
     const cases = [
       {
@@ -292,6 +363,57 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     expect(maxDelta).toBeGreaterThan(0.05);
   });
 
+  test("Rec.709-safe Stone and Urban variants compress risky display chroma while preserving neutral and skin behavior", () => {
+    const cases = [
+      {
+        fullPath: STONE_CUBE_PATH,
+        safePath: STONE_REC709_SAFE_CUBE_PATH,
+        risky: [
+          [0.9, 0.05, 0.05],
+          [0.05, 0.9, 0.05],
+          [0.05, 0.25, 0.95],
+        ],
+      },
+      {
+        fullPath: URBAN_CUBE_PATH,
+        safePath: URBAN_REC709_SAFE_CUBE_PATH,
+        risky: [
+          [0.9, 0.05, 0.05],
+          [0.05, 0.9, 0.05],
+          [0.05, 0.25, 0.95],
+        ],
+      },
+    ] as const;
+
+    for (const { fullPath, safePath, risky } of cases) {
+      const full = parseCube(readFileSync(fullPath, "utf8"));
+      const safeText = readFileSync(safePath, "utf8");
+      const safe = parseCube(safeText);
+      expect(safeText).toContain("variant=rec709-safe");
+      expect(safeText).toContain(`generator=${CREATIVE_PACK_01_REC709_SAFE_TRANSFORM}`);
+
+      for (const point of [
+        [0.45, 0.45, 0.45],
+        [0.62, 0.45, 0.36],
+      ] as const) {
+        const fullSample = sampleCube(full, point);
+        const safeSample = sampleCube(safe, point);
+        for (let i = 0; i < 3; i++) {
+          expect(Math.abs(safeSample[i] - fullSample[i])).toBeLessThanOrEqual(
+            0.001,
+          );
+        }
+      }
+
+      for (const point of risky) {
+        const fullSample = sampleCube(full, point);
+        const safeSample = sampleCube(safe, point);
+        expect(spread(safeSample)).toBeLessThan(spread(fullSample));
+        expect(Math.abs(luma(safeSample) - luma(fullSample))).toBeLessThan(0.05);
+      }
+    }
+  });
+
   test("Noir is a toned print monochrome cube with bounded residual chroma", () => {
     const noir = parseCube(readFileSync(NOIR_CUBE_PATH, "utf8"));
     const points: readonly SamplePoint[] = [
@@ -337,5 +459,27 @@ describe("Creative LUT Pack 01 — generated cubes", () => {
     expect(maxResidualSpread).toBeGreaterThanOrEqual(0.055);
     expect(maxSpread).toBeLessThanOrEqual(0.08);
     expect(totalLumaDelta / points.length).toBeGreaterThan(0.06);
+  });
+
+  test("Rec.709-safe Noir variant stays pinned to the monochrome print family", () => {
+    const full = parseCube(readFileSync(NOIR_CUBE_PATH, "utf8"));
+    const safeText = readFileSync(NOIR_REC709_SAFE_CUBE_PATH, "utf8");
+    const safe = parseCube(safeText);
+    expect(safeText).toContain("variant=rec709-safe");
+    expect(safeText).toContain(`generator=${CREATIVE_PACK_01_REC709_SAFE_TRANSFORM}`);
+
+    for (const point of [
+      [0.9, 0.05, 0.05],
+      [0.05, 0.9, 0.05],
+      [0.05, 0.25, 0.95],
+      [0.62, 0.45, 0.36],
+      [0.45, 0.45, 0.45],
+    ] as const) {
+      const fullSample = sampleCube(full, point);
+      const safeSample = sampleCube(safe, point);
+      expect(spread(safeSample)).toBeLessThanOrEqual(0.081);
+      expect(Math.abs(spread(safeSample) - spread(fullSample))).toBeLessThan(0.002);
+      expect(Math.abs(luma(safeSample) - luma(fullSample))).toBeLessThan(0.002);
+    }
   });
 });

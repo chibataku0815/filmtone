@@ -347,20 +347,30 @@ enum FilmtoneLookDirector {
         sourceProfileId: String?,
         sourceColorClassRaw: String?
     ) -> SourceBranch {
+        return isRec709SafeSource(
+            sourceProfileId: sourceProfileId,
+            sourceColorClassRaw: sourceColorClassRaw
+        ) ? .rec709Safe : .full
+    }
+
+    static func isRec709SafeSource(
+        sourceProfileId: String?,
+        sourceColorClassRaw: String?
+    ) -> Bool {
         if let sourceProfileId {
             if sourceProfileId == "built-in:source-profile.rec709" {
-                return .rec709Safe
+                return true
             }
             if sourceProfileId.hasPrefix("built-in:source-profile.") {
-                return .full
+                return false
             }
         }
 
         switch sourceColorClassRaw {
         case "apple-log", "apple-log2":
-            return .full
+            return false
         default:
-            return .rec709Safe
+            return true
         }
     }
 

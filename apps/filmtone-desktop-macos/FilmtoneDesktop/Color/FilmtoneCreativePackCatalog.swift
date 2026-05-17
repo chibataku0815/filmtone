@@ -32,6 +32,11 @@ enum FilmtoneCreativePackCatalog {
         /// required (blue folder references break the resolver).
         let bundledFilename: String
         let pinnedSha256: String
+        /// Source-aware Rec.709 / unknown-display safe color variant.
+        /// Optical / glow parameters stay in `paramOverridesPatch`; this
+        /// binding changes only the bundled color cube selected at render time.
+        let rec709SafeBundledFilename: String
+        let rec709SafePinnedSha256: String
         /// Cube intensity is pinned to 1.0 for v1.4 Pack 01 — the cube is
         /// the SSOT for color expression and there is no UI for a second
         /// intensity axis. Strength slider operates in preset-blend space.
@@ -118,7 +123,9 @@ enum FilmtoneCreativePackCatalog {
             expectedProcessSpace: expectedProcessSpace,
             rec709SafeIntensityCeiling: 0.86,
             bundledFilename: "filmtone-creative-pack-01-stone.cube",
-            pinnedSha256: "2f9e0240450b1b5fe1e78ca88017509eb1c50a050c4a02723a36ac651c9393c4",
+            pinnedSha256: "b533a08cdc7ad7f563865bce758ec589bad966860d539d39b9d08165ee6e37ad",
+            rec709SafeBundledFilename: "filmtone-creative-pack-01-stone-rec709-safe.cube",
+            rec709SafePinnedSha256: "65aa4c8294361cf1c55fcb9c5c7bb357b9e6ead08778c043885e86d336e49dbe",
             intensity: 1.0,
             packId: packId,
             paramOverridesPatch: stonePatch
@@ -130,7 +137,9 @@ enum FilmtoneCreativePackCatalog {
             expectedProcessSpace: expectedProcessSpace,
             rec709SafeIntensityCeiling: 0.84,
             bundledFilename: "filmtone-creative-pack-01-urban.cube",
-            pinnedSha256: "fefd48a796ff724fb23b2741ac14ed0c4453b24215ca7535680ad4ca043aaa44",
+            pinnedSha256: "880737a9f73f2e171779328707daef92a98bce3c612fa83c9817fc0980105760",
+            rec709SafeBundledFilename: "filmtone-creative-pack-01-urban-rec709-safe.cube",
+            rec709SafePinnedSha256: "e958a500f0d7f9ffe4c77143be60691b248ccf688a727c8ee4b8b09110805505",
             intensity: 1.0,
             packId: packId,
             paramOverridesPatch: urbanPatch
@@ -142,7 +151,9 @@ enum FilmtoneCreativePackCatalog {
             expectedProcessSpace: expectedProcessSpace,
             rec709SafeIntensityCeiling: 0.92,
             bundledFilename: "filmtone-creative-pack-01-noir.cube",
-            pinnedSha256: "29309e03244e7d3d1b328f0308549935d4937da0eadc6b3c6144be13fce57873",
+            pinnedSha256: "50f4d1d14b4cec964c6e100d86af5777a32c6dd976a13e9fc6b4b261bf7a72fa",
+            rec709SafeBundledFilename: "filmtone-creative-pack-01-noir-rec709-safe.cube",
+            rec709SafePinnedSha256: "f8f321d576f17045861e81441c0e17d303ec31b6243c26b59c31734c7d6057ea",
             intensity: 1.0,
             packId: packId,
             paramOverridesPatch: noirPatch

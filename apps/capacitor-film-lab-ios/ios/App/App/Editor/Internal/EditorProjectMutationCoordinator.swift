@@ -378,27 +378,37 @@ final class EditorProjectMutationCoordinator {
                 // surface the same `lutMissingForApply` toast as for a deleted
                 // library entry rather than silently degrading
                 // (`feedback_no_fallback_bug_hotbed`).
+                let sourceProfileId = FilmtoneLookDirector.sourceProfileId(
+                    for: store.project.cameraProfile
+                )
+                let sourceColorClassRaw = FilmtoneLookDirector.sourceColorClassRaw(
+                    probe: store.probe
+                )
+                let selectedBinding = FilmtoneBuiltInCatalog.creativeLutBinding(
+                    forSlug: slug,
+                    defaultBinding: .bundled(
+                        slug: slug,
+                        filename: filename,
+                        sha256: pinnedSha256,
+                        intensity: intensity
+                    ),
+                    sourceProfileId: sourceProfileId,
+                    sourceColorClassRaw: sourceColorClassRaw
+                )
                 if let resolved = FilmtoneEditorStore.loadBundledCreativeLut(
-                    slug: slug,
-                    filename: filename,
-                    pinnedSha256: pinnedSha256,
-                    intensity: intensity,
+                    binding: selectedBinding,
                     packId: FilmtoneBuiltInCatalog.creativePack01Id
                 ) {
                     resolvedCreativeLut = resolved
                     creativePack01Adaptation = FilmtoneCreativePack01Adaptation.resolve(
                         slug: slug,
                         descriptor: store.probe?.sourceToneDescriptor,
-                        sourceProfileId: FilmtoneLookDirector.sourceProfileId(
-                            for: store.project.cameraProfile
-                        ),
+                        sourceProfileId: sourceProfileId,
                         sourceDetailBias: FilmtoneLookDirector.resolveSourceDetailBias(
                             probe: store.probe,
                             cameraProfile: store.project.cameraProfile
                         ),
-                        sourceColorClassRaw: FilmtoneLookDirector.sourceColorClassRaw(
-                            probe: store.probe
-                        )
+                        sourceColorClassRaw: sourceColorClassRaw
                     )
                 } else {
                     lutMissingForApply = true
