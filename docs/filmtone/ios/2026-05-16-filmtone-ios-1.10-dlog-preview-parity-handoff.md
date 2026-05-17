@@ -13,6 +13,13 @@ Date: 2026-05-16 JST
   using `APP_VERSION=1.10 BUILD_NUMBER=13 bun run release:submit-review`.
   `automatic_release` was `false`.
 
+2026-05-17 release update:
+
+- App Store Connect reports `1.10 (13)` as `READY_FOR_DISTRIBUTION`.
+- Public iTunes lookup returns `1.10` for US / GB / CA / AU / DE / FR / KR.
+- JP iTunes lookup still returns `1.9`; treat JP public lookup as a storefront
+  propagation / regional-state lag until the truth script reports `1.10`.
+
 ## What Changed
 
 - Fixed iOS editor preview wiring so `project.cameraProfile` is passed into:

@@ -531,6 +531,11 @@ CLI / Verify harness now has deterministic still-image luma, channel ceiling,
 chroma stress, and black-floor metrics for future repair analysis. Archive
 `archive/2026-05-16-codex-grade-repair-metrics-proof.md`.
 
+2026-05-17: Desktop v1.11 shipped as a signed, notarized DMG with public
+update metadata on `latestVersion: 1.11`. iOS `1.10 (13)` is
+`READY_FOR_DISTRIBUTION` in App Store Connect; JP storefront lookup still lags
+at `1.9`. Archive `archive/2026-05-17-desktop-v1.11-ios-1.10-release.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

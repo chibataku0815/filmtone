@@ -6,12 +6,16 @@ entry points stay visible.
 
 ## Release State
 
-- Public App Store version: `1.9` as of the 2026-05-16 truth refresh.
+- App Store Connect: `1.10 (13)` is `READY_FOR_DISTRIBUTION` as of the
+  2026-05-17 release check.
+- Public storefront lookup is country-specific during propagation:
+  US / GB / CA / AU / DE / FR / KR return `1.10`, while JP still returns `1.9`
+  from the iTunes lookup used by `check-filmtone-ios-truth.sh`.
 - Local Xcode / TestFlight candidate: `1.10` build `13`.
 - Current TestFlight: `1.10 (13)` processed and distributed to Internal
   testers on 2026-05-16 JST.
-- App Store review: `1.10 (13)` submitted for review on 2026-05-16 JST with
-  automatic release disabled.
+- App Store review: `1.10 (13)` was submitted for review on 2026-05-16 JST and
+  is now released / ready for distribution in App Store Connect.
 - Release handoff for the pre-public submission state:
   [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
   and the current 1.10 candidate:
