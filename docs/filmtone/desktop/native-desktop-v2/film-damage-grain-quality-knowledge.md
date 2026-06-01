@@ -69,13 +69,33 @@ Implemented in:
 
 Behavior:
 
-- Grain now uses a 24 fps material clock with a very small sub-frame blend.
+- Grain now uses a 24 fps material clock without sub-frame morphing.
 - Film Damage builds a `materialMask` from gate wear, edge soil, dirt, stain,
   dust, sparkle, scratch, and fiber blends.
 - Damaged regions receive neutral micro re-grain, source-luma tone return, and
   a small bright-defect soil pass.
+- Dust should read as small, clear physical specks. Large dirt/stain fields are
+  kept subtle so the Dust control does not produce oversized spots.
+- Scratches should use a thin core with only a restrained scuffed edge; raising
+  visibility should not make the line body broad.
+- Scratches remain film/gate-space material rather than source-tracked marks,
+  but must not be perfectly static. Add subtle gate weave, per-scratch drift,
+  density breathing, and live gap flutter so they do not read as a fixed overlay.
 - The probe now emits damage-only and grain+damage sheets so future iterations
   can compare integration quality.
+
+## Performance Rule
+
+Final optical kernels run for every export pixel, so integration quality cannot
+depend on smooth multi-sample noise over the whole frame.
+
+- Guard local re-grain work behind the `materialMask`; clean pixels should skip
+  the damage-integration tail.
+- Prefer cheap quantized cell hashes for damaged-region micro texture over
+  smooth value-noise calls in the final pass.
+- Avoid sub-frame grain morphing in export kernels unless there is a measured
+  need; one stable frame-material grain pattern is cheaper and less synthetic.
+- Keep Desktop and iOS/iPad kernels aligned before judging visual parity.
 
 ## Remaining Quality Ceiling
 
