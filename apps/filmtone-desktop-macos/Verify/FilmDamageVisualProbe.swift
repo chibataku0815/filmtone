@@ -111,13 +111,47 @@ private func renderCase(
     plate: CGImage,
     context: CIContext,
     timeSeconds: Double = defaultTimeSeconds,
-    sourceSeed: Double = defaultSourceSeed
+    sourceSeed: Double = defaultSourceSeed,
+    includeGrain: Bool = false
 ) throws -> CGImage {
     let extent = CGRect(x: 0, y: 0, width: tileWidth, height: tileHeight)
     let input = CIImage(cgImage: plate).cropped(to: extent)
+    let integratedInput: CIImage
+    if includeGrain {
+        guard let grainKernel = FilmtoneGradeKernels.grain else {
+            throw NSError(
+                domain: "FilmDamageVisualProbe",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "grain kernel failed to compile"]
+            )
+        }
+        guard let grained = grainKernel.apply(
+            extent: extent,
+            arguments: [
+                input,
+                0.070,
+                0.45,
+                0.34,
+                timeSeconds,
+                sourceSeed,
+                CIVector(x: 0, y: 0),
+                CIVector(x: CGFloat(tileWidth), y: CGFloat(tileHeight)),
+            ]
+        ) else {
+            throw NSError(
+                domain: "FilmDamageVisualProbe",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "grain kernel failed to apply"]
+            )
+        }
+        integratedInput = grained
+    } else {
+        integratedInput = input
+    }
+
     let output: CIImage
     if probeCase.dust <= 0.0001 && probeCase.scratch <= 0.0001 {
-        output = input
+        output = integratedInput
     } else {
         guard let kernel = FilmtoneGradeKernels.filmDamage else {
             throw NSError(
@@ -129,7 +163,7 @@ private func renderCase(
         guard let applied = kernel.apply(
             extent: extent,
             arguments: [
-                input,
+                integratedInput,
                 probeCase.dust,
                 probeCase.scratch,
                 timeSeconds,
@@ -162,7 +196,8 @@ private func drawText(_ text: String, in rect: CGRect, attributes: [NSAttributed
 
 private func makeContactSheet(
     plateName: String,
-    images: [(ProbeCase, CGImage)]
+    images: [(ProbeCase, CGImage)],
+    modeName: String = "damage"
 ) -> NSBitmapImageRep {
     let width = cases.count * tileWidth + (cases.count + 1) * gap
     let height = tileHeight + labelHeight + gap * 3
@@ -195,7 +230,7 @@ private func makeContactSheet(
         .foregroundColor: NSColor(calibratedWhite: 0.88, alpha: 1),
     ]
     drawText(
-        "Film Damage monochrome physical proof - \(plateName) plate - t=\(defaultTimeSeconds), seed=\(defaultSourceSeed)",
+        "Film Damage grain integration proof - \(modeName) - \(plateName) plate - t=\(defaultTimeSeconds), seed=\(defaultSourceSeed)",
         in: CGRect(x: gap, y: height - gap - 20, width: width - gap * 2, height: 20),
         attributes: titleAttrs
     )
@@ -219,7 +254,8 @@ private func makeContactSheet(
 private func makeTemporalContactSheet(
     plateName: String,
     probeCase: ProbeCase,
-    images: [(TemporalSample, CGImage)]
+    images: [(TemporalSample, CGImage)],
+    modeName: String = "damage"
 ) -> NSBitmapImageRep {
     let width = images.count * tileWidth + (images.count + 1) * gap
     let height = tileHeight + labelHeight + gap * 3
@@ -252,7 +288,7 @@ private func makeTemporalContactSheet(
         .foregroundColor: NSColor(calibratedWhite: 0.88, alpha: 1),
     ]
     drawText(
-        "Film Damage monochrome physical temporal proof - \(plateName) plate - \(probeCase.name) d:\(probeCase.dust) s:\(probeCase.scratch)",
+        "Film Damage grain integration temporal proof - \(modeName) - \(plateName) plate - \(probeCase.name) d:\(probeCase.dust) s:\(probeCase.scratch)",
         in: CGRect(x: gap, y: height - gap - 20, width: width - gap * 2, height: 20),
         attributes: titleAttrs
     )
@@ -294,6 +330,28 @@ private struct FilmDamageVisualProbe {
             print(url.path)
         }
 
+        let integratedSource = makePlate(.midtone, width: tileWidth, height: tileHeight)
+        let integratedRendered = try cases.map { probeCase in
+            (
+                probeCase,
+                try renderCase(
+                    probeCase,
+                    plate: integratedSource,
+                    context: context,
+                    includeGrain: true
+                )
+            )
+        }
+        let integratedSheet = makeContactSheet(
+            plateName: ProbePlate.midtone.rawValue,
+            images: integratedRendered,
+            modeName: "grain+damage"
+        )
+        let integratedPngData = integratedSheet.representation(using: .png, properties: [:])!
+        let integratedUrl = outputRoot.appendingPathComponent("film-damage-integrated-grain-midtone.png")
+        try integratedPngData.write(to: integratedUrl)
+        print(integratedUrl.path)
+
         let temporalSource = makePlate(.midtone, width: tileWidth, height: tileHeight)
         for probeCase in [cases[2], cases[3], cases[4]] {
             let rendered = try temporalSamples.map { sample in
@@ -304,11 +362,17 @@ private struct FilmDamageVisualProbe {
                         plate: temporalSource,
                         context: context,
                         timeSeconds: sample.timeSeconds,
-                        sourceSeed: sample.sourceSeed
+                        sourceSeed: sample.sourceSeed,
+                        includeGrain: true
                     )
                 )
             }
-            let sheet = makeTemporalContactSheet(plateName: ProbePlate.midtone.rawValue, probeCase: probeCase, images: rendered)
+            let sheet = makeTemporalContactSheet(
+                plateName: ProbePlate.midtone.rawValue,
+                probeCase: probeCase,
+                images: rendered,
+                modeName: "grain+damage"
+            )
             let pngData = sheet.representation(using: .png, properties: [:])!
             let url = outputRoot.appendingPathComponent("film-damage-temporal-\(probeCase.name).png")
             try pngData.write(to: url)

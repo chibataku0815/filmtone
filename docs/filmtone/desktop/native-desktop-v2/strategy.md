@@ -611,6 +611,12 @@ Desktop/iPad kernels now make dark dust, dirt, scratches, fibers, gate wear, and
 stains visibly dominant, with sparse neutral/off-white highlights only. Archive
 `archive/2026-06-01-film-damage-monochrome-physical.md`.
 
+2026-06-01: Film Damage / Grain integration follow-up completed. Native
+Desktop/iPad kernels now move grain timing toward frame-material updates and
+re-grain damaged regions so dust, scratches, stains, and gate wear sit less like
+clean post masks. Archive
+`archive/2026-06-01-film-damage-grain-integration.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

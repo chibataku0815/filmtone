@@ -354,9 +354,10 @@ kernel vec4 grain(__sample image, float intensity, float radialMix, float grainS
     float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     float chromaSpread = max(max(abs(color.r - color.g), abs(color.r - color.b)), abs(color.g - color.b));
 
-    float grainClock = max(timeSeconds, 0.0) * mix(1.85, 2.75, coarseBlend);
+    float grainClock = max(timeSeconds, 0.0) * 24.0;
     float grainFrameA = floor(grainClock);
-    float grainPhase = smoothstep(0.0, 1.0, fract(grainClock));
+    float grainSubframe = smoothstep(0.0, 1.0, fract(grainClock));
+    float grainPhase = grainSubframe * mix(0.10, 0.18, coarseBlend);
     vec4 signalA = grainSignal(pixelCoord, grainFrameA, sourceSeed, size, coarseBlend);
     vec4 signalB = grainSignal(pixelCoord, grainFrameA + 1.0, sourceSeed, size, coarseBlend);
     float phaseVariance = (1.0 - grainPhase) * (1.0 - grainPhase) + grainPhase * grainPhase;
@@ -594,6 +595,7 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
     float frame = max(timeSeconds, 0.0) * 24.0;
 	    float seed = sourceSeed * 19.0;
 	    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+	    float sourceLuma = luma;
 	    float edge = damageEdge(pixelCoord, extentSize);
 	    float driver = max(dust, scratch);
 	    float profileT = smoothstep(0.18, 1.0, driver);
@@ -619,15 +621,17 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 		    float gateSide = step(extentSize.x * 0.5, pixelCoord.x);
 		    float gateBreak = mix(0.54, 1.0, damageValueNoise(vec2(gateSide * 1.7 + floor(gateDistance / max(18.0, gateWearWidth * 0.72)) * 0.19, floor(gateCell / 4.0) * 0.33), seed + heldFrame * 0.11 + 713.0));
 		    float gateWear = gateMask * gateBreak * (dust * 0.052 + scratch * 0.036) * globalOpacity;
-		    float gateLuma = clamp(luma * 0.54 - 0.028 * (0.4 + edge), 0.0, 1.0);
-		    vec3 gateTarget = vec3(gateLuma);
-		    color.rgb = mix(color.rgb, gateTarget, gateWear * 1.45);
+	    float gateLuma = clamp(luma * 0.54 - 0.028 * (0.4 + edge), 0.0, 1.0);
+	    vec3 gateTarget = vec3(gateLuma);
+	    float gateBlend = gateWear * 1.45;
+	    color.rgb = mix(color.rgb, gateTarget, gateBlend);
 		    vec2 edgeSoilCoord = vec2(gateDistance / max(34.0, gateWearWidth * 0.92), pixelCoord.y / mix(170.0, 74.0, dust)) + vec2(seed * 0.010 + gateSide * 0.13, heldFrame * 0.030);
 		    float edgeSoilNoise = damageValueNoise(edgeSoilCoord, seed + 719.0);
 		    float edgeSoil = gateMask * smoothstep(0.56, 0.98, edgeSoilNoise) * dust * (0.012 + dust * 0.026) * globalOpacity;
-		    float edgeSoilLuma = clamp(luma * 0.44 - 0.030 * (0.6 + edge), 0.0, 1.0);
-		    vec3 edgeSoilTarget = vec3(edgeSoilLuma);
-		    color.rgb = mix(color.rgb, edgeSoilTarget, edgeSoil * 1.55);
+	    float edgeSoilLuma = clamp(luma * 0.44 - 0.030 * (0.6 + edge), 0.0, 1.0);
+	    vec3 edgeSoilTarget = vec3(edgeSoilLuma);
+	    float edgeSoilBlend = edgeSoil * 1.55;
+	    color.rgb = mix(color.rgb, edgeSoilTarget, edgeSoilBlend);
 
 		    vec2 dirtCell = floor(pixelCoord / (mix(128.0, 68.0, dust) * profileScale));
 		    float dirtCellSize = mix(128.0, 68.0, dust) * profileScale;
@@ -639,10 +643,11 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 		    dirtMask = max(dirtMask, damageSpot(pixelCoord, dirtCell + vec2(-1.0, 0.0), dirtCellSize, dirtAmount, defectFrame, seed + 331.0, dirtEdgeBoost, 0.72, profileScale, periodBase));
 		    dirtMask = max(dirtMask, damageSpot(pixelCoord, dirtCell + vec2(0.0, 1.0), dirtCellSize, dirtAmount, defectFrame, seed + 331.0, dirtEdgeBoost, 0.72, profileScale, periodBase));
 		    dirtMask = max(dirtMask, damageSpot(pixelCoord, dirtCell + vec2(0.0, -1.0), dirtCellSize, dirtAmount, defectFrame, seed + 331.0, dirtEdgeBoost, 0.72, profileScale, periodBase));
-		    float dirtTexture = mix(0.62, 1.0, damageValueNoise(pixelCoord / mix(22.0, 9.0, dust) + vec2(seed * 0.013, 0.0), seed + 337.0));
-		    float dirtLuma = clamp(luma * mix(0.50, 0.26, dust) - mix(0.035, 0.070, dust) * (0.70 + edge * 0.30), 0.0, 1.0);
-		    vec3 dirtTarget = vec3(dirtLuma);
-		    color.rgb = mix(color.rgb, dirtTarget, dirtMask * dirtTexture * mix(0.28, 0.72, dust) * globalOpacity);
+	    float dirtTexture = mix(0.62, 1.0, damageValueNoise(pixelCoord / mix(22.0, 9.0, dust) + vec2(seed * 0.013, 0.0), seed + 337.0));
+	    float dirtLuma = clamp(luma * mix(0.50, 0.26, dust) - mix(0.035, 0.070, dust) * (0.70 + edge * 0.30), 0.0, 1.0);
+	    vec3 dirtTarget = vec3(dirtLuma);
+	    float dirtBlend = dirtMask * dirtTexture * mix(0.28, 0.72, dust) * globalOpacity;
+		    color.rgb = mix(color.rgb, dirtTarget, dirtBlend);
 
 		    float speckAmount = dust * mix(0.58, 0.78, dust) * profileDensity;
 		    vec2 dustCell = floor(pixelCoord / (mix(34.0, 13.5, dust) * profileScale));
@@ -660,10 +665,12 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 		    float darkDust = dustMask * (1.0 - sparkleGate);
 		    float speckTexture = mix(0.64, 1.0, damageValueNoise(pixelCoord / mix(5.0, 2.4, dust), seed + 83.0));
 		    float darkDustLuma = clamp(luma * mix(0.34, 0.12, dust) - mix(0.020, 0.055, dust), 0.0, 1.0);
-		    color.rgb = mix(color.rgb, vec3(darkDustLuma), darkDust * speckTexture * mix(0.42, 0.88, dust) * globalOpacity);
+	    float darkDustBlend = darkDust * speckTexture * mix(0.42, 0.88, dust) * globalOpacity;
+		    color.rgb = mix(color.rgb, vec3(darkDustLuma), darkDustBlend);
 		    float sparkleGuard = 1.0 - smoothstep(0.70, 0.98, luma);
 		    vec3 sparkleTarget = vec3(mix(0.84, 0.96, damageHash(dustCell, seed + 86.0)));
-		    color.rgb = mix(color.rgb, sparkleTarget, sparkleDust * mix(0.36, 0.70, dust) * sparkleGuard * globalOpacity);
+	    float sparkleBlend = sparkleDust * mix(0.36, 0.70, dust) * sparkleGuard * globalOpacity;
+		    color.rgb = mix(color.rgb, sparkleTarget, sparkleBlend);
 
     vec2 stainCell = floor(pixelCoord / (mix(180.0, 86.0, dust) * profileScale));
     float stainCellSize = mix(180.0, 86.0, dust) * profileScale;
@@ -676,7 +683,8 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
     stainMask = max(stainMask, damageSpot(pixelCoord, stainCell + vec2(0.0, -1.0), stainCellSize, dust, defectFrame, seed + 503.0, stainEdgeBoost, 1.0, profileScale, periodBase));
 		    float stainDarkLuma = clamp(luma * mix(0.58, 0.34, dust) - mix(0.030, 0.070, dust), 0.0, 1.0);
 		    vec3 stainDarkTarget = vec3(stainDarkLuma);
-		    color.rgb = mix(color.rgb, stainDarkTarget, stainMask * mix(0.12, 0.36, dust) * globalOpacity);
+	    float stainBlend = stainMask * mix(0.12, 0.36, dust) * globalOpacity;
+		    color.rgb = mix(color.rgb, stainDarkTarget, stainBlend);
 
 		    float scratchMask = max(
 		        damageScratch(pixelCoord, extentSize, scratch, defectFrame, seed + 211.0, 0.0, profileScale, profileDensity, periodBase),
@@ -693,8 +701,29 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	    vec3 scratchDarkTarget = vec3(clamp(luma * 0.20 - 0.030, 0.0, 1.0));
 	    vec3 scratchLightTarget = vec3(mix(0.82, 0.95, damageHash(vec2(scratchPolarity, floor(pixelCoord.y / 29.0)), seed + 847.0)));
 	    vec3 scratchTarget = mix(scratchDarkTarget, scratchLightTarget, lightScratch);
-		    color.rgb = mix(color.rgb, scratchTarget, scratchMask * mix(0.52, 0.88, scratch) * globalOpacity);
-		    color.rgb = mix(color.rgb, vec3(clamp(luma * 0.24 - 0.020, 0.0, 1.0)), fiberMask * mix(0.42, 0.78, scratch) * globalOpacity);
+	    float scratchBlend = scratchMask * mix(0.52, 0.88, scratch) * globalOpacity;
+	    float fiberBlend = fiberMask * mix(0.42, 0.78, scratch) * globalOpacity;
+		    color.rgb = mix(color.rgb, scratchTarget, scratchBlend);
+		    color.rgb = mix(color.rgb, vec3(clamp(luma * 0.24 - 0.020, 0.0, 1.0)), fiberBlend);
+
+	    float materialMask = max(max(max(gateBlend, edgeSoilBlend), max(dirtBlend, stainBlend)), max(max(darkDustBlend, sparkleBlend), max(scratchBlend, fiberBlend)));
+	    materialMask = clamp(materialMask, 0.0, 1.0);
+	    float materialFeather = smoothstep(0.018, 0.50, materialMask);
+	    float regrainFrame = floor(frame);
+	    float regrainFine = damageValueNoise(pixelCoord * mix(0.62, 1.15, profileT) + vec2(seed * 0.17, regrainFrame * 0.31), seed + 911.0) - 0.5;
+	    float regrainCoarse = damageValueNoise(pixelCoord / mix(12.0, 5.5, driver) + vec2(seed * 0.07, heldFrame * 0.23), seed + 919.0) - 0.5;
+	    float edgeRagged = mix(0.72, 1.12, damageValueNoise(pixelCoord / mix(5.5, 2.7, driver) + vec2(seed * 0.11, heldFrame * 0.19), seed + 929.0));
+	    float highlightEmbed = 1.0 - smoothstep(0.86, 1.0, sourceLuma);
+	    float materialGrain = (regrainFine * 0.72 + regrainCoarse * 0.28) * mix(0.020, 0.055, profileT) * materialFeather * highlightEmbed;
+	    color.rgb += vec3(materialGrain);
+	    float brightDamageBlend = clamp(max(sparkleBlend, scratchBlend * lightScratch), 0.0, 1.0);
+	    float whiteSoil = brightDamageBlend * mix(0.010, 0.035, driver) * edgeRagged * (1.0 - smoothstep(0.92, 1.0, sourceLuma));
+	    color.rgb -= vec3(whiteSoil);
+	    float sourceToneReturn = materialFeather * mix(0.035, 0.095, profileT) * smoothstep(0.12, 0.72, sourceLuma);
+	    float postDamageLuma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+	    color.rgb = mix(color.rgb, vec3(mix(postDamageLuma, sourceLuma, 0.28)), sourceToneReturn);
+	    float neutralLock = materialFeather * mix(0.04, 0.12, driver);
+	    color.rgb = mix(color.rgb, vec3(dot(color.rgb, vec3(0.2126, 0.7152, 0.0722))), neutralLock);
 
     color.rgb = clamp(color.rgb, 0.0, 1.0);
     return color;
