@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import FilmLabSwiftCore
 import SwiftUI
 
 // Headless export entry: when launched with `--export-still` or
@@ -20,6 +21,7 @@ import SwiftUI
 //     --input <path/to/source.mov> \
 //     --output <path/to/output.mp4> \
 //     [--preset ...] [--look ...] [--strength 0.0..1.0] [--no-sidecar]
+//     [--param key=value]...
 //
 // `--preset` and `--look` may both be present. When they are, --look wins
 // (basePreset is forced to `reset` so the cube + paramOverrides are the
@@ -124,6 +126,7 @@ enum FilmtoneDesktopCLI {
         let rawPreset = (try? value(for: "--preset", in: args)) ?? FilmtonePresetCatalog.defaultName
         let lookSlug = try parseLook(args: args)
         let strength = parseStrength(args)
+        let paramOverrides = try parseParamOverrides(args)
         let preset = lookSlug == nil ? rawPreset : FilmtonePresetCatalog.defaultName
 
         return FilmtoneVideoExportRequest(
@@ -132,7 +135,8 @@ enum FilmtoneDesktopCLI {
             presetName: preset,
             presetStrength: strength,
             lookSlug: lookSlug,
-            codec: .h264
+            codec: .h264,
+            paramOverrides: paramOverrides
         )
     }
 
@@ -166,6 +170,43 @@ enum FilmtoneDesktopCLI {
             return FilmtonePresetCatalog.presetStrengthDefault
         }
         return FilmtonePresetCatalog.clampStrength(parsed)
+    }
+
+    private static func parseParamOverrides(_ args: [String]) throws -> FilmtonePhase0ParamsPatch {
+        var values: [String: Double] = [:]
+        var index = 0
+        while index < args.count {
+            guard args[index] == "--param" else {
+                index += 1
+                continue
+            }
+            guard index + 1 < args.count else {
+                throw NSError(
+                    domain: "FilmtoneDesktopCLI",
+                    code: 64,
+                    userInfo: [NSLocalizedDescriptionKey: "missing value for --param"]
+                )
+            }
+            let assignment = args[index + 1]
+            let parts = assignment.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2, !parts[0].isEmpty, let rawValue = Double(parts[1]) else {
+                throw NSError(
+                    domain: "FilmtoneDesktopCLI",
+                    code: 64,
+                    userInfo: [NSLocalizedDescriptionKey: "invalid --param value: \(assignment)"]
+                )
+            }
+            guard FilmtonePhase0Generated.paramKeys.contains(parts[0]) else {
+                throw NSError(
+                    domain: "FilmtoneDesktopCLI",
+                    code: 64,
+                    userInfo: [NSLocalizedDescriptionKey: "unknown --param key: \(parts[0])"]
+                )
+            }
+            values[parts[0]] = AdvancedAdjustCatalog.clamp(rawValue, for: parts[0])
+            index += 2
+        }
+        return FilmtonePhase0ParamsPatch(values: values)
     }
 
     // Bridges async export into the sync CLI entry by parking the calling

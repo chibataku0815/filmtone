@@ -93,8 +93,26 @@ depend on smooth multi-sample noise over the whole frame.
   the damage-integration tail.
 - Prefer cheap quantized cell hashes for damaged-region micro texture over
   smooth value-noise calls in the final pass.
+- Reject absent Film Damage events before fade and shape work. `damageSpot` and
+  `damageScratch` are called repeatedly per pixel, so presence and lifetime
+  checks must happen before contour, roughness, gap, and texture calculations.
 - Avoid sub-frame grain morphing in export kernels unless there is a measured
   need; one stable frame-material grain pattern is cheaper and less synthetic.
+- Keep smooth Grain noise only where it carries density/large-scale texture.
+  High-frequency grain and scratch/dust material texture can use direct cell
+  hashes; film material should read granular, not interpolated everywhere.
+- Gate Film Damage families explicitly. Dust-only exports should not run
+  scratch/fiber work, and scratch-only exports should not run dirt/stain/dust
+  cell work.
+- Desktop video export should use an export-only CoreImage context with
+  intermediate caching disabled, matching the iOS export path. The shared
+  preview context is the wrong lifetime model for long 4K exports.
+- Wait for writer readiness before rendering the next frame. Rendering into a
+  fresh pixel buffer while AVAssetWriter is already backpressured increases
+  memory pressure without increasing throughput.
+- Do not use short writer-ready or finish timeouts as proof of failure in
+  offline heavy-optics exports. Surface writer status and finalization progress
+  separately so a final encoder flush does not look like a render hang.
 - Keep Desktop and iOS/iPad kernels aligned before judging visual parity.
 
 ## Remaining Quality Ceiling

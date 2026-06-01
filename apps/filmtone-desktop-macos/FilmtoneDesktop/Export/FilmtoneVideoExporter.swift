@@ -117,6 +117,19 @@ struct FilmtoneVideoExportProgress: Sendable {
     let processedFrames: Int
     let estimatedTotalFrames: Int
     let normalized: Double
+    let message: String?
+
+    init(
+        processedFrames: Int,
+        estimatedTotalFrames: Int,
+        normalized: Double,
+        message: String? = nil
+    ) {
+        self.processedFrames = processedFrames
+        self.estimatedTotalFrames = estimatedTotalFrames
+        self.normalized = normalized
+        self.message = message
+    }
 }
 
 struct FilmtoneVideoExportResult: Sendable {
@@ -192,13 +205,15 @@ enum FilmtoneVideoExporter {
             contract: contract
         )
 
+        let exportContext = FilmtoneCIContext.makeExportContext(contract: contract)
         let renderContext = makeRenderContext(
             request: request,
             probe: probe,
             reader: reader,
             outputSize: outputSize,
             contract: contract,
-            resolvedProfile: resolvedProfile
+            resolvedProfile: resolvedProfile,
+            ciContext: exportContext
         )
 
         try writer.start()
@@ -235,6 +250,7 @@ enum FilmtoneVideoExporter {
                     value: CMTimeValue(outputFrameIndex),
                     timescale: CMTimeScale(frameRate)
                 )
+                try await writer.waitForVideoInputReady()
                 let outputBuffer = try renderPixelBuffer(
                     from: selectedFrame,
                     frameTimeSeconds: sourceLookupTime,
@@ -253,6 +269,12 @@ enum FilmtoneVideoExporter {
                 }
             }
 
+            progress?(FilmtoneVideoExportProgress(
+                processedFrames: processed,
+                estimatedTotalFrames: max(processed, estimatedTotal),
+                normalized: 0.99,
+                message: "Writing output…"
+            ))
             try await writer.finish()
         } catch {
             reader.cancel()
@@ -343,7 +365,7 @@ enum FilmtoneVideoExporter {
         let sourceSeed = FilmtoneGradePipeline.makeStableSourceSeed(
             from: request.sourceURL.absoluteString
         )
-        let context = FilmtoneCIContext.shared
+        let context = FilmtoneCIContext.makeExportContext(contract: contract)
         let outputColorSpace = contract.destinationColorSpace
         let renderBounds = CGRect(origin: .zero, size: outputSize)
         let preferredTransform = reader.preferredTransform
@@ -386,6 +408,7 @@ enum FilmtoneVideoExporter {
 
                 let frame = TimedVideoFrame(pixelBuffer: pair.pixelBuffer, seconds: CMTimeGetSeconds(validTime))
                 let frameTimeSeconds = frame.seconds.isFinite ? max(frame.seconds, 0) : 0
+                try await writer.waitForVideoInputReady()
                 let outputBuffer = try renderPixelBuffer(
                     from: frame,
                     frameTimeSeconds: frameTimeSeconds,
@@ -412,6 +435,12 @@ enum FilmtoneVideoExporter {
             if let audioTask {
                 try await audioTask.value
             }
+            progress?(FilmtoneVideoExportProgress(
+                processedFrames: processed,
+                estimatedTotalFrames: max(processed, estimatedTotal),
+                normalized: 0.99,
+                message: "Writing output…"
+            ))
             try await writer.finish()
         } catch {
             audioTask?.cancel()
@@ -521,7 +550,8 @@ enum FilmtoneVideoExporter {
         reader: FilmtoneVideoReader,
         outputSize: CGSize,
         contract: FilmtoneColorPipelineContract,
-        resolvedProfile: CameraProfileCatalogEntry?
+        resolvedProfile: CameraProfileCatalogEntry?,
+        ciContext: CIContext
     ) -> VideoFrameRenderContext {
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
             .applyingSourcePolicy(
@@ -545,7 +575,7 @@ enum FilmtoneVideoExporter {
                 colorClass: probe.colorClass,
                 resolvedProfile: resolvedProfile
             ),
-            ciContext: FilmtoneCIContext.shared,
+            ciContext: ciContext,
             outputColorSpace: contract.destinationColorSpace,
             renderBounds: CGRect(origin: .zero, size: outputSize),
             preferredTransform: reader.preferredTransform,

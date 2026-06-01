@@ -27,7 +27,7 @@ import Foundation
 //   §Stage insertion points → macOS native. Identity at
 //   `effectiveDetailSoftness == 0` (caller short-circuit + kernel guard).
 //
-//   baseGradeV2 → filmCompressionV3 → shadowLatitude → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage
+//   baseGradeV2 → filmCompressionV3 → shadowLatitude → detailSoftness → edgeOptics → glowFamily → vignette → grain → creativeLut → printStage → filmDamage
 
 enum FilmtoneGradePipeline {
 
@@ -125,6 +125,14 @@ enum FilmtoneGradePipeline {
         }
         if shouldApplyPrintStage(renderParams) {
             current = applyPrintStage(to: current, params: renderParams)
+        }
+        if renderParams.dustAmount > 0.0001 || renderParams.scratchAmount > 0.0001 {
+            current = applyFilmDamage(
+                to: current,
+                params: renderParams,
+                timeSeconds: frameTimeSeconds,
+                sourceSeed: sourceSeed
+            )
         }
 
         return current
@@ -285,6 +293,27 @@ enum FilmtoneGradePipeline {
             params.grainRadialMix,
             params.grainSize,
             timeSeconds,
+            sourceSeed,
+            origin,
+            size,
+        ]) ?? image
+    }
+
+    private static func applyFilmDamage(
+        to image: CIImage,
+        params: FilmtonePhase0Params,
+        timeSeconds: Double,
+        sourceSeed: Double
+    ) -> CIImage {
+        guard let kernel = FilmtoneGradeKernels.filmDamage else { return image }
+        let extent = image.extent
+        let origin = CIVector(x: extent.origin.x, y: extent.origin.y)
+        let size = CIVector(x: extent.size.width, y: extent.size.height)
+        return kernel.apply(extent: extent, arguments: [
+            image,
+            params.dustAmount,
+            params.scratchAmount,
+            max(timeSeconds, 0),
             sourceSeed,
             origin,
             size,

@@ -16,9 +16,8 @@ import Foundation
 /// `cancelled` flag.
 ///
 /// Writer settings, reader pixel-format candidate order, audio settings,
-/// the 15-second wait timeout, the 30-second finish timeout, and CMTime
-/// math are preserved exactly from the pre-extraction `FilmtoneExportSession`
-/// bodies.
+/// the offline writer wait policy, the offline finish timeout, and CMTime
+/// math are preserved from the pre-extraction `FilmtoneExportSession` bodies.
 final class ExportMediaWriter {
     private let outputURL: URL
     private let outputFPS: Int
@@ -155,10 +154,10 @@ final class ExportMediaWriter {
         writer.finishWriting {
             semaphore.signal()
         }
-        let waitResult = semaphore.wait(timeout: .now() + 30)
+        let waitResult = semaphore.wait(timeout: .now() + 120)
         if waitResult == .timedOut {
             writer.cancelWriting()
-            throw FilmtoneMediaError.exportFailed("The writer did not finish output within the expected time.")
+            throw FilmtoneMediaError.exportFailed("The writer did not finish output within 120 seconds.")
         }
 
         try checkCancelled()
@@ -201,8 +200,8 @@ final class ExportMediaWriter {
                 break
             }
 
-            if Date().timeIntervalSince(startedWaitingAt) >= 15 {
-                throw FilmtoneMediaError.exportFailed("The \(label) writer input stopped accepting media data.")
+            if Date().timeIntervalSince(startedWaitingAt) >= 120 {
+                throw FilmtoneMediaError.exportFailed("The \(label) writer input stopped accepting media data for more than 120 seconds.")
             }
 
             Thread.sleep(forTimeInterval: 0.002)

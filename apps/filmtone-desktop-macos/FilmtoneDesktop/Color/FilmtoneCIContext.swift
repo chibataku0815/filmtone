@@ -24,6 +24,17 @@ enum FilmtoneCIContext {
         ])
     }()
 
+    static func makeExportContext(contract: FilmtoneColorPipelineContract) -> CIContext {
+        CIContext(options: [
+            .cacheIntermediates: false,
+            .priorityRequestLow: false,
+            .workingColorSpace: contract.workingColorSpace,
+            .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
+            .outputColorSpace: contract.destinationColorSpace,
+            .useSoftwareRenderer: false,
+        ])
+    }
+
     static let outputColorSpace: CGColorSpace =
         CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
 }

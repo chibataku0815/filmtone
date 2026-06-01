@@ -168,7 +168,8 @@ final class ExportCoordinator {
                 let result = try await FilmtoneVideoExporter.export(request) { progress in
                     Task { @MainActor in
                         state.exportProgress = progress.normalized
-                        state.exportProgressMessage = "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
+                        state.exportProgressMessage = progress.message
+                            ?? "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
                     }
                 }
                 let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0
@@ -254,7 +255,8 @@ final class ExportCoordinator {
                 let result = try await FilmtoneVideoExporter.exportHighlightReel(request) { progress in
                     Task { @MainActor in
                         state.exportProgress = progress.normalized
-                        state.exportProgressMessage = "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
+                        state.exportProgressMessage = progress.message
+                            ?? "Rendering frame \(progress.processedFrames)/\(progress.estimatedTotalFrames)"
                     }
                 }
                 let fileSize = (try? FileManager.default.attributesOfItem(atPath: result.outputURL.path)[.size] as? Int64) ?? 0

@@ -3,7 +3,7 @@ import CoreMedia
 import CoreVideo
 import Foundation
 
-enum FilmtoneVideoWriterError: Error {
+enum FilmtoneVideoWriterError: Error, LocalizedError {
     case writerSetupFailed(URL, underlying: Error?)
     case inputCannotBeAdded(URL)
     case audioInputCannotBeAdded(URL)
@@ -12,6 +12,32 @@ enum FilmtoneVideoWriterError: Error {
     case audioAppendFailed(URL, underlying: Error?)
     case waitForReadyTimedOut(URL)
     case finishIncomplete(URL, status: AVAssetWriter.Status, underlying: Error?)
+
+    var errorDescription: String? {
+        switch self {
+        case .writerSetupFailed(let url, let underlying):
+            return "Could not set up video writer for \(url.lastPathComponent)\(Self.underlyingMessage(underlying))"
+        case .inputCannotBeAdded(let url):
+            return "Could not add video input for \(url.lastPathComponent)"
+        case .audioInputCannotBeAdded(let url):
+            return "Could not add audio input for \(url.lastPathComponent)"
+        case .writerStartFailed(let url, let underlying):
+            return "Could not start video writer for \(url.lastPathComponent)\(Self.underlyingMessage(underlying))"
+        case .appendFailed(let url, let underlying):
+            return "Could not append a rendered frame to \(url.lastPathComponent)\(Self.underlyingMessage(underlying))"
+        case .audioAppendFailed(let url, let underlying):
+            return "Could not append audio to \(url.lastPathComponent)\(Self.underlyingMessage(underlying))"
+        case .waitForReadyTimedOut(let url):
+            return "The video writer stopped accepting frames for \(url.lastPathComponent)"
+        case .finishIncomplete(let url, let status, let underlying):
+            return "The video writer did not complete \(url.lastPathComponent) (status: \(status))\(Self.underlyingMessage(underlying))"
+        }
+    }
+
+    private static func underlyingMessage(_ error: Error?) -> String {
+        guard let error else { return "" }
+        return ": \(error.localizedDescription)"
+    }
 }
 
 // AVAssetWriter wrapper for H.264 mp4 output. Lifted from iOS
@@ -136,6 +162,10 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         adaptor.pixelBufferPool
     }
 
+    func waitForVideoInputReady() async throws {
+        try await waitForReadyForMoreMediaData(videoInput)
+    }
+
     func append(buffer: CVPixelBuffer, presentationTime: CMTime) async throws {
         try await waitForReadyForMoreMediaData(videoInput)
         if !adaptor.append(buffer, withPresentationTime: presentationTime) {
@@ -182,11 +212,21 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
 
     private func waitForReadyForMoreMediaData(
         _ input: AVAssetWriterInput,
-        timeoutSeconds: Double = 15
+        timeoutSeconds: Double = 120
     ) async throws {
         let startedAt = Date()
         while !input.isReadyForMoreMediaData {
             try Task.checkCancellation()
+            switch writer.status {
+            case .failed, .cancelled, .completed:
+                throw FilmtoneVideoWriterError.finishIncomplete(
+                    outputURL,
+                    status: writer.status,
+                    underlying: writer.error
+                )
+            default:
+                break
+            }
             if Date().timeIntervalSince(startedAt) >= timeoutSeconds {
                 throw FilmtoneVideoWriterError.waitForReadyTimedOut(outputURL)
             }
