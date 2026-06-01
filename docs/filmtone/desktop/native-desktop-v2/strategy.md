@@ -542,6 +542,75 @@ update metadata on `latestVersion: 1.11`. iOS `1.10 (13)` is
 `READY_FOR_DISTRIBUTION` in App Store Connect; JP storefront lookup still lags
 at `1.9`. Archive `archive/2026-05-17-desktop-v1.11-ios-1.10-release.md`.
 
+2026-05-31: Cross-platform Film Damage interrupt completed for native Desktop
+and iPad using shared `dustAmount` / `scratchAmount` params with deterministic
+post-print native kernels. Archive `archive/2026-05-31-film-damage-cross-platform.md`.
+
+2026-06-01: Film Damage v2 host port completed for native Desktop and iPad,
+using the existing Dust / Scratches controls to drive richer dust, stains,
+flicker, gate wear, scratches, and fiber-like marks. Archive
+`archive/2026-06-01-film-damage-v2-host-port.md`.
+
+2026-06-01: Film Damage visual target alignment completed. Current failure is
+white sparkle / dot primitives dominating perception before material dirt and
+gate character. Report `film-damage-visual-target-report.md`; archive
+`archive/2026-06-01-film-damage-visual-target-alignment.md`.
+
+2026-06-01: Film Damage Candidate A3 completed for native Desktop and iPad.
+White sparkle is now a minority accent, dust is split into dirt bed / dark specks
+/ sparse sparkle, and Strong leans more toward gate/edge wear. Archive
+`archive/2026-06-01-film-damage-candidate-a.md`.
+
+2026-06-01: Film Damage 2.1 host bridge completed for native Desktop and iPad.
+visual-effect-core revision 2.1 bridgeable semantics now drive internal
+format/global scaling, temporal fades, broken scratches, and persistent fibers.
+Archive `archive/2026-06-01-film-damage-v21-host-bridge.md`.
+
+2026-06-01: Film Damage edge-balance follow-up completed. Native Desktop and
+iPad kernels now avoid left-origin scratch/gate clustering and restore rare
+off-white sparkle as a minority artifact. Archive
+`archive/2026-06-01-film-damage-edge-balance.md`.
+
+2026-06-01: Film Damage temporal restraint follow-up completed. White sparkle
+was reduced again and native Desktop/iPad damage masks now pop/hold or quantize
+rather than smoothly crawling/wiggling. Archive
+`archive/2026-06-01-film-damage-temporal-restraint.md`.
+
+2026-06-01: Film Damage visibility-balance follow-up completed. Native
+Desktop/iPad kernels now reduce fine left-edge gate wear, restore stronger sparse
+off-white dust, and make scratch-only high strength visibly readable. Archive
+`archive/2026-06-01-film-damage-visibility-balance.md`.
+
+2026-06-01: Film Damage temporal humanization follow-up completed. Strong now
+uses a more visible recipe, dust/scratch defects hold over several frames
+instead of updating every frame, and Max scratches are thinner and less regular.
+Archive `archive/2026-06-01-film-damage-temporal-humanization.md`.
+
+2026-06-01: Film Damage v3 plate-material proof completed. Native Desktop/iPad
+kernels now use longer roll envelopes, persistent scratch/fiber fields, softer
+material-colored dust, and lower edge bias. Archive
+`archive/2026-06-01-film-damage-v3-plate-material-proof.md`.
+
+2026-06-01: Film Damage fast-easing follow-up completed. Damage events now enter
+and exit faster, with bounded transition-edge softness/smear to reduce rigid
+procedural popping. Archive
+`archive/2026-06-01-film-damage-fast-easing-blur.md`.
+
+2026-06-01: Film Damage ultrafast attack/release morph follow-up completed.
+Native Desktop/iPad kernels now separate attack/hold/release, keep hold more
+stable, and reserve stronger morph/smear/softness for the transition edges.
+Archive `archive/2026-06-01-film-damage-ultrafast-morph.md`.
+
+2026-06-01: Film Damage neutral polarity follow-up completed. Native
+Desktop/iPad kernels now remove warm brown defect targets and keep dust, dirt,
+stain, scratch, and gate artifacts in neutral black/gray/off-white polarity.
+Archive `archive/2026-06-01-film-damage-neutral-polarity.md`.
+
+2026-06-01: Film Damage monochrome physical defect follow-up completed. Native
+Desktop/iPad kernels now make dark dust, dirt, scratches, fibers, gate wear, and
+stains visibly dominant, with sparse neutral/off-white highlights only. Archive
+`archive/2026-06-01-film-damage-monochrome-physical.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.
