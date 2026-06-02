@@ -29,6 +29,9 @@ apps/filmtone-desktop-macos/build/
 **/*.xcuserstate
 **/DerivedData/
 
+# Native Desktop v2 local visual proof output
+docs/filmtone/desktop/native-desktop-v2/artifacts/
+
 # macOS Phase 1b parity outputs
 /test-out/
 
