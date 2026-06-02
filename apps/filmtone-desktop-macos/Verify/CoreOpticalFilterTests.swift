@@ -3,6 +3,35 @@ import CoreImage
 import Foundation
 
 func registerCoreOpticalFilterTests() {
+    // Test group 14.5 — Desktop video export resolution policy.
+    // Normal in-app export is FHD; 4K is an explicit opt-in only for
+    // 4K-capable sources. This prevents a 3840x2160 source from silently
+    // making the slow path the default while keeping automation caps separate.
+    // ---------------------------------------------------------------------------
+
+    runner.test("video export resolution caps FHD and 4K long edges") {
+        try assertClose(FilmtoneVideoExportResolution.fhd.outputLongEdgeLimit, 1920)
+        try assertClose(FilmtoneVideoExportResolution.fourK.outputLongEdgeLimit, 3840)
+    }
+
+    runner.test("video export 4K option appears only for 4K-capable display sizes") {
+        if FilmtoneVideoExportResolution.isFourKCapable(displaySize: nil) {
+            throw AssertionError(description: "nil display size must not expose 4K")
+        }
+        if FilmtoneVideoExportResolution.isFourKCapable(displaySize: CGSize(width: 1920, height: 1080)) {
+            throw AssertionError(description: "FHD source must not expose 4K")
+        }
+        if FilmtoneVideoExportResolution.isFourKCapable(displaySize: CGSize(width: 2560, height: 1440)) {
+            throw AssertionError(description: "sub-4K source must not expose 4K")
+        }
+        if !FilmtoneVideoExportResolution.isFourKCapable(displaySize: CGSize(width: 3840, height: 2160)) {
+            throw AssertionError(description: "3840x2160 source must expose 4K")
+        }
+        if !FilmtoneVideoExportResolution.isFourKCapable(displaySize: CGSize(width: 2160, height: 3840)) {
+            throw AssertionError(description: "portrait 4K source must expose 4K")
+        }
+    }
+
     // Test group 15 — M5-K3 FilmtoneCompareSplitMath. Pins the boundary
     // behavior of the shared split-fraction helper so EditorState.didSet,
     // FilmtoneCompareCompose.makeSplit, and the AVPlayer composition handler

@@ -81,6 +81,11 @@ Behavior:
 - Scratches remain film/gate-space material rather than source-tracked marks,
   but must not be perfectly static. Add subtle gate weave, per-scratch drift,
   density breathing, and live gap flutter so they do not read as a fixed overlay.
+- Full-resolution export scratches need a different scale guard than 1280px
+  preview: a mathematically thin 1px core can look integrated in preview but
+  become a hard, clean vertical line in 4K output. Soften the core by output
+  extent, break it up with internal pore texture, and make bright scratches
+  source-luma-relative instead of fixed near-white.
 - The probe now emits damage-only and grain+damage sheets so future iterations
   can compare integration quality.
 
@@ -107,6 +112,14 @@ depend on smooth multi-sample noise over the whole frame.
 - Desktop video export should use an export-only CoreImage context with
   intermediate caching disabled, matching the iOS export path. The shared
   preview context is the wrong lifetime model for long 4K exports.
+- For the current Desktop video writer, output is 8-bit BGRA/H.264 SDR.
+  Exporting through an `RGBAh` CIContext costs heavily at 4K/60 without matching
+  the output precision. Use `RGBA8` for this SDR path and revisit half-float or
+  higher precision only when HDR, 10-bit, or ProRes export is introduced.
+- Do not assume IOSurface/Metal-compatible writer buffers are automatically
+  faster. On the 2026-06-02 DJI 4K/60 test clip, adding those adaptor attributes
+  slightly helped a 10s sample but slowed the full 67.57s export, so the change
+  was rejected.
 - Wait for writer readiness before rendering the next frame. Rendering into a
   fresh pixel buffer while AVAssetWriter is already backpressured increases
   memory pressure without increasing throughput.
@@ -140,6 +153,14 @@ visual kernel cost. Desktop should preserve audio with a separate audio reader
 and an `audioInput.requestMediaDataWhenReady` pump, matching the iOS queue
 model; do not append audio through a polling async wait loop while the video
 render loop is also feeding the writer.
+
+On 2026-06-02, the user-provided 3840x2160 DJI 4K/60 Stone + Grain + Film
+Damage export (`DJI_20260531161741_0017_D.MP4`, 4048 frames / 67.57s) measured
+127.79s before the SDR `RGBA8` export context change and 84.39s after it.
+`render` remained the bottleneck at 64.28s / 77.5% of elapsed time; writer
+wait, append, audio, and finish were negligible. This means further major speed
+gains require reducing the CoreImage graph/kernel cost or adding a lower-quality
+explicit fast mode, not more AVAssetWriter polling changes.
 
 ## Embed Rule
 

@@ -29,7 +29,10 @@ enum FilmtoneCIContext {
             .cacheIntermediates: false,
             .priorityRequestLow: false,
             .workingColorSpace: contract.workingColorSpace,
-            .workingFormat: NSNumber(value: CIFormat.RGBAh.rawValue),
+            // Current Desktop video export writes 8-bit BGRA/H.264 SDR. Keeping
+            // this path at RGBA8 matches the preview/output precision and avoids
+            // the 4K/60 half-float render cost; revisit for HDR/10-bit exports.
+            .workingFormat: NSNumber(value: CIFormat.RGBA8.rawValue),
             .outputColorSpace: contract.destinationColorSpace,
             .useSoftwareRenderer: false,
         ])

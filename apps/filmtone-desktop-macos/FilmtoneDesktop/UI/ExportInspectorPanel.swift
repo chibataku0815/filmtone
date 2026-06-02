@@ -44,7 +44,11 @@ struct ExportInspectorPanel: View {
 
     private var readyState: some View {
         VStack(alignment: .leading, spacing: 10) {
-            formatSelector
+            if state.sourceKind == .video {
+                videoResolutionSelector
+            } else {
+                formatSelector
+            }
 
             if state.canUseSlow24VideoTiming {
                 videoTimingSelector
@@ -81,7 +85,7 @@ struct ExportInspectorPanel: View {
             } label: {
                 HStack {
                     Image(systemName: "square.and.arrow.up")
-                    Text(state.sourceKind == .video ? "Export Video…" : "Export Still…")
+                    Text(exportButtonTitle)
                     Spacer()
                     Image(systemName: "arrow.right")
                 }
@@ -132,6 +136,69 @@ struct ExportInspectorPanel: View {
         .disabled(state.sourceKind == .video)
     }
 
+    private var videoResolutionSelector: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                videoResolutionButton(.fhd, label: "FHD")
+                if state.canExportVideo4K {
+                    videoResolutionButton(.fourK, label: "4K")
+                }
+            }
+            .padding(4)
+            .frame(width: 220)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.16))
+            )
+            .glassEffect(
+                .clear.tint(Color.white.opacity(0.07)),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+
+            if state.resolvedVideoExportResolution == .fourK {
+                videoResolutionWarning
+            } else {
+                Text("Default FHD output for faster exports.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var videoResolutionWarning: some View {
+        HStack(alignment: .top, spacing: 7) {
+            Image(systemName: "clock.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.orange.opacity(0.95))
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("4K can take longer")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text("Keeps more detail, but export may be much slower.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(
+            Color.orange.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.orange.opacity(0.32), lineWidth: 1)
+        )
+    }
+
     private var videoTimingSelector: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
@@ -171,6 +238,17 @@ struct ExportInspectorPanel: View {
         .filmtonePointingHandCursor()
     }
 
+    private func videoResolutionButton(_ resolution: FilmtoneVideoExportResolution, label: String) -> some View {
+        Button {
+            state.setVideoExportResolution(resolution)
+        } label: {
+            Text(label)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: state.resolvedVideoExportResolution == resolution))
+        .filmtonePointingHandCursor()
+    }
+
     private func exportFormatButton(_ format: StillExportFormat, label: String) -> some View {
         Button {
             state.exportFormat = format
@@ -180,6 +258,18 @@ struct ExportInspectorPanel: View {
         }
         .buttonStyle(FilmtoneGlassSegmentButtonStyle(isSelected: state.exportFormat == format))
         .filmtonePointingHandCursor(state.sourceKind != .video)
+    }
+
+    private var exportButtonTitle: String {
+        guard state.sourceKind == .video else {
+            return "Export Still…"
+        }
+        switch state.resolvedVideoExportResolution {
+        case .fhd:
+            return "Export FHD Video…"
+        case .fourK:
+            return "Export 4K Video…"
+        }
     }
 
     private var progressState: some View {

@@ -159,6 +159,7 @@ final class ExportCoordinator {
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId,
             opticalFilterIntensity: state.opticalFilterIntensity,
+            outputLongEdgeLimit: state.videoExportOutputLongEdgeLimit,
             videoTimingMode: state.resolvedVideoTimingMode
         )
 
@@ -246,7 +247,8 @@ final class ExportCoordinator {
             capturePackageProvenance: state.capturePackageProvenance,
             highlightMarkers: state.exportHighlightMarkers,
             opticalFilterProfileId: state.opticalFilterProfileId,
-            opticalFilterIntensity: state.opticalFilterIntensity
+            opticalFilterIntensity: state.opticalFilterIntensity,
+            outputLongEdgeLimit: state.videoExportOutputLongEdgeLimit
         )
 
         let startedAt = Date()

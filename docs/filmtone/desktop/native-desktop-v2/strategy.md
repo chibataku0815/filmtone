@@ -657,6 +657,22 @@ Desktop audio preservation now uses a separate audio reader plus writer-ready
 audio pump, preventing 60fps/audio exports from blocking video input near the
 final frames. Archive `archive/2026-06-02-desktop-60fps-export-99-stall.md`.
 
+2026-06-02: Desktop scratch export integration and 4K/60 speed pass completed.
+Native Desktop export now softens 4K scratches to match preview material feel
+and uses the SDR RGBA8 export context, reducing the DJI 4048-frame test from
+127.79s to 84.39s. Archive
+`archive/2026-06-02-desktop-scratch-export-integration-60fps-speed.md`.
+
+2026-06-02: Desktop export resolution choice completed. Native Desktop video
+export now defaults to FHD in the app UI, exposes 4K only for 4K-capable
+sources, and warns that 4K output takes longer. Archive
+`archive/2026-06-02-desktop-fhd-4k-export-choice.md`.
+
+2026-06-02: Desktop 4K export warning UX follow-up completed. Selecting 4K now
+shows an amber time-cost callout, and the action button changes to `Export 4K
+Video…` so the slow path is explicit before export. Archive
+`archive/2026-06-02-desktop-4k-export-warning-ux.md`.
+
 ## Constraints
 
 - macOS target is macOS 26 only.

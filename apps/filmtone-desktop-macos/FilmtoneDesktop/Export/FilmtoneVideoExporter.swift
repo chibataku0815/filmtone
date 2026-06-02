@@ -13,6 +13,29 @@ enum FilmtoneVideoCodec: String, Sendable {
     // future path without churn).
 }
 
+enum FilmtoneVideoExportResolution: String, CaseIterable, Sendable {
+    case fhd
+    case fourK
+
+    static let fhdLongEdge = 1920.0
+    static let fourKLongEdge = 3840.0
+
+    var outputLongEdgeLimit: Double {
+        switch self {
+        case .fhd:
+            return Self.fhdLongEdge
+        case .fourK:
+            return Self.fourKLongEdge
+        }
+    }
+
+    static func isFourKCapable(displaySize: CGSize?) -> Bool {
+        guard let displaySize else { return false }
+        let longEdge = max(Double(displaySize.width), Double(displaySize.height))
+        return longEdge >= fourKLongEdge - 0.5
+    }
+}
+
 struct FilmtoneVideoExportRequest: FilmtoneSidecarRequest {
     let sourceURL: URL
     let outputURL: URL

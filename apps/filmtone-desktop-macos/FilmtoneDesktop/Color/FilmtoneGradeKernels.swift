@@ -601,7 +601,9 @@ float damageScratch(vec2 pixel, vec2 size, float amount, float frame, float seed
         morphBend = (damageHash(floor(vec2(pixel.y * 0.022 + frame * 0.31, lane * 0.57)), seed + 132.0) - 0.5) * laneWidth * mix(0.010, 0.030, effectiveAmount) * transitionBlur;
     }
     float centerX = baseX + wave * waviness + heldDrift + microJump + smear + morphBend;
-    float widthPx = mix(0.40, 1.18, effectiveAmount) * mix(1.0, 0.44, fiber) * mix(0.70, 1.30, damageHash(eventId, seed + 131.0)) * profileScale;
+    float exportSoftScale = smoothstep(1600.0, 3840.0, max(size.x, size.y));
+    float widthPx = mix(0.62, 1.64, effectiveAmount) * mix(1.0, 0.52, fiber) * mix(0.76, 1.42, damageHash(eventId, seed + 131.0)) * profileScale;
+    widthPx *= mix(1.0, 1.46, exportSoftScale);
     widthPx *= 1.0 + transitionBlur * mix(0.38, 0.25, fiber);
     float roughEdge = mix(0.52, 1.0, damageHash(floor(vec2(pixel.y * mix(0.046, 0.15, effectiveAmount), lane * 0.37)), seed + 147.0));
     if (transitionBlur > 0.001) {
@@ -609,9 +611,10 @@ float damageScratch(vec2 pixel, vec2 size, float amount, float frame, float seed
         roughEdge = mix(roughEdge, transitionRough, transitionBlur * 0.45);
     }
     float lineDistance = abs(pixel.x - centerX);
-    float lineCore = 1.0 - smoothstep(widthPx * (0.30 + roughEdge * 0.14), widthPx * mix(0.92, 1.34, effectiveAmount), lineDistance);
-    float lineScuff = (1.0 - smoothstep(widthPx * 0.85, widthPx * mix(1.75, 2.95, effectiveAmount), lineDistance)) * mix(0.07, 0.17, effectiveAmount);
-    float line = max(lineCore, lineScuff * damageHash(floor(vec2(pixel.y * 0.021, lane * 2.7)), seed + 145.0));
+    float lineCore = 1.0 - smoothstep(widthPx * (0.12 + roughEdge * 0.10), widthPx * mix(1.28, 1.95, effectiveAmount), lineDistance);
+    float lineScuff = (1.0 - smoothstep(widthPx * 0.72, widthPx * mix(2.25, 3.80, effectiveAmount), lineDistance)) * mix(0.10, 0.24, effectiveAmount);
+    float pore = mix(0.46, 1.0, damageHash(floor(vec2(pixel.y * 0.48, lane * 3.1) + eventId * 0.09), seed + 144.0));
+    float line = clamp(lineCore * mix(0.48, 0.72, effectiveAmount) * pore + lineScuff * damageHash(floor(vec2(pixel.y * 0.021, lane * 2.7)), seed + 145.0), 0.0, 1.0);
     float stableTravel = (damageHash(eventId, seed + 135.0) - 0.5) * size.y * mix(0.12, 0.06, fiber);
     float transitionTravel = 0.0;
     if (transitionBlur > 0.001) {
@@ -769,12 +772,14 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	    float scratchPolarity = damageHash(vec2(floor(scratchCoord.x / mix(180.0, 44.0, scratch)), 0.0), seed + 821.0);
 	    scratchMask *= mix(0.55, 1.0, damageHash(floor(vec2(scratchCoord.x * 0.35, scratchCoord.y * 0.07 + frame * 0.018)), seed + 829.0));
 	    fiberMask *= mix(0.50, 1.0, damageHash(floor(vec2(scratchCoord.x * 0.08, scratchCoord.y * 0.23 + frame * 0.014)), seed + 839.0));
-	    lightScratch = step(0.92, scratchPolarity);
-	    vec3 scratchDarkTarget = vec3(clamp(luma * 0.20 - 0.030, 0.0, 1.0));
-	    vec3 scratchLightTarget = vec3(mix(0.82, 0.95, damageHash(vec2(scratchPolarity, floor(pixelCoord.y / 29.0)), seed + 847.0)));
+	    lightScratch = step(0.965, scratchPolarity);
+	    vec3 scratchDarkTarget = vec3(clamp(luma * 0.24 - 0.022, 0.0, 1.0));
+	    float lightLift = mix(0.14, 0.30, damageHash(vec2(scratchPolarity, floor(pixelCoord.y / 29.0)), seed + 847.0));
+	    vec3 scratchLightTarget = vec3(clamp(luma + lightLift, 0.0, mix(0.66, 0.82, scratch)));
 	    vec3 scratchTarget = mix(scratchDarkTarget, scratchLightTarget, lightScratch);
-	    scratchBlend = scratchMask * mix(0.58, 0.96, scratch) * globalOpacity;
-	    fiberBlend = fiberMask * mix(0.42, 0.78, scratch) * globalOpacity;
+	    float scratchEmbedGuard = mix(0.72, 1.0, smoothstep(0.06, 0.72, sourceLuma));
+	    scratchBlend = scratchMask * mix(0.46, 0.78, scratch) * globalOpacity * scratchEmbedGuard;
+	    fiberBlend = fiberMask * mix(0.34, 0.62, scratch) * globalOpacity * scratchEmbedGuard;
 		    color.rgb = mix(color.rgb, scratchTarget, scratchBlend);
 		    color.rgb = mix(color.rgb, vec3(clamp(luma * 0.24 - 0.020, 0.0, 1.0)), fiberBlend);
 	    }

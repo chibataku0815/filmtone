@@ -25,6 +25,25 @@ final class EditorState {
     var videoDurationSeconds: Double?
     /// Nominal source fps used to derive Resolve-friendly marker frame ids.
     var videoNominalFrameRate: Double?
+    /// Display-oriented video dimensions after preferredTransform. Used by the
+    /// export inspector so FHD can be the default and 4K appears only when the
+    /// source can actually support it.
+    var videoDisplaySize: CGSize? {
+        didSet {
+            if !canExportVideo4K && videoExportResolution == .fourK {
+                videoExportResolution = .fhd
+            }
+        }
+    }
+    /// Normal Desktop export defaults to FHD. 4K is an explicit opt-in for
+    /// 4K-capable sources because it materially increases render time.
+    var videoExportResolution: FilmtoneVideoExportResolution = .fhd {
+        didSet {
+            if videoExportResolution == .fourK && !canExportVideo4K {
+                videoExportResolution = .fhd
+            }
+        }
+    }
     /// Explicit video timing mode for preview + normal video export.
     var videoTimingMode: FilmtoneVideoTimingMode = .normal
     /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
@@ -225,6 +244,20 @@ final class EditorState {
         sourceKind == .video && FilmtoneVideoTimingPolicy.isSlow24Eligible(sourceFPS: videoNominalFrameRate)
     }
 
+    var canExportVideo4K: Bool {
+        sourceKind == .video
+            && FilmtoneVideoExportResolution.isFourKCapable(displaySize: videoDisplaySize)
+    }
+
+    var resolvedVideoExportResolution: FilmtoneVideoExportResolution {
+        videoExportResolution == .fourK && canExportVideo4K ? .fourK : .fhd
+    }
+
+    var videoExportOutputLongEdgeLimit: Double? {
+        guard sourceKind == .video else { return nil }
+        return resolvedVideoExportResolution.outputLongEdgeLimit
+    }
+
     var videoDisplayDurationSeconds: Double? {
         videoTimingPolicy.displayDuration(sourceDuration: videoDurationSeconds)
     }
@@ -309,6 +342,8 @@ final class EditorState {
         videoPreviewSeconds = nil
         videoDurationSeconds = nil
         videoNominalFrameRate = nil
+        videoDisplaySize = nil
+        videoExportResolution = .fhd
         videoTimingMode = .normal
         if let url, kind == .video {
             highlightMarkers = FilmtoneSidecarWriter.readHighlightMarkers(matchingSourceURL: url)
@@ -448,6 +483,20 @@ final class EditorState {
         currentDurationProbeTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let videoProbe = try? await FilmtoneSourceProber.probeVideo(sourceURL: url)
+            if let videoProbe,
+               !Task.isCancelled,
+               self.sourceURL == url {
+                let displayRect = CGRect(origin: .zero, size: videoProbe.naturalSize)
+                    .applying(videoProbe.preferredTransform)
+                self.videoDisplaySize = CGSize(
+                    width: abs(displayRect.width),
+                    height: abs(displayRect.height)
+                )
+                if videoProbe.nominalFrameRate.isFinite,
+                   videoProbe.nominalFrameRate > 0 {
+                    self.videoNominalFrameRate = Double(videoProbe.nominalFrameRate)
+                }
+            }
             var probedDuration = videoProbe?.durationSeconds
             if probedDuration == nil {
                 probedDuration = try? await FilmtoneVideoFramePreviewLoader.loadDurationSeconds(from: url)
@@ -466,11 +515,6 @@ final class EditorState {
                !session.isPlaying,
                !self.isScrubbing {
                 session.seek(toSeconds: initialPreviewSeconds)
-            }
-            if let frameRate = videoProbe?.nominalFrameRate,
-               frameRate.isFinite,
-               frameRate > 0 {
-                self.videoNominalFrameRate = Double(frameRate)
             }
         }
     }
@@ -516,6 +560,16 @@ final class EditorState {
         videoTimingMode = nextMode
         videoSession?.setTimingPolicy(videoTimingPolicy)
         videoSession?.setRate(playbackRate)
+        lastExportResult = nil
+        lastExportError = nil
+    }
+
+    func setVideoExportResolution(_ resolution: FilmtoneVideoExportResolution) {
+        let nextResolution: FilmtoneVideoExportResolution = resolution == .fourK && canExportVideo4K
+            ? .fourK
+            : .fhd
+        guard videoExportResolution != nextResolution else { return }
+        videoExportResolution = nextResolution
         lastExportResult = nil
         lastExportError = nil
     }
