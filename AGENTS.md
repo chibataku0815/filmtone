@@ -189,6 +189,34 @@ Rules:
   value.
 - Do not infer current release state from old `life` or portfolio-era docs.
 
+## iPhone / iPad Release Identity Gate
+
+iPhone Filmtone and iPad Filmtone Studio are separate App Store Connect apps.
+Never shorten a release claim to "iOS" when the distinction matters. State the
+rail explicitly:
+
+| Rail | Bundle ID | Scheme | IPA payload | Extension | Device family |
+|---|---|---|---|---|---|
+| iPhone | `com.chibatakumi.film.lab.ios` | `App` | `Payload/App.app` | `FilmtoneExportActivity.appex` | `[1]` |
+| iPad | `com.chibatakumi.film.lab.ipad` | `App-iPad` | `Payload/App-iPad.app` | `FilmtoneExportActivityIPad.appex` | `[2]` |
+
+Rules:
+
+- For iPad archive/upload/TestFlight/App Store work, using `scheme: "App"`
+  with overridden bundle id, display name, or `TARGETED_DEVICE_FAMILY` is
+  forbidden. It is still an iPhone build lineage and must be treated as invalid.
+- For iPhone archive/upload/TestFlight/App Store work, any IPA containing
+  `Payload/App-iPad.app` or bundle id `com.chibatakumi.film.lab.ipad` is
+  forbidden.
+- Before saying a build is ready, uploaded, distributed, or submitted, verify
+  the actual IPA payload and `Info.plist` identity. Do not trust lane names,
+  filenames, screenshot groups, App Store page headings, or memory.
+- The fastlane upload lanes must perform this check mechanically before any
+  binary upload. If a lane lacks that guard, add the guard first and stop.
+- If a wrong-rail build reaches App Store Connect, expire it immediately,
+  identify the bad build by exact version/build, and only then upload the
+  corrected rail.
+
 ## Verification
 
 Use the smallest verification that proves the changed surface.

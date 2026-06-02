@@ -7,25 +7,139 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		002E30DAFC2EA10438555315 /* FilmtoneSavedLookSheetMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000023 /* FilmtoneSavedLookSheetMode.swift */; };
+		07925EC61115F9409AC47ECF /* FilmtoneSliderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001C /* FilmtoneSliderRow.swift */; };
+		08271745AC7A4950DC61A936 /* FilmtoneExportNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000050 /* FilmtoneExportNotification.swift */; };
+		083FFD45DB6CEA4004A86798 /* OpticsResampling.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B208 /* OpticsResampling.swift */; };
+		0949E84D5F59AD764608DF87 /* FilmtoneStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000B /* FilmtoneStrings.swift */; };
+		09E1E800910CC676D57495C5 /* ExportSourceProfileResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */; };
+		0A3DC745DF1CF527C562F99A /* FilmtoneCaptureLookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000091 /* FilmtoneCaptureLookSheet.swift */; };
 		0BB8A8BD4529447093495AD8 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */; };
+		0BD378DEE64DC6429914234A /* ExportMediaWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20E /* ExportMediaWriter.swift */; };
+		0C5B2A197CEFA21002FDC4A6 /* DepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000020 /* DepthSourceService.swift */; };
+		0E798E60D43732D602D894E2 /* FilmtoneCaptureTopStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift */; };
 		0F432292C35AA746C1B5029F /* OpticalKernels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866759EC6B64193580EDDE6 /* OpticalKernels.swift */; };
+		108E7AD3D3FC14B80367B427 /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		11DAE7E9115406049E511862 /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
+		1477C4A522D3B117EF0803A7 /* FilmtoneCaptureBottomDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift */; };
+		14933E6A1D7F3756CB2EDF51 /* FilmtoneRootChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000024 /* FilmtoneRootChrome.swift */; };
 		16AEB7307DB348ECDC7058AC /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
 		181852B55B628E07A96EBD40 /* ExportSidecarDateFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */; };
+		1914661034217B41C8A1F1EC /* ExportStillImageWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B218 /* ExportStillImageWriter.swift */; };
+		1996252C52C165586386FDF0 /* FilmtonePadCompareSplitOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 619C825EB52460300D520CF6 /* FilmtonePadCompareSplitOverlay.swift */; };
+		1A2FB996BD0C6D5C66B26ACB /* FilmtoneStrengthSheetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002A /* FilmtoneStrengthSheetData.swift */; };
+		1BBF0176F8D5552D9BEC0747 /* FilmtoneExternalFolderBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000088 /* FilmtoneExternalFolderBookmark.swift */; };
+		1CBA2A40E2B5D1EBCF38E058 /* FilmtoneCombinedTimingSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000041 /* FilmtoneCombinedTimingSmoke.swift */; };
+		1D69E113018BC5AD45724B09 /* HdrPreparationPolicyDeriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */; };
+		1DF31D45C5A35E34CB002132 /* FilmtoneCaptureTransformLutClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift */; };
+		1EB6A7BCC9DE944FF467CA54 /* FilmtonePadVideoTimelineBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */; };
+		210298DEDED7573D37D52D75 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
+		21779BAB64D1E845064E3FBA /* FilmtonePadStillCompareLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */; };
+		2387CB087F9C55289E8B88B6 /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
+		24060960CA10182EB65C2C8F /* FilmtoneLutControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001D /* FilmtoneLutControls.swift */; };
+		264A1292ED91913F429E9A59 /* CaptureDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000022 /* CaptureDeviceManager.swift */; };
+		26DA91BDF9587F845F74E3F3 /* FilmtoneCaptureLensChipRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift */; };
+		285A4A43E04D50007895EE56 /* EditorPreviewOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000006 /* EditorPreviewOrchestrator.swift */; };
+		2B2066C08EC292F4B89F96B8 /* FilmtoneOpticalFilterSelectionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000012 /* FilmtoneOpticalFilterSelectionStore.swift */; };
+		2B525D69E070E1DA7820BCE2 /* FilmtonePhase0Math.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000A /* FilmtonePhase0Math.swift */; };
+		2C73766689B052A0EC6CD253 /* FilmtoneStrengthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000006 /* FilmtoneStrengthSheet.swift */; };
+		2D4724019B18D53C1EA9F961 /* FilmtoneCaptureCockpitTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008F /* FilmtoneCaptureCockpitTopBar.swift */; };
 		2D4D5561AFFF0125F03894AE /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
+		2D5D38403E576112C5E86527 /* FilmLabSwiftCore in Frameworks */ = {isa = PBXBuildFile; productRef = F40000010000000000000020 /* FilmLabSwiftCore */; };
 		33183593451FFC7F6B131F6F /* ExportSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */; };
+		3570DE4CB1174FF8ED98D6D0 /* FilmtoneExportActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */; };
+		361E96BD4788FF9F28230A85 /* FilmtoneLibrarySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000016 /* FilmtoneLibrarySection.swift */; };
+		36A44E79B1134BDDEDD40A7F /* CacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000002 /* CacheStore.swift */; };
+		3847136CDC8CB4594EBDB4C0 /* FilmtoneInterfaceOrientationLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000097 /* FilmtoneInterfaceOrientationLock.swift */; };
+		38E4A1914BBB6B07508717C4 /* FilmtoneDepthMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000021 /* FilmtoneDepthMap.swift */; };
+		3957024317C128E0ECEC54C9 /* FilmtoneSourceProfileSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000018 /* FilmtoneSourceProfileSchema.swift */; };
+		39A9699099FBC351C0A2BD70 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
+		3F53E805C211B559E20D2572 /* FilmtoneColorPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000010 /* FilmtoneColorPipeline.swift */; };
+		4182D56A37F1E9132FDB6B62 /* FilmtoneMediaRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000011 /* FilmtoneMediaRuntime.swift */; };
+		426619226614D2CFB44660D1 /* MezzanineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000012 /* MezzanineService.swift */; };
 		42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
+		4379605E18C0593866D66DE3 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
+		43CB8CECAC145B9AEF1DAC33 /* FilmtoneTermHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000011 /* FilmtoneTermHelpSheet.swift */; };
+		44138438F38EC2D62679C1E6 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
+		47BCC8AFAFCFEF98340A87BF /* CaptureAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000029 /* CaptureAudioSupport.swift */; };
 		4834B221C07285097FC03D87 /* FilmtoneExportLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */; };
+		4955CAA181BDEFA67A79E0B0 /* FilmtonePreviewPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000E /* FilmtonePreviewPlayerView.swift */; };
+		4988D2FDDA4D427FA191C14A /* EditorProjectController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000002 /* EditorProjectController.swift */; };
+		4B5AC0CBD937E4BDD9AA566D /* FilmtoneLibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000014 /* FilmtoneLibraryStore.swift */; };
+		4C4F4CD27003421EAF36261F /* FilmtonePadCompareSplitOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 619C825EB52460300D520CF6 /* FilmtonePadCompareSplitOverlay.swift */; };
+		4DF46563F8251D7A5FFB0101 /* FilmtoneMetalOpticsRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002E /* FilmtoneMetalOpticsRenderer.swift */; };
+		4E141C2BEFB6C0DB1C70F0BD /* FilmtoneExportLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
+		50DA254142D75EE18E23B02F /* FilmtoneMotionRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000031 /* FilmtoneMotionRecorder.swift */; };
+		531BB011D663C53C2F52354C /* ExportInputLutBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B202 /* ExportInputLutBuilder.swift */; };
 		5394D3D00FBAC703C6C0C7C0 /* FilmtoneMotionBlurAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */; };
+		54707FC42AFBDD83897D778B /* FilmtoneFullscreenLutEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000010 /* FilmtoneFullscreenLutEditor.swift */; };
+		547EADE95EDDEE94A2A73A6E /* SourceColorClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000003 /* SourceColorClassifier.swift */; };
+		55186630070289A99F8CBEE3 /* FilmtonePadToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */; };
+		55CD952CDE3446BC90BA4592 /* ExportMezzanineRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B21A /* ExportMezzanineRouter.swift */; };
+		5605000063E452C6C55449D4 /* FilmtoneHdrPolicyNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000006 /* FilmtoneHdrPolicyNotice.swift */; };
+		5958C95E833728457EC1AD7A /* FilmtoneCapturePostRecordChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000096 /* FilmtoneCapturePostRecordChoice.swift */; };
+		5A4026D1E9C9C0D4EC8D2DC1 /* FilmtoneExportActivityIPad.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F41C944E366CA27CE1E948DE /* FilmtoneExportActivityIPad.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5B26717CB018992CD63CCC32 /* ExportVideoIOBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */; };
+		5C3DDDBE0F90CC61A71A73AB /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
+		5E4015BD28DB96BE6060784E /* ExportFrameAppender.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B210 /* ExportFrameAppender.swift */; };
+		5E9C4B3085EB39465C1B779E /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
+		628BE003DDA9514A827013A6 /* FilmtonePadPreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5387260918A84CA30D21C5 /* FilmtonePadPreviewSurface.swift */; };
+		634E8F7537A18AA3A83097C8 /* FilmtoneLookDirectorApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A0 /* FilmtoneLookDirectorApply.swift */; };
 		63F888EB39F993E54072124A /* DynamicIslandViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914659B53876C5363F8AB84A /* DynamicIslandViews.swift */; };
+		6502FF75937D4F9179C5DBA9 /* ExportVideoTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B220 /* ExportVideoTimeline.swift */; };
+		660F5E4182091100E423E15D /* MezzanineColorProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* MezzanineColorProbe.swift */; };
+		6714A62DE47E20EE970CA732 /* FilmtoneSourceProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002D /* FilmtoneSourceProfileSheet.swift */; };
+		6805657091D088AE17A2F629 /* RecordingStateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000024 /* RecordingStateController.swift */; };
+		6918D69F7F67AE974AF7E650 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000003 /* InfoPlist.strings */; };
+		69AC16F9932420758A1CCB99 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
+		6A4129BE85B4632C721F7DCC /* FilmtoneCaptureInteractionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008E /* FilmtoneCaptureInteractionOverlay.swift */; };
+		6C5174FB14DC2DF279110AE6 /* FilmtoneLutBlobCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000013 /* FilmtoneLutBlobCodec.swift */; };
+		6CC7C47FB8A245D6D3931801 /* ExportAudioDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */; };
+		6D8C7DD3A62E213F1CF990AE /* FormatExtensionReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000001 /* FormatExtensionReader.swift */; };
+		6DD0FF4A674C960E4F351918 /* EditorExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000A /* EditorExportCoordinator.swift */; };
+		6E48C6A68B20D495A598CAA7 /* FilmtoneCaptureTakePreviewLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009C /* FilmtoneCaptureTakePreviewLoader.swift */; };
+		70A76C688AB3EE26DEDA73B8 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */; };
+		70B76CA851BAA12DBF3DA9CB /* FilmtoneBuiltInCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000017 /* FilmtoneBuiltInCatalog.swift */; };
+		73C4DA3DA732A4EEEACC8E83 /* FilmtoneCaptureChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008A /* FilmtoneCaptureChrome.swift */; };
+		760476117BDC49C21DFD5BD5 /* FilmtoneCapturePreviewLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009B /* FilmtoneCapturePreviewLayer.swift */; };
+		76047BE53B219434221E5F88 /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
+		784C6D26F788EACDA2D7364D /* FilmtonePadInspectorRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32825E944D19050B1B4DCBB /* FilmtonePadInspectorRail.swift */; };
+		798231D7AE7CE36FFFB42EEB /* CapturePackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000026 /* CapturePackageAssembler.swift */; };
 		7BEB7F8934F9E1F2C9091E9D /* FilmtoneSharedGradeProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */; };
+		7C4FEC83C8A8DD15856D3C52 /* ExportVideoCompletionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B222 /* ExportVideoCompletionCoordinator.swift */; };
+		7D06CED10047B0BB0640BD75 /* FilmtoneCaptureOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000098 /* FilmtoneCaptureOrientation.swift */; };
+		7F99731A1914E1A7920AA05B /* ExportVideoFramePump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B224 /* ExportVideoFramePump.swift */; };
+		7FF128E9AFF4F4D88BDDB17D /* FilmtonePadAdjustPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A02C2E9966EC844BB79F781 /* FilmtonePadAdjustPanel.swift */; };
+		80207E09EA683C236FDCA9CF /* FilmtoneOpticalFiltersGenerated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000011 /* FilmtoneOpticalFiltersGenerated.swift */; };
 		80C165763871B1D58ECA7A88 /* FilmtoneExportSession+Cancelable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */; };
+		81FFCCAE10210FD0BB7E7B8F /* ExportDepthPayloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */; };
+		84720C9ACDF2D8E1C56C913E /* FilmtoneSourceToneDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009F /* FilmtoneSourceToneDescriptor.swift */; };
+		86632984C3C533D8D1ABFB32 /* AssetPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000001 /* AssetPickerService.swift */; };
+		87C58C505B42522954E88A0B /* FilmtoneMotionBlurMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000009 /* FilmtoneMotionBlurMath.swift */; };
+		8891BCCF4AF03B2FA753661B /* FilmtoneProductCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000071 /* FilmtoneProductCapture.swift */; };
+		893A3262A3F8686F50DC6DA7 /* FilmtonePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000008 /* FilmtonePersistence.swift */; };
+		894BBC8AD71282F548940058 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
+		89A762B75DC7468C53CEB30D /* OpticalKernels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866759EC6B64193580EDDE6 /* OpticalKernels.swift */; };
+		8A7F6E52C051853265F45E80 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
+		8CF776D2889665C3ED7CD2D4 /* FilmtoneDisclosureSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000028 /* FilmtoneDisclosureSection.swift */; };
+		8CF8788ABA1B18E8A1F62E2B /* FilmtoneCaptureLivePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000087 /* FilmtoneCaptureLivePreview.swift */; };
+		8D2DA57C56744FECA3FB7954 /* FilmtoneSavedLookSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000015 /* FilmtoneSavedLookSheet.swift */; };
+		8D96D80AA2F008BA22698635 /* FilmtoneGcsvWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000052 /* FilmtoneGcsvWriter.swift */; };
+		93B2753057D9021E0729591D /* FilmtoneCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000082 /* FilmtoneCaptureSession.swift */; };
 		94B98E313D898089A3F2D764 /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
+		969E73D7DB69EE0F17AE9042 /* ExportSidecarWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B216 /* ExportSidecarWriter.swift */; };
+		9784F352F8703EE2AD09D899 /* FilmtoneOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000022 /* FilmtoneOnboardingView.swift */; };
+		97F1C457D417AC84847482A4 /* FilmtoneRayAngleOptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000005 /* FilmtoneRayAngleOptics.swift */; };
+		994B8662E4F4797042180E68 /* GradeRenderPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20C /* GradeRenderPipeline.swift */; };
+		99C09FFDDC1F7DB5FDC631B7 /* ExportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B228 /* ExportGeometry.swift */; };
+		9AA4B830E69B483BDE3A0CC6 /* ExportSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */; };
 		9C5A6BF76EF250FAF3AF63DD /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
 		9DB3A44F4189BC9462F7784E /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
+		9F0891BA87809F9126B925EB /* PhotoLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000007 /* PhotoLibraryService.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		A10000010000000000000001 /* AssetPickerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000001 /* AssetPickerService.swift */; };
 		A10000010000000000000002 /* CacheStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000002 /* CacheStore.swift */; };
@@ -37,6 +151,9 @@
 		A10000010000000000000010 /* BenchmarkCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000010 /* BenchmarkCollector.swift */; };
 		A10000010000000000000011 /* FilmtoneMediaRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000011 /* FilmtoneMediaRuntime.swift */; };
 		A10000010000000000000012 /* MezzanineService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000012 /* MezzanineService.swift */; };
+		A1AA68B46C14DE5C9521BA41 /* OpticsCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B20A /* OpticsCompositor.swift */; };
+		A1AC1C1BB4642026484261F2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
+		A1EA5E987DA0356F98ABA59E /* ExportVideoAudioPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B226 /* ExportVideoAudioPump.swift */; };
 		A20000010000000000000001 /* MezzanineColorProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000001 /* MezzanineColorProbe.swift */; };
 		A20000010000000000000020 /* DepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000020 /* DepthSourceService.swift */; };
 		A20000010000000000000021 /* FilmtoneDepthMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000021 /* FilmtoneDepthMap.swift */; };
@@ -44,7 +161,16 @@
 		A20000010000000000000023 /* VideoDepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000023 /* VideoDepthSourceService.swift */; };
 		A20000010000000000000030 /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
 		A20000010000000000000050 /* FilmtoneExportNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000050 /* FilmtoneExportNotification.swift */; };
+		A396394E6259A2C34DA5D89F /* FilmtoneStrengthSheetStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift */; };
+		A7D5B5152C5A72F565C267C9 /* FilmtoneMotionBlurAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */; };
 		A9C09CB4FBA0A528C5478E81 /* FilmtoneExportActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */; };
+		AA48CB11DCBC4189F77ECF2E /* FilmtoneLibrarySchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000012 /* FilmtoneLibrarySchema.swift */; };
+		ABDEEF2DF7F911479B14C786 /* FilmtoneExportSidecarBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000008 /* FilmtoneExportSidecarBuilder.swift */; };
+		AD7839C8BD65CEA3B93EC4F2 /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
+		ADF3650EBCF68BA746B375DE /* FilmtonePadAdjustPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A02C2E9966EC844BB79F781 /* FilmtonePadAdjustPanel.swift */; };
+		AE622843BCAF012C9B2B5185 /* FilmtoneGcsvSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000051 /* FilmtoneGcsvSmoke.swift */; };
+		AF24DEA17E82A1E7A3E043B6 /* FilmtoneCapturePreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000081 /* FilmtoneCapturePreflight.swift */; };
+		B09F061F4CAD3E246CC93B0D /* FilmtoneCaptureRulerScrubber.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000092 /* FilmtoneCaptureRulerScrubber.swift */; };
 		B1E10001000000000000B201 /* ExportInputLutBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B202 /* ExportInputLutBuilder.swift */; };
 		B1E10001000000000000B203 /* ExportSourceProfileResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B204 /* ExportSourceProfileResolver.swift */; };
 		B1E10001000000000000B205 /* ExportDepthPayloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B206 /* ExportDepthPayloadManager.swift */; };
@@ -67,6 +193,21 @@
 		B1E10001000000000000B227 /* ExportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B228 /* ExportGeometry.swift */; };
 		B1E10001000000000000B229 /* ExportVideoIOBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */; };
 		B1E10001000000000000B22B /* ExportAudioDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */; };
+		B68A30D207C367823A672F8F /* DynamicIslandViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914659B53876C5363F8AB84A /* DynamicIslandViews.swift */; };
+		B6A223AC690A5620FF40D1A8 /* FilmtoneCaptureLensCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000086 /* FilmtoneCaptureLensCatalog.swift */; };
+		B80EE299A02AB2A36D65749D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000004 /* PrivacyInfo.xcprivacy */; };
+		B846EFB922814F1485776C30 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
+		BA16DC361FEEEEC56367ADFA /* FilmtoneExportSession+Cancelable.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */; };
+		BA27E66639549C5D7A337198 /* FilmtonePadWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */; };
+		BA2B643458D59661C053B965 /* ExportVideoDepthMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B21E /* ExportVideoDepthMatcher.swift */; };
+		BB253D6C4EC6C38B26D820F7 /* FilmtonePadLookPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40484CC1C45635EFA996007B /* FilmtonePadLookPanel.swift */; };
+		BC8ABFEBAEEB45C995DBFB31 /* FilmtoneExportPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000007 /* FilmtoneExportPanel.swift */; };
+		BC90050AC795B86B001CF1D5 /* FilmtoneStabilizationSmoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000061 /* FilmtoneStabilizationSmoke.swift */; };
+		BD0B8B3B19B17A7F812DD146 /* FilmtoneCaptureTakePreviewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009D /* FilmtoneCaptureTakePreviewModel.swift */; };
+		BDB8488ACF51D98C62558AE5 /* FilmtoneProxyGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000083 /* FilmtoneProxyGenerator.swift */; };
+		BE352BAFE0B9770C39897517 /* EditorProjectMutationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */; };
+		BE3A9A832B6817CBDF6D82E8 /* VideoDepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000023 /* VideoDepthSourceService.swift */; };
+		C1AB3073B4B8E929F4442E78 /* FilmtoneSourceProfileCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001A /* FilmtoneSourceProfileCatalog.swift */; };
 		C30000010000000000000003 /* EditorProjectController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000002 /* EditorProjectController.swift */; };
 		C30000010000000000000005 /* EditorLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000004 /* EditorLibraryController.swift */; };
 		C30000010000000000000007 /* EditorPreviewOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000006 /* EditorPreviewOrchestrator.swift */; };
@@ -77,6 +218,17 @@
 		C30000010000000000000025 /* RecordingStateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000024 /* RecordingStateController.swift */; };
 		C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000026 /* CapturePackageAssembler.swift */; };
 		C30000010000000000000028 /* CaptureAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000029 /* CaptureAudioSupport.swift */; };
+		C38A8F7C4659B8EF2422120B /* BenchmarkCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000010 /* BenchmarkCollector.swift */; };
+		C43D612175E5FB88ED2C84CE /* FilmtoneCreativePack01Adaptation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift */; };
+		C4E18B913A0082D5D8F0919B /* ExportSourceImageNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B212 /* ExportSourceImageNormalizer.swift */; };
+		C6405E798230262B6DEA4A1A /* EditorLibraryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000004 /* EditorLibraryController.swift */; };
+		C6B6DA271CC6A85C3A58E487 /* FilmtoneMediaTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000006 /* FilmtoneMediaTypes.swift */; };
+		C98C475563B787143B01097B /* FilmtoneCaptureWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000030 /* FilmtoneCaptureWriter.swift */; };
+		CB34847FB0C33D884F508393 /* ExportCancelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000030 /* ExportCancelController.swift */; };
+		CBAD8E9E9A663F233372E923 /* FilmtoneSecurityScopedBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000093 /* FilmtoneSecurityScopedBookmark.swift */; };
+		CE0FA8C202BB1915E72C064D /* FilmtonePadInspectorRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32825E944D19050B1B4DCBB /* FilmtonePadInspectorRail.swift */; };
+		CE66FBAB14D40261F552C7C8 /* FilmtonePadPreviewSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5387260918A84CA30D21C5 /* FilmtonePadPreviewSurface.swift */; };
+		CF44F4C2F67CA08901C055A2 /* FilmtoneFluidBlobBackdrop.metal in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000095 /* FilmtoneFluidBlobBackdrop.metal */; };
 		D10000010000000000000001 /* FilmtoneRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000001 /* FilmtoneRootView.swift */; };
 		D10000010000000000000002 /* FilmtoneEditorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000002 /* FilmtoneEditorStore.swift */; };
 		D10000010000000000000003 /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
@@ -169,19 +321,61 @@
 		D200000100000000000000A0 /* FilmtoneLookDirectorApply.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A0 /* FilmtoneLookDirectorApply.swift */; };
 		D200000100000000000000A1 /* FilmtoneCreativePack01Patches.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A1 /* FilmtoneCreativePack01Patches.swift */; };
 		D200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift */; };
+		D23A9F552BCAFF704299731B /* FilmtoneCapturePackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000080 /* FilmtoneCapturePackage.swift */; };
+		D306FE2A09A3ED619582EBBA /* FilmtoneSourceProfileMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000019 /* FilmtoneSourceProfileMath.swift */; };
 		D40000010000000000000002 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
+		D523FFB6EC4917330387438C /* FilmtoneExportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000004 /* FilmtoneExportSession.swift */; };
+		D54F720893BC99C0600C1823 /* FilmtoneEmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002B /* FilmtoneEmptyView.swift */; };
+		D567E3E3126E630E40923FA7 /* FilmtonePresetCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000009 /* FilmtonePresetCatalog.swift */; };
 		D588A95BF7748786256BD9E2 /* CancelExportIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14DB40995D16C85F10AC9F5 /* CancelExportIntent.swift */; };
+		D6B4BD1F2C96067F8B044499 /* FilmtoneDepthPrefilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000022 /* FilmtoneDepthPrefilter.swift */; };
+		D8C3194190E7E8D75B40D63F /* FilmtoneCaptureLookModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000089 /* FilmtoneCaptureLookModel.swift */; };
+		D8E3AA991752E89775743C59 /* ExportSidecarDateFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */; };
+		DAD30D6438FC5089893E076E /* SourceProbeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000009 /* SourceProbeService.swift */; };
+		DCA63BDF67CFBAA528698660 /* ExportPreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B21C /* ExportPreviewRenderer.swift */; };
+		DD19FB84CAA6E466A3DD3967 /* FilmtonePadVideoTimelineBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */; };
+		DE0F6593BC9454ADB5612196 /* FilmtoneFluidBlobBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000094 /* FilmtoneFluidBlobBackdrop.swift */; };
 		E10000010000000000000001 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000001 /* Localizable.xcstrings */; };
 		E10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000003 /* InfoPlist.strings */; };
 		E10000010000000000000003 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F10000010000000000000004 /* PrivacyInfo.xcprivacy */; };
+		E14D9D69D77A2262D2D52D1F /* FilmtoneCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000084 /* FilmtoneCaptureView.swift */; };
 		E20000010000000000000001 /* FilmtoneSnapshotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */; };
 		E20000010000000000000002 /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000010000000000000003 /* SnapshotHelper.swift */; };
 		E20000010000000000000003 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F20000010000000000000004 /* XCTest.framework */; };
+		E24853AD6DED0336C6006389 /* ShareSheetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000010000000000000008 /* ShareSheetService.swift */; };
+		E429C2BC991B2C229154055D /* FilmtonePadLookPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40484CC1C45635EFA996007B /* FilmtonePadLookPanel.swift */; };
+		E4CA5AE27FB68A47F4B16A02 /* FilmtoneCaptureCapabilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000002F /* FilmtoneCaptureCapabilityProbe.swift */; };
+		E4E0F6A99002EFD466E27B67 /* FilmtoneLookDirector.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009E /* FilmtoneLookDirector.swift */; };
+		E5B7B61A01759D559778257E /* FilmtoneSnapshotSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000F /* FilmtoneSnapshotSupport.swift */; };
+		E64D23A91E907690ED5C3C78 /* FilmtoneAdvancedParamsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000027 /* FilmtoneAdvancedParamsModel.swift */; };
+		E6857A31F6FCBB49AB9FE88B /* FilmtonePadToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */; };
+		E709555961D75223DCD1C8C4 /* FilmtonePadStillCompareLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */; };
+		E776FFE631000971F54987F3 /* FilmtoneCameraOpticsFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000007 /* FilmtoneCameraOpticsFormatter.swift */; };
+		EA5F1AA4A52D69D680FE9E9D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
+		EB8244742278029CC48EF271 /* FilmtoneExportAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */; };
+		EC6AF099A9D3AB9B4E94F405 /* FilmtonePadWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */; };
+		EE359BA4E83AD8DAD4F933B1 /* ExportConnectPackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1E10001000000000000B214 /* ExportConnectPackageAssembler.swift */; };
+		EE798F8DA12B10F405E2203E /* FilmtonePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000004 /* FilmtonePreviewView.swift */; };
+		EEB165ADB6FFF17415BDE38D /* FilmtoneCapturePackagePersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000085 /* FilmtoneCapturePackagePersistence.swift */; };
+		F11B1343C8BD5A3EBC9112DD /* FilmtoneCubeParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000001000000000000000C /* FilmtoneCubeParser.swift */; };
+		F1F150350811DFA2B67EA33D /* FilmtoneHelpAssetGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001B /* FilmtoneHelpAssetGenerator.swift */; };
+		F3FECF18C3E2E0DE338EA194 /* FilmtoneCaptureTakePickerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000009A /* FilmtoneCaptureTakePickerOverlay.swift */; };
 		F40000010000000000000001 /* FilmLabSwiftCore in Frameworks */ = {isa = PBXBuildFile; productRef = F40000010000000000000020 /* FilmLabSwiftCore */; };
+		F5CC89465C281F3209790A8A /* FilmtoneEditorFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000010000000000000003 /* FilmtoneEditorFacade.swift */; };
+		F99933F40867F8E6A96F748E /* FilmtoneAdjustmentHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000025 /* FilmtoneAdjustmentHelpSheet.swift */; };
 		FB515221B33E009D82A359F8 /* FilmtoneExportActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1CD935F1B2B7F6B8905120A5 /* FilmtoneExportActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FBC836F078F09B460B4D5CA4 /* FilmtoneSharedGradeProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */; };
+		FC34623DA6860DF3AE363C03 /* FilmtoneCreativePack01Patches.swift in Sources */ = {isa = PBXBuildFile; fileRef = C200000100000000000000A1 /* FilmtoneCreativePack01Patches.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		30AAB26F5DB52D9366964B6D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 07432D0DD2E1EC98B19A6234;
+			remoteInfo = FilmtoneExportActivityIPad;
+		};
 		E20000010000000000000005 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
@@ -210,6 +404,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FA01E84A24D414B6ED4D0EFA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5A4026D1E9C9C0D4EC8D2DC1 /* FilmtoneExportActivityIPad.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -217,6 +422,9 @@
 		1CD935F1B2B7F6B8905120A5 /* FilmtoneExportActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FilmtoneExportActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportActivity.swift; sourceTree = "<group>"; };
 		3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSessionModels.swift; sourceTree = "<group>"; };
+		40484CC1C45635EFA996007B /* FilmtonePadLookPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadLookPanel.swift; sourceTree = "<group>"; };
+		48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadWorkspaceView.swift; sourceTree = "<group>"; };
+		4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadStillCompareLayer.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -226,9 +434,13 @@
 		544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportRenderHelpers.swift; sourceTree = "<group>"; };
 		571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportLiveActivity.swift; sourceTree = "<group>"; };
 		5DF203A51BB1545086A0BC3B /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		619C825EB52460300D520CF6 /* FilmtonePadCompareSplitOverlay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadCompareSplitOverlay.swift; sourceTree = "<group>"; };
+		6A02C2E9966EC844BB79F781 /* FilmtonePadAdjustPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadAdjustPanel.swift; sourceTree = "<group>"; };
+		7A5387260918A84CA30D21C5 /* FilmtonePadPreviewSurface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadPreviewSurface.swift; sourceTree = "<group>"; };
 		8BA722ECF59CA0509BE28D0A /* LockScreenView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LockScreenView.swift; sourceTree = "<group>"; };
 		914659B53876C5363F8AB84A /* DynamicIslandViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandViews.swift; sourceTree = "<group>"; };
 		9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneMotionBlurAccumulator.swift; sourceTree = "<group>"; };
+		A32825E944D19050B1B4DCBB /* FilmtonePadInspectorRail.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadInspectorRail.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B10000010000000000000001 /* AssetPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetPickerService.swift; sourceTree = "<group>"; };
@@ -264,16 +476,6 @@
 		B1E10001000000000000B228 /* ExportGeometry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportGeometry.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B22A /* ExportVideoIOBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportVideoIOBuilder.swift; sourceTree = "<group>"; };
 		B1E10001000000000000B22C /* ExportAudioDiagnostics.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportAudioDiagnostics.swift; sourceTree = "<group>"; };
-		C30000010000000000000002 /* EditorProjectController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectController.swift; sourceTree = "<group>"; };
-		C30000010000000000000004 /* EditorLibraryController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorLibraryController.swift; sourceTree = "<group>"; };
-		C30000010000000000000006 /* EditorPreviewOrchestrator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewOrchestrator.swift; sourceTree = "<group>"; };
-		C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectMutationCoordinator.swift; sourceTree = "<group>"; };
-		C3000001000000000000000A /* EditorExportCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorExportCoordinator.swift; sourceTree = "<group>"; };
-		C3000001000000000000000C /* EditorCaptureRelay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorCaptureRelay.swift; sourceTree = "<group>"; };
-		C30000010000000000000022 /* CaptureDeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureDeviceManager.swift; sourceTree = "<group>"; };
-		C30000010000000000000024 /* RecordingStateController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingStateController.swift; sourceTree = "<group>"; };
-		C30000010000000000000026 /* CapturePackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CapturePackageAssembler.swift; sourceTree = "<group>"; };
-		C30000010000000000000029 /* CaptureAudioSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureAudioSupport.swift; sourceTree = "<group>"; };
 		B20000010000000000000001 /* MezzanineColorProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MezzanineColorProbe.swift; sourceTree = "<group>"; };
 		B20000010000000000000020 /* DepthSourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthSourceService.swift; sourceTree = "<group>"; };
 		B20000010000000000000021 /* FilmtoneDepthMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneDepthMap.swift; sourceTree = "<group>"; };
@@ -374,8 +576,21 @@
 		C200000100000000000000A1 /* FilmtoneCreativePack01Patches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePack01Patches.swift; sourceTree = "<group>"; };
 		C200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePack01Adaptation.swift; sourceTree = "<group>"; };
 		C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSidecarDateFormatter.swift; sourceTree = "<group>"; };
+		C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadToolbar.swift; sourceTree = "<group>"; };
+		C30000010000000000000002 /* EditorProjectController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectController.swift; sourceTree = "<group>"; };
+		C30000010000000000000004 /* EditorLibraryController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorLibraryController.swift; sourceTree = "<group>"; };
+		C30000010000000000000006 /* EditorPreviewOrchestrator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewOrchestrator.swift; sourceTree = "<group>"; };
+		C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectMutationCoordinator.swift; sourceTree = "<group>"; };
+		C3000001000000000000000A /* EditorExportCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorExportCoordinator.swift; sourceTree = "<group>"; };
+		C3000001000000000000000C /* EditorCaptureRelay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorCaptureRelay.swift; sourceTree = "<group>"; };
+		C30000010000000000000022 /* CaptureDeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureDeviceManager.swift; sourceTree = "<group>"; };
+		C30000010000000000000024 /* RecordingStateController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingStateController.swift; sourceTree = "<group>"; };
+		C30000010000000000000026 /* CapturePackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CapturePackageAssembler.swift; sourceTree = "<group>"; };
+		C30000010000000000000029 /* CaptureAudioSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureAudioSupport.swift; sourceTree = "<group>"; };
+		C9491A2501C61D66390AF2C6 /* App-iPad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "App-iPad.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D40000010000000000000001 /* CreativeLuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CreativeLuts; path = Resources/CreativeLuts; sourceTree = "<group>"; };
 		E92BBC4019AD97D40A52D6E1 /* FilmtoneExportAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportAttributes.swift; sourceTree = "<group>"; };
+		EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadVideoTimelineBar.swift; sourceTree = "<group>"; };
 		F10000010000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		F10000010000000000000002 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		F10000010000000000000004 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -383,6 +598,7 @@
 		F20000010000000000000002 /* FilmtoneSnapshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneSnapshotsUITests.swift; sourceTree = "<group>"; };
 		F20000010000000000000003 /* SnapshotHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotHelper.swift; sourceTree = "<group>"; };
 		F20000010000000000000004 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
+		F41C944E366CA27CE1E948DE /* FilmtoneExportActivityIPad.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FilmtoneExportActivityIPad.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "FilmtoneExportSession+Cancelable.swift"; sourceTree = "<group>"; };
 		F866759EC6B64193580EDDE6 /* OpticalKernels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpticalKernels.swift; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
@@ -390,12 +606,28 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		4455FE279F806DBB0E20644C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
 				F40000010000000000000001 /* FilmLabSwiftCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A3EC518B0AD23CA2D4E9DC0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				108E7AD3D3FC14B80367B427 /* Pods_App.framework in Frameworks */,
+				2D5D38403E576112C5E86527 /* FilmLabSwiftCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -421,6 +653,7 @@
 			isa = PBXGroup;
 			children = (
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
+				7EAEB02AAFBF537CB48E20FE /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -507,6 +740,8 @@
 				504EC3041FED79650016851F /* App.app */,
 				F20000010000000000000001 /* FilmtoneSnapshotsUITests.xctest */,
 				1CD935F1B2B7F6B8905120A5 /* FilmtoneExportActivity.appex */,
+				C9491A2501C61D66390AF2C6 /* App-iPad.app */,
+				F41C944E366CA27CE1E948DE /* FilmtoneExportActivityIPad.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -616,16 +851,11 @@
 			path = Capture;
 			sourceTree = "<group>";
 		};
-		C30000010000000000000020 /* Internal */ = {
+		7EAEB02AAFBF537CB48E20FE /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				C30000010000000000000029 /* CaptureAudioSupport.swift */,
-				C30000010000000000000022 /* CaptureDeviceManager.swift */,
-				C30000010000000000000024 /* RecordingStateController.swift */,
-				C30000010000000000000026 /* CapturePackageAssembler.swift */,
 			);
-			name = Internal;
-			path = Internal;
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
@@ -685,9 +915,36 @@
 				C2000001000000000000002A /* FilmtoneStrengthSheetData.swift */,
 				C20000010000000000000029 /* FilmtoneStrengthSheetStyles.swift */,
 				C20000010000000000000011 /* FilmtoneTermHelpSheet.swift */,
+				A59A651772C36B88D9476A18 /* Pad */,
 			);
 			name = Editor;
 			path = Editor;
+			sourceTree = "<group>";
+		};
+		A59A651772C36B88D9476A18 /* Pad */ = {
+			isa = PBXGroup;
+			children = (
+				6A02C2E9966EC844BB79F781 /* FilmtonePadAdjustPanel.swift */,
+				619C825EB52460300D520CF6 /* FilmtonePadCompareSplitOverlay.swift */,
+				A32825E944D19050B1B4DCBB /* FilmtonePadInspectorRail.swift */,
+				40484CC1C45635EFA996007B /* FilmtonePadLookPanel.swift */,
+				7A5387260918A84CA30D21C5 /* FilmtonePadPreviewSurface.swift */,
+				4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */,
+				C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */,
+				EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */,
+				48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */,
+			);
+			name = Pad;
+			path = Pad;
+			sourceTree = "<group>";
+		};
+		B78CEA8E135ED7FBA23F887C /* Strings */ = {
+			isa = PBXGroup;
+			children = (
+				C1000001000000000000000B /* FilmtoneStrings.swift */,
+			);
+			name = Strings;
+			path = Strings;
 			sourceTree = "<group>";
 		};
 		C30000010000000000000001 /* Internal */ = {
@@ -704,13 +961,16 @@
 			path = Internal;
 			sourceTree = "<group>";
 		};
-		B78CEA8E135ED7FBA23F887C /* Strings */ = {
+		C30000010000000000000020 /* Internal */ = {
 			isa = PBXGroup;
 			children = (
-				C1000001000000000000000B /* FilmtoneStrings.swift */,
+				C30000010000000000000029 /* CaptureAudioSupport.swift */,
+				C30000010000000000000022 /* CaptureDeviceManager.swift */,
+				C30000010000000000000024 /* RecordingStateController.swift */,
+				C30000010000000000000026 /* CapturePackageAssembler.swift */,
 			);
-			name = Strings;
-			path = Strings;
+			name = Internal;
+			path = Internal;
 			sourceTree = "<group>";
 		};
 		D22897C52DC4C531989C22B0 /* Source */ = {
@@ -765,6 +1025,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		07432D0DD2E1EC98B19A6234 /* FilmtoneExportActivityIPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ABC95CD77CB0D9ADA152CB50 /* Build configuration list for PBXNativeTarget "FilmtoneExportActivityIPad" */;
+			buildPhases = (
+				CABE69BDDB58DAD416602DDE /* Sources */,
+				4455FE279F806DBB0E20644C /* Frameworks */,
+				DAFA3CA1EE659F21806C07C9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FilmtoneExportActivityIPad;
+			productName = FilmtoneExportActivityIPad;
+			productReference = F41C944E366CA27CE1E948DE /* FilmtoneExportActivityIPad.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -786,6 +1063,28 @@
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		78646F5954D4809ED2652D56 /* App-iPad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 51A0CC52654EAF315DEF3B97 /* Build configuration list for PBXNativeTarget "App-iPad" */;
+			buildPhases = (
+				396340E696DB39A120439DBF /* Sources */,
+				7A3EC518B0AD23CA2D4E9DC0 /* Frameworks */,
+				7DCAB52DA4A3074AE47EB1BF /* Resources */,
+				FA01E84A24D414B6ED4D0EFA /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				095574B13665600BEFE99306 /* PBXTargetDependency */,
+			);
+			name = "App-iPad";
+			packageProductDependencies = (
+				F40000010000000000000020 /* FilmLabSwiftCore */,
+			);
+			productName = "App-iPad";
+			productReference = C9491A2501C61D66390AF2C6 /* App-iPad.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C64E7E65453A4EDD448B0D56 /* FilmtoneExportActivity */ = {
@@ -863,6 +1162,8 @@
 				504EC3031FED79650016851F /* App */,
 				E20000010000000000000007 /* FilmtoneSnapshotsUITests */,
 				C64E7E65453A4EDD448B0D56 /* FilmtoneExportActivity */,
+				78646F5954D4809ED2652D56 /* App-iPad */,
+				07432D0DD2E1EC98B19A6234 /* FilmtoneExportActivityIPad */,
 			);
 		};
 /* End PBXProject section */
@@ -882,7 +1183,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7DCAB52DA4A3074AE47EB1BF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				69AC16F9932420758A1CCB99 /* LaunchScreen.storyboard in Resources */,
+				210298DEDED7573D37D52D75 /* CreativeLuts in Resources */,
+				39A9699099FBC351C0A2BD70 /* Assets.xcassets in Resources */,
+				6918D69F7F67AE974AF7E650 /* InfoPlist.strings in Resources */,
+				8A7F6E52C051853265F45E80 /* Localizable.xcstrings in Resources */,
+				B80EE299A02AB2A36D65749D /* PrivacyInfo.xcprivacy in Resources */,
+				B846EFB922814F1485776C30 /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D2D382CD0F949F3BA4082C29 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DAFA3CA1EE659F21806C07C9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -920,6 +1242,175 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		396340E696DB39A120439DBF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				86632984C3C533D8D1ABFB32 /* AssetPickerService.swift in Sources */,
+				36A44E79B1134BDDEDD40A7F /* CacheStore.swift in Sources */,
+				D523FFB6EC4917330387438C /* FilmtoneExportSession.swift in Sources */,
+				C6B6DA271CC6A85C3A58E487 /* FilmtoneMediaTypes.swift in Sources */,
+				9F0891BA87809F9126B925EB /* PhotoLibraryService.swift in Sources */,
+				E24853AD6DED0336C6006389 /* ShareSheetService.swift in Sources */,
+				DAD30D6438FC5089893E076E /* SourceProbeService.swift in Sources */,
+				4182D56A37F1E9132FDB6B62 /* FilmtoneMediaRuntime.swift in Sources */,
+				426619226614D2CFB44660D1 /* MezzanineService.swift in Sources */,
+				660F5E4182091100E423E15D /* MezzanineColorProbe.swift in Sources */,
+				0C5B2A197CEFA21002FDC4A6 /* DepthSourceService.swift in Sources */,
+				38E4A1914BBB6B07508717C4 /* FilmtoneDepthMap.swift in Sources */,
+				D6B4BD1F2C96067F8B044499 /* FilmtoneDepthPrefilter.swift in Sources */,
+				BE3A9A832B6817CBDF6D82E8 /* VideoDepthSourceService.swift in Sources */,
+				76047BE53B219434221E5F88 /* ExportCancelController.swift in Sources */,
+				08271745AC7A4950DC61A936 /* FilmtoneExportNotification.swift in Sources */,
+				C38A8F7C4659B8EF2422120B /* BenchmarkCollector.swift in Sources */,
+				5C3DDDBE0F90CC61A71A73AB /* FilmtoneRootView.swift in Sources */,
+				894BBC8AD71282F548940058 /* FilmtoneEditorStore.swift in Sources */,
+				F5CC89465C281F3209790A8A /* FilmtoneEditorFacade.swift in Sources */,
+				EE798F8DA12B10F405E2203E /* FilmtonePreviewView.swift in Sources */,
+				54707FC42AFBDD83897D778B /* FilmtoneFullscreenLutEditor.swift in Sources */,
+				4955CAA181BDEFA67A79E0B0 /* FilmtonePreviewPlayerView.swift in Sources */,
+				2C73766689B052A0EC6CD253 /* FilmtoneStrengthSheet.swift in Sources */,
+				BC8ABFEBAEEB45C995DBFB31 /* FilmtoneExportPanel.swift in Sources */,
+				893A3262A3F8686F50DC6DA7 /* FilmtonePersistence.swift in Sources */,
+				D567E3E3126E630E40923FA7 /* FilmtonePresetCatalog.swift in Sources */,
+				80207E09EA683C236FDCA9CF /* FilmtoneOpticalFiltersGenerated.swift in Sources */,
+				2B2066C08EC292F4B89F96B8 /* FilmtoneOpticalFilterSelectionStore.swift in Sources */,
+				2B525D69E070E1DA7820BCE2 /* FilmtonePhase0Math.swift in Sources */,
+				0949E84D5F59AD764608DF87 /* FilmtoneStrings.swift in Sources */,
+				F11B1343C8BD5A3EBC9112DD /* FilmtoneCubeParser.swift in Sources */,
+				E5B7B61A01759D559778257E /* FilmtoneSnapshotSupport.swift in Sources */,
+				F1F150350811DFA2B67EA33D /* FilmtoneHelpAssetGenerator.swift in Sources */,
+				07925EC61115F9409AC47ECF /* FilmtoneSliderRow.swift in Sources */,
+				24060960CA10182EB65C2C8F /* FilmtoneLutControls.swift in Sources */,
+				9784F352F8703EE2AD09D899 /* FilmtoneOnboardingView.swift in Sources */,
+				002E30DAFC2EA10438555315 /* FilmtoneSavedLookSheetMode.swift in Sources */,
+				14933E6A1D7F3756CB2EDF51 /* FilmtoneRootChrome.swift in Sources */,
+				F99933F40867F8E6A96F748E /* FilmtoneAdjustmentHelpSheet.swift in Sources */,
+				E64D23A91E907690ED5C3C78 /* FilmtoneAdvancedParamsModel.swift in Sources */,
+				8CF776D2889665C3ED7CD2D4 /* FilmtoneDisclosureSection.swift in Sources */,
+				A396394E6259A2C34DA5D89F /* FilmtoneStrengthSheetStyles.swift in Sources */,
+				1A2FB996BD0C6D5C66B26ACB /* FilmtoneStrengthSheetData.swift in Sources */,
+				D54F720893BC99C0600C1823 /* FilmtoneEmptyView.swift in Sources */,
+				6714A62DE47E20EE970CA732 /* FilmtoneSourceProfileSheet.swift in Sources */,
+				4DF46563F8251D7A5FFB0101 /* FilmtoneMetalOpticsRenderer.swift in Sources */,
+				E4CA5AE27FB68A47F4B16A02 /* FilmtoneCaptureCapabilityProbe.swift in Sources */,
+				C98C475563B787143B01097B /* FilmtoneCaptureWriter.swift in Sources */,
+				50DA254142D75EE18E23B02F /* FilmtoneMotionRecorder.swift in Sources */,
+				1CBA2A40E2B5D1EBCF38E058 /* FilmtoneCombinedTimingSmoke.swift in Sources */,
+				AE622843BCAF012C9B2B5185 /* FilmtoneGcsvSmoke.swift in Sources */,
+				BC90050AC795B86B001CF1D5 /* FilmtoneStabilizationSmoke.swift in Sources */,
+				8891BCCF4AF03B2FA753661B /* FilmtoneProductCapture.swift in Sources */,
+				D23A9F552BCAFF704299731B /* FilmtoneCapturePackage.swift in Sources */,
+				AF24DEA17E82A1E7A3E043B6 /* FilmtoneCapturePreflight.swift in Sources */,
+				93B2753057D9021E0729591D /* FilmtoneCaptureSession.swift in Sources */,
+				BDB8488ACF51D98C62558AE5 /* FilmtoneProxyGenerator.swift in Sources */,
+				E14D9D69D77A2262D2D52D1F /* FilmtoneCaptureView.swift in Sources */,
+				EEB165ADB6FFF17415BDE38D /* FilmtoneCapturePackagePersistence.swift in Sources */,
+				B6A223AC690A5620FF40D1A8 /* FilmtoneCaptureLensCatalog.swift in Sources */,
+				8CF8788ABA1B18E8A1F62E2B /* FilmtoneCaptureLivePreview.swift in Sources */,
+				1BBF0176F8D5552D9BEC0747 /* FilmtoneExternalFolderBookmark.swift in Sources */,
+				D8C3194190E7E8D75B40D63F /* FilmtoneCaptureLookModel.swift in Sources */,
+				73C4DA3DA732A4EEEACC8E83 /* FilmtoneCaptureChrome.swift in Sources */,
+				0E798E60D43732D602D894E2 /* FilmtoneCaptureTopStatusBar.swift in Sources */,
+				1477C4A522D3B117EF0803A7 /* FilmtoneCaptureBottomDeck.swift in Sources */,
+				6A4129BE85B4632C721F7DCC /* FilmtoneCaptureInteractionOverlay.swift in Sources */,
+				2D4724019B18D53C1EA9F961 /* FilmtoneCaptureCockpitTopBar.swift in Sources */,
+				26DA91BDF9587F845F74E3F3 /* FilmtoneCaptureLensChipRow.swift in Sources */,
+				0A3DC745DF1CF527C562F99A /* FilmtoneCaptureLookSheet.swift in Sources */,
+				B09F061F4CAD3E246CC93B0D /* FilmtoneCaptureRulerScrubber.swift in Sources */,
+				CBAD8E9E9A663F233372E923 /* FilmtoneSecurityScopedBookmark.swift in Sources */,
+				DE0F6593BC9454ADB5612196 /* FilmtoneFluidBlobBackdrop.swift in Sources */,
+				CF44F4C2F67CA08901C055A2 /* FilmtoneFluidBlobBackdrop.metal in Sources */,
+				5958C95E833728457EC1AD7A /* FilmtoneCapturePostRecordChoice.swift in Sources */,
+				3847136CDC8CB4594EBDB4C0 /* FilmtoneInterfaceOrientationLock.swift in Sources */,
+				7D06CED10047B0BB0640BD75 /* FilmtoneCaptureOrientation.swift in Sources */,
+				1DF31D45C5A35E34CB002132 /* FilmtoneCaptureTransformLutClassifier.swift in Sources */,
+				F3FECF18C3E2E0DE338EA194 /* FilmtoneCaptureTakePickerOverlay.swift in Sources */,
+				760476117BDC49C21DFD5BD5 /* FilmtoneCapturePreviewLayer.swift in Sources */,
+				6E48C6A68B20D495A598CAA7 /* FilmtoneCaptureTakePreviewLoader.swift in Sources */,
+				BD0B8B3B19B17A7F812DD146 /* FilmtoneCaptureTakePreviewModel.swift in Sources */,
+				E4E0F6A99002EFD466E27B67 /* FilmtoneLookDirector.swift in Sources */,
+				84720C9ACDF2D8E1C56C913E /* FilmtoneSourceToneDescriptor.swift in Sources */,
+				634E8F7537A18AA3A83097C8 /* FilmtoneLookDirectorApply.swift in Sources */,
+				FC34623DA6860DF3AE363C03 /* FilmtoneCreativePack01Patches.swift in Sources */,
+				C43D612175E5FB88ED2C84CE /* FilmtoneCreativePack01Adaptation.swift in Sources */,
+				8D96D80AA2F008BA22698635 /* FilmtoneGcsvWriter.swift in Sources */,
+				6D8C7DD3A62E213F1CF990AE /* FormatExtensionReader.swift in Sources */,
+				4379605E18C0593866D66DE3 /* SourceColorMetadataNormalizer.swift in Sources */,
+				547EADE95EDDEE94A2A73A6E /* SourceColorClassifier.swift in Sources */,
+				3F53E805C211B559E20D2572 /* FilmtoneColorPipeline.swift in Sources */,
+				1D69E113018BC5AD45724B09 /* HdrPreparationPolicyDeriver.swift in Sources */,
+				97F1C457D417AC84847482A4 /* FilmtoneRayAngleOptics.swift in Sources */,
+				5605000063E452C6C55449D4 /* FilmtoneHdrPolicyNotice.swift in Sources */,
+				E776FFE631000971F54987F3 /* FilmtoneCameraOpticsFormatter.swift in Sources */,
+				ABDEEF2DF7F911479B14C786 /* FilmtoneExportSidecarBuilder.swift in Sources */,
+				87C58C505B42522954E88A0B /* FilmtoneMotionBlurMath.swift in Sources */,
+				43CB8CECAC145B9AEF1DAC33 /* FilmtoneTermHelpSheet.swift in Sources */,
+				AA48CB11DCBC4189F77ECF2E /* FilmtoneLibrarySchema.swift in Sources */,
+				6C5174FB14DC2DF279110AE6 /* FilmtoneLutBlobCodec.swift in Sources */,
+				4B5AC0CBD937E4BDD9AA566D /* FilmtoneLibraryStore.swift in Sources */,
+				8D2DA57C56744FECA3FB7954 /* FilmtoneSavedLookSheet.swift in Sources */,
+				361E96BD4788FF9F28230A85 /* FilmtoneLibrarySection.swift in Sources */,
+				70B76CA851BAA12DBF3DA9CB /* FilmtoneBuiltInCatalog.swift in Sources */,
+				3957024317C128E0ECEC54C9 /* FilmtoneSourceProfileSchema.swift in Sources */,
+				D306FE2A09A3ED619582EBBA /* FilmtoneSourceProfileMath.swift in Sources */,
+				C1AB3073B4B8E929F4442E78 /* FilmtoneSourceProfileCatalog.swift in Sources */,
+				EA5F1AA4A52D69D680FE9E9D /* AppDelegate.swift in Sources */,
+				AD7839C8BD65CEA3B93EC4F2 /* FilmtoneExportAttributes.swift in Sources */,
+				5E9C4B3085EB39465C1B779E /* CancelExportIntent.swift in Sources */,
+				4E141C2BEFB6C0DB1C70F0BD /* FilmtoneExportLiveActivity.swift in Sources */,
+				BA16DC361FEEEEC56367ADFA /* FilmtoneExportSession+Cancelable.swift in Sources */,
+				44138438F38EC2D62679C1E6 /* ExportMetrics.swift in Sources */,
+				11DAE7E9115406049E511862 /* ExportRenderHelpers.swift in Sources */,
+				9AA4B830E69B483BDE3A0CC6 /* ExportSessionModels.swift in Sources */,
+				D8E3AA991752E89775743C59 /* ExportSidecarDateFormatter.swift in Sources */,
+				531BB011D663C53C2F52354C /* ExportInputLutBuilder.swift in Sources */,
+				09E1E800910CC676D57495C5 /* ExportSourceProfileResolver.swift in Sources */,
+				81FFCCAE10210FD0BB7E7B8F /* ExportDepthPayloadManager.swift in Sources */,
+				FBC836F078F09B460B4D5CA4 /* FilmtoneSharedGradeProcessor.swift in Sources */,
+				A7D5B5152C5A72F565C267C9 /* FilmtoneMotionBlurAccumulator.swift in Sources */,
+				89A762B75DC7468C53CEB30D /* OpticalKernels.swift in Sources */,
+				083FFD45DB6CEA4004A86798 /* OpticsResampling.swift in Sources */,
+				A1AA68B46C14DE5C9521BA41 /* OpticsCompositor.swift in Sources */,
+				994B8662E4F4797042180E68 /* GradeRenderPipeline.swift in Sources */,
+				0BD378DEE64DC6429914234A /* ExportMediaWriter.swift in Sources */,
+				5E4015BD28DB96BE6060784E /* ExportFrameAppender.swift in Sources */,
+				C4E18B913A0082D5D8F0919B /* ExportSourceImageNormalizer.swift in Sources */,
+				EE359BA4E83AD8DAD4F933B1 /* ExportConnectPackageAssembler.swift in Sources */,
+				969E73D7DB69EE0F17AE9042 /* ExportSidecarWriter.swift in Sources */,
+				1914661034217B41C8A1F1EC /* ExportStillImageWriter.swift in Sources */,
+				55CD952CDE3446BC90BA4592 /* ExportMezzanineRouter.swift in Sources */,
+				DCA63BDF67CFBAA528698660 /* ExportPreviewRenderer.swift in Sources */,
+				BA2B643458D59661C053B965 /* ExportVideoDepthMatcher.swift in Sources */,
+				6502FF75937D4F9179C5DBA9 /* ExportVideoTimeline.swift in Sources */,
+				7C4FEC83C8A8DD15856D3C52 /* ExportVideoCompletionCoordinator.swift in Sources */,
+				7F99731A1914E1A7920AA05B /* ExportVideoFramePump.swift in Sources */,
+				A1EA5E987DA0356F98ABA59E /* ExportVideoAudioPump.swift in Sources */,
+				99C09FFDDC1F7DB5FDC631B7 /* ExportGeometry.swift in Sources */,
+				5B26717CB018992CD63CCC32 /* ExportVideoIOBuilder.swift in Sources */,
+				6CC7C47FB8A245D6D3931801 /* ExportAudioDiagnostics.swift in Sources */,
+				4988D2FDDA4D427FA191C14A /* EditorProjectController.swift in Sources */,
+				C6405E798230262B6DEA4A1A /* EditorLibraryController.swift in Sources */,
+				285A4A43E04D50007895EE56 /* EditorPreviewOrchestrator.swift in Sources */,
+				BE352BAFE0B9770C39897517 /* EditorProjectMutationCoordinator.swift in Sources */,
+				6DD0FF4A674C960E4F351918 /* EditorExportCoordinator.swift in Sources */,
+				2387CB087F9C55289E8B88B6 /* EditorCaptureRelay.swift in Sources */,
+				264A1292ED91913F429E9A59 /* CaptureDeviceManager.swift in Sources */,
+				6805657091D088AE17A2F629 /* RecordingStateController.swift in Sources */,
+				798231D7AE7CE36FFFB42EEB /* CapturePackageAssembler.swift in Sources */,
+				47BCC8AFAFCFEF98340A87BF /* CaptureAudioSupport.swift in Sources */,
+				7FF128E9AFF4F4D88BDDB17D /* FilmtonePadAdjustPanel.swift in Sources */,
+				1996252C52C165586386FDF0 /* FilmtonePadCompareSplitOverlay.swift in Sources */,
+				784C6D26F788EACDA2D7364D /* FilmtonePadInspectorRail.swift in Sources */,
+				BB253D6C4EC6C38B26D820F7 /* FilmtonePadLookPanel.swift in Sources */,
+				CE66FBAB14D40261F552C7C8 /* FilmtonePadPreviewSurface.swift in Sources */,
+				E709555961D75223DCD1C8C4 /* FilmtonePadStillCompareLayer.swift in Sources */,
+				E6857A31F6FCBB49AB9FE88B /* FilmtonePadToolbar.swift in Sources */,
+				DD19FB84CAA6E466A3DD3967 /* FilmtonePadVideoTimelineBar.swift in Sources */,
+				EC6AF099A9D3AB9B4E94F405 /* FilmtonePadWorkspaceView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1077,6 +1568,15 @@
 				C30000010000000000000025 /* RecordingStateController.swift in Sources */,
 				C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */,
 				C30000010000000000000028 /* CaptureAudioSupport.swift in Sources */,
+				ADF3650EBCF68BA746B375DE /* FilmtonePadAdjustPanel.swift in Sources */,
+				4C4F4CD27003421EAF36261F /* FilmtonePadCompareSplitOverlay.swift in Sources */,
+				CE0FA8C202BB1915E72C064D /* FilmtonePadInspectorRail.swift in Sources */,
+				E429C2BC991B2C229154055D /* FilmtonePadLookPanel.swift in Sources */,
+				628BE003DDA9514A827013A6 /* FilmtonePadPreviewSurface.swift in Sources */,
+				21779BAB64D1E845064E3FBA /* FilmtonePadStillCompareLayer.swift in Sources */,
+				55186630070289A99F8CBEE3 /* FilmtonePadToolbar.swift in Sources */,
+				1EB6A7BCC9DE944FF467CA54 /* FilmtonePadVideoTimelineBar.swift in Sources */,
+				BA27E66639549C5D7A337198 /* FilmtonePadWorkspaceView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1093,6 +1593,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CABE69BDDB58DAD416602DDE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3570DE4CB1174FF8ED98D6D0 /* FilmtoneExportActivity.swift in Sources */,
+				70A76C688AB3EE26DEDA73B8 /* LockScreenView.swift in Sources */,
+				B68A30D207C367823A672F8F /* DynamicIslandViews.swift in Sources */,
+				EB8244742278029CC48EF271 /* FilmtoneExportAttributes.swift in Sources */,
+				A1AC1C1BB4642026484261F2 /* CancelExportIntent.swift in Sources */,
+				CB34847FB0C33D884F508393 /* ExportCancelController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E20000010000000000000008 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1105,6 +1618,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		095574B13665600BEFE99306 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = FilmtoneExportActivityIPad;
+			target = 07432D0DD2E1EC98B19A6234 /* FilmtoneExportActivityIPad */;
+			targetProxy = 30AAB26F5DB52D9366964B6D /* PBXContainerItemProxy */;
+		};
 		A1B33562B8DFCB61DC04110E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = FilmtoneExportActivity;
@@ -1153,6 +1672,7 @@
 				CURRENT_PROJECT_VERSION = 15;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/FilmtoneExportActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Filmtone Export";
@@ -1160,7 +1680,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 1.11;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -1169,6 +1689,28 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		41DC2C7414737FABBFC163F8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_APP_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				FILMTONE_BUNDLE_DISPLAY_NAME = "Filmtone Studio";
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.11;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ipad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
 		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1283,12 +1825,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_APP_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				FILMTONE_BUNDLE_DISPLAY_NAME = Filmtone;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.11;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(FILMTONE_APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
@@ -1304,11 +1848,13 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_APP_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				FILMTONE_BUNDLE_DISPLAY_NAME = Filmtone;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.11;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(FILMTONE_APP_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
@@ -1323,6 +1869,7 @@
 				CURRENT_PROJECT_VERSION = 15;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/FilmtoneExportActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Filmtone Export";
@@ -1330,12 +1877,84 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				MARKETING_VERSION = 1.11;
-				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		9678F87453CC509A9B343B14 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/FilmtoneExportActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Filmtone Export";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.11;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ipad.exportactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		BAB8FAF4993DC6126481E7E3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_APP_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios;
+				FILMTONE_BUNDLE_DISPLAY_NAME = "Filmtone Studio";
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 1.11;
+				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ipad;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		DE73B4DB6B03775A210C9539 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = C3G77H8NM6;
+				FILMTONE_EXPORT_ACTIVITY_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ios.exportactivity;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/FilmtoneExportActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Filmtone Export";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 1.11;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chibatakumi.film.lab.ipad.exportactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
 		};
@@ -1393,6 +2012,24 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		51A0CC52654EAF315DEF3B97 /* Build configuration list for PBXNativeTarget "App-iPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				41DC2C7414737FABBFC163F8 /* Release */,
+				BAB8FAF4993DC6126481E7E3 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ABC95CD77CB0D9ADA152CB50 /* Build configuration list for PBXNativeTarget "FilmtoneExportActivityIPad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DE73B4DB6B03775A210C9539 /* Release */,
+				9678F87453CC509A9B343B14 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

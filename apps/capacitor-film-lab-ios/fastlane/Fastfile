@@ -1,6 +1,7 @@
 default_platform(:ios)
 
 require "fileutils"
+require "open3"
 require "shellwords"
 require "tmpdir"
 
@@ -11,7 +12,11 @@ IOS_PROJECT = File.join(APP_ROOT, "ios", "App", "App.xcodeproj", "project.pbxpro
 BUILD_OUTPUT_DIR = File.join(APP_ROOT, "build", "fastlane")
 DEVELOPMENT_TEAM_ID = "C3G77H8NM6"
 APP_IDENTIFIER = "com.chibatakumi.film.lab.ios"
+EXPORT_ACTIVITY_IDENTIFIER = "#{APP_IDENTIFIER}.exportactivity"
 IPAD_APP_IDENTIFIER = "com.chibatakumi.film.lab.ipad"
+IPAD_EXPORT_ACTIVITY_IDENTIFIER = "#{IPAD_APP_IDENTIFIER}.exportactivity"
+IPAD_PRODUCT_NAME = "Filmtone Studio"
+IPAD_OUTPUT_NAME = "App-iPad"
 SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots")
 IPAD_SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots-ipad")
 METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata")
@@ -32,7 +37,7 @@ IPAD_METADATA_REQUIRED_FIELDS = [
 IPAD_SCREENSHOT_COUNT = 5
 IPAD_SCREENSHOT_WIDTH = 2732
 IPAD_SCREENSHOT_HEIGHT = 2048
-IPAD_DEFAULT_NEXT_VERSION = "1.1"
+IPAD_DEFAULT_NEXT_VERSION = "1.2"
 IPAD_FORBIDDEN_COPY_PATTERNS = [
   /Filmtone for iPad/i,
   /\bfor iPad\b/i,
@@ -60,6 +65,30 @@ DEFAULT_REVIEW_LAST_NAME = "Chiba"
 DEFAULT_REVIEW_EMAIL = "chiba@fores-tone.co.jp"
 SCREENSHOT_SIMULATOR_DEVICE = "iPhone 17 Pro Max"
 SCREENSHOT_SIMULATOR_UDID = "D3011FE4-52CA-4B7F-B181-A55D9998E192"
+IPHONE_IPA_IDENTITY = {
+  label: "iPhone",
+  app_bundle_name: "App.app",
+  forbidden_app_bundle_name: "App-iPad.app",
+  executable: "App",
+  bundle_id: APP_IDENTIFIER,
+  display_name: "Filmtone",
+  device_family: [1],
+  extension_bundle_name: "FilmtoneExportActivity.appex",
+  extension_executable: "FilmtoneExportActivity",
+  extension_bundle_id: EXPORT_ACTIVITY_IDENTIFIER,
+}.freeze
+IPAD_IPA_IDENTITY = {
+  label: "iPad",
+  app_bundle_name: "App-iPad.app",
+  forbidden_app_bundle_name: "App.app",
+  executable: "App-iPad",
+  bundle_id: IPAD_APP_IDENTIFIER,
+  display_name: IPAD_PRODUCT_NAME,
+  device_family: [2],
+  extension_bundle_name: "FilmtoneExportActivityIPad.appex",
+  extension_executable: "FilmtoneExportActivityIPad",
+  extension_bundle_id: IPAD_EXPORT_ACTIVITY_IDENTIFIER,
+}.freeze
 
 def normalized_env(name)
   value = ENV[name]
@@ -77,6 +106,91 @@ def env!(name)
   value = normalized_env(name)
   UI.user_error!("Missing required environment variable #{name}") if value.nil?
   value
+end
+
+def command_output!(*command)
+  stdout, stderr, status = Open3.capture3(*command)
+  return stdout if status.success?
+
+  UI.user_error!("Command failed: #{command.shelljoin}\n#{stderr}")
+end
+
+def plist_value!(plist_path, key)
+  command_output!("/usr/libexec/PlistBuddy", "-c", "Print :#{key}", plist_path).strip
+end
+
+def plist_integer_array!(plist_path, key)
+  value = command_output!("/usr/libexec/PlistBuddy", "-c", "Print :#{key}", plist_path)
+  value.scan(/^\s*(\d+)\s*$/).flatten.map(&:to_i)
+end
+
+def assert_plist_value!(plist_path:, key:, expected:, label:)
+  actual = plist_value!(plist_path, key)
+  return if actual == expected
+
+  UI.user_error!(
+    "#{label} identity mismatch for #{key}: expected #{expected.inspect}, got #{actual.inspect} in #{plist_path}"
+  )
+end
+
+def verify_ipa_identity!(ipa_path, identity)
+  temp_dir = Dir.mktmpdir("filmtone-ipa-identity-")
+  command_output!("unzip", "-q", ipa_path, "-d", temp_dir)
+
+  payload_dir = File.join(temp_dir, "Payload")
+  app_path = File.join(payload_dir, identity[:app_bundle_name])
+  forbidden_app_path = File.join(payload_dir, identity[:forbidden_app_bundle_name])
+
+  if Dir.exist?(forbidden_app_path)
+    UI.user_error!(
+      "#{identity[:label]} IPA identity failed: found forbidden payload #{identity[:forbidden_app_bundle_name]} in #{ipa_path}"
+    )
+  end
+  UI.user_error!(
+    "#{identity[:label]} IPA identity failed: expected Payload/#{identity[:app_bundle_name]} in #{ipa_path}"
+  ) unless Dir.exist?(app_path)
+
+  info_plist = File.join(app_path, "Info.plist")
+  UI.user_error!("Missing app Info.plist at #{info_plist}") unless File.exist?(info_plist)
+
+  assert_plist_value!(plist_path: info_plist, key: "CFBundleExecutable", expected: identity[:executable], label: identity[:label])
+  assert_plist_value!(plist_path: info_plist, key: "CFBundleIdentifier", expected: identity[:bundle_id], label: identity[:label])
+  assert_plist_value!(plist_path: info_plist, key: "CFBundleDisplayName", expected: identity[:display_name], label: identity[:label])
+
+  device_family = plist_integer_array!(info_plist, "UIDeviceFamily")
+  unless device_family == identity[:device_family]
+    UI.user_error!(
+      "#{identity[:label]} IPA identity mismatch for UIDeviceFamily: expected #{identity[:device_family].inspect}, got #{device_family.inspect} in #{info_plist}"
+    )
+  end
+
+  extension_path = File.join(app_path, "PlugIns", identity[:extension_bundle_name])
+  UI.user_error!(
+    "#{identity[:label]} IPA identity failed: expected PlugIns/#{identity[:extension_bundle_name]} in #{ipa_path}"
+  ) unless Dir.exist?(extension_path)
+
+  extension_info_plist = File.join(extension_path, "Info.plist")
+  UI.user_error!("Missing extension Info.plist at #{extension_info_plist}") unless File.exist?(extension_info_plist)
+
+  assert_plist_value!(
+    plist_path: extension_info_plist,
+    key: "CFBundleExecutable",
+    expected: identity[:extension_executable],
+    label: "#{identity[:label]} extension"
+  )
+  assert_plist_value!(
+    plist_path: extension_info_plist,
+    key: "CFBundleIdentifier",
+    expected: identity[:extension_bundle_id],
+    label: "#{identity[:label]} extension"
+  )
+
+  UI.success(
+    "Verified #{identity[:label]} IPA identity: Payload/#{identity[:app_bundle_name]}, #{identity[:bundle_id]}, UIDeviceFamily=#{identity[:device_family].join(',')}"
+  )
+  ipa_path
+ensure
+  FileUtils.rm_rf(temp_dir) if temp_dir
 end
 
 def app_store_version_number!
@@ -213,6 +327,12 @@ end
 
 def localized_build_release_notes
   localized_release_note_texts.each_with_object({}) do |(locale, notes), memo|
+    memo[locale] = { whats_new: notes }
+  end
+end
+
+def localized_ipad_build_release_notes
+  localized_ipad_release_note_texts.each_with_object({}) do |(locale, notes), memo|
     memo[locale] = { whats_new: notes }
   end
 end
@@ -434,7 +554,7 @@ def explicit_ipa_path!(options, lane:)
 
   ipa_path = File.expand_path(explicit_path, APP_ROOT)
   UI.user_error!("IPA not found at #{ipa_path}") unless File.exist?(ipa_path)
-  ipa_path
+  verify_ipa_identity!(ipa_path, IPHONE_IPA_IDENTITY)
 end
 
 def explicit_ipad_ipa_path!(options, lane:)
@@ -450,7 +570,7 @@ def explicit_ipad_ipa_path!(options, lane:)
 
   ipa_path = File.expand_path(explicit_path, APP_ROOT)
   UI.user_error!("iPad IPA not found at #{ipa_path}") unless File.exist?(ipa_path)
-  ipa_path
+  verify_ipa_identity!(ipa_path, IPAD_IPA_IDENTITY)
 end
 
 def ipad_app_review_information!
@@ -665,6 +785,7 @@ platform :ios do
     ensure
       FileUtils.rm_f(temp_key_path) if temp_key_path
     end
+    verify_ipa_identity!(File.join(BUILD_OUTPUT_DIR, "Filmtone.ipa"), IPHONE_IPA_IDENTITY)
   end
 
   desc "Capture App Store screenshots with a deterministic UI test rail"
@@ -707,6 +828,60 @@ platform :ios do
     sync_release_notes_only!(version: version)
   end
 
+  desc "Archive Filmtone Studio from the native App-iPad target"
+  lane :ipad_archive do |options|
+    FileUtils.mkdir_p(BUILD_OUTPUT_DIR)
+
+    app_version = ipad_app_store_version!
+    build_number = ipad_app_store_build_number!(options)
+    output_directory = File.join(BUILD_OUTPUT_DIR, "Filmtone-iPad-#{app_version}-#{build_number}")
+    FileUtils.mkdir_p(output_directory)
+
+    xcargs_parts = [
+      "-allowProvisioningUpdates",
+      "MARKETING_VERSION=#{app_version}",
+      "CURRENT_PROJECT_VERSION=#{build_number}",
+    ]
+    temp_key_path = nil
+
+    if asc_api_key_configured?
+      temp_key_path = resolve_asc_key_file_path! if normalized_env("ASC_KEY_CONTENT")
+      key_file_path = temp_key_path || File.expand_path(env!("ASC_KEY_PATH"), APP_ROOT)
+      xcargs_parts.concat(
+        [
+          "-authenticationKeyIssuerID", env!("ASC_ISSUER_ID"),
+          "-authenticationKeyID", env!("ASC_KEY_ID"),
+          "-authenticationKeyPath", key_file_path,
+        ]
+      )
+    end
+
+    UI.important("Archiving native App-iPad #{app_version} (#{build_number}) for #{IPAD_APP_IDENTIFIER}.")
+    xcargs = xcargs_parts.map(&:shellescape).join(" ")
+
+    begin
+      build_app(
+        workspace: IOS_WORKSPACE,
+        scheme: "App-iPad",
+        clean: true,
+        export_method: "app-store",
+        output_directory: output_directory,
+        output_name: IPAD_OUTPUT_NAME,
+        build_path: output_directory,
+        xcargs: xcargs,
+        export_options: {
+          method: "app-store-connect",
+          manageAppVersionAndBuildNumber: false,
+          signingStyle: "automatic",
+          teamID: DEVELOPMENT_TEAM_ID,
+        }
+      )
+    ensure
+      FileUtils.rm_f(temp_key_path) if temp_key_path
+    end
+    verify_ipa_identity!(File.join(output_directory, "#{IPAD_OUTPUT_NAME}.ipa"), IPAD_IPA_IDENTITY)
+  end
+
   desc "Validate staged Filmtone Studio App Store assets without uploading"
   lane :ipad_preflight do
     validate_ipad_metadata!
@@ -731,6 +906,7 @@ platform :ios do
       platform: "ios",
       metadata_path: IPAD_METADATA_TEMPLATE_PATH,
       screenshots_path: IPAD_SCREENSHOTS_PATH,
+      languages: IPAD_SCREENSHOT_LOCALES,
       skip_binary_upload: true,
       skip_metadata: false,
       skip_screenshots: false,
@@ -762,6 +938,7 @@ platform :ios do
       platform: "ios",
       metadata_path: IPAD_METADATA_TEMPLATE_PATH,
       screenshots_path: IPAD_SCREENSHOTS_PATH,
+      languages: IPAD_SCREENSHOT_LOCALES,
       skip_binary_upload: false,
       skip_metadata: false,
       skip_screenshots: false,
@@ -777,6 +954,24 @@ platform :ios do
         export_compliance_uses_encryption: false,
       }
     )
+  end
+
+  desc "Upload Filmtone Studio build to TestFlight"
+  lane :ipad_beta do |options|
+    ipa_path = explicit_ipad_ipa_path!(options, lane: "ipad_beta")
+    upload_options = {
+      api_key: load_asc_api_key!,
+      app_identifier: IPAD_APP_IDENTIFIER,
+      ipa: ipa_path,
+      app_platform: "ios",
+      skip_waiting_for_build_processing: truthy_env?("SKIP_WAITING_FOR_BUILD_PROCESSING"),
+      distribute_external: false,
+      notify_external_testers: false,
+    }
+    build_release_notes = localized_ipad_build_release_notes
+    upload_options[:localized_build_info] = build_release_notes unless build_release_notes.empty?
+
+    upload_to_testflight(**upload_options)
   end
 
   desc "Submit an already uploaded Filmtone Studio build without touching screenshots or binary"

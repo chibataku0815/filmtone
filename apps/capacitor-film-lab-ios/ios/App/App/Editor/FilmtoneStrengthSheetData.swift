@@ -69,6 +69,32 @@ extension FilmtoneStrengthSheet {
             return .advanced
         }
     }
+
+    var filmDamageAdvancedGroup: FilmtoneAdvancedParamGroup {
+        .init(
+            id: "damage",
+            title: store.strings.advancedDamageLabel,
+            recipes: standardAdvancedRecipes(
+                defaultValues: { base in
+                    [
+                        "dustAmount": max(base.dustAmount, 0.20),
+                        "scratchAmount": max(base.scratchAmount, 0.16),
+                    ]
+                },
+                strongValues: { base in
+                    [
+                        "dustAmount": max(base.dustAmount, 0.52),
+                        "scratchAmount": max(base.scratchAmount, 0.56),
+                    ]
+                }
+            ),
+            controls: [
+                control("dustAmount", range: 0...1),
+                control("scratchAmount", range: 0...1),
+            ]
+        )
+    }
+
     var advancedParamGroups: [FilmtoneAdvancedParamGroup] {
         var groups: [FilmtoneAdvancedParamGroup] = [
             .init(
@@ -182,28 +208,6 @@ extension FilmtoneStrengthSheet {
                     control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
                     control("grainRadialMix", range: 0...1),
-                ]
-            ),
-            .init(
-                id: "damage",
-                title: store.strings.advancedDamageLabel,
-                recipes: standardAdvancedRecipes(
-                    defaultValues: { base in
-                        [
-                            "dustAmount": max(base.dustAmount, 0.20),
-                            "scratchAmount": max(base.scratchAmount, 0.16),
-                        ]
-                    },
-                    strongValues: { base in
-                        [
-                            "dustAmount": max(base.dustAmount, 0.52),
-                            "scratchAmount": max(base.scratchAmount, 0.56),
-                        ]
-                    }
-                ),
-                controls: [
-                    control("dustAmount", range: 0...1),
-                    control("scratchAmount", range: 0...1),
                 ]
             ),
         ]

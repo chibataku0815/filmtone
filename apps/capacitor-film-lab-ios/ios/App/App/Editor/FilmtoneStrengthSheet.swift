@@ -24,6 +24,7 @@ struct FilmtoneStrengthSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                     strengthSection
                     backlightVeilSection
+                    filmDamageSection
                     adjustmentsSection
                     advancedParamsSection
                 }
@@ -38,6 +39,7 @@ struct FilmtoneStrengthSheet: View {
             if !advancedParamsExpanded {
                 advancedParamsExpanded = store.hasAdvancedAdjustments
             }
+            expandedAdvancedGroupIds.insert(filmDamageAdvancedGroup.id)
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.hidden)
@@ -280,6 +282,11 @@ struct FilmtoneStrengthSheet: View {
                 comparisonStyle: .quick
             ))
         }
+    }
+
+    private var filmDamageSection: some View {
+        advancedGroupSection(filmDamageAdvancedGroup)
+            .sectionDivider()
     }
 
     private var advancedParamsSection: some View {

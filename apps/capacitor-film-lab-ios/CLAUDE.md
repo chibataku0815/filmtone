@@ -21,15 +21,25 @@
 
 ## 2. アプリ identity
 
-| 項目 | 値 |
-|------|-----|
-| Bundle ID | `com.chibatakumi.film.lab.ios` |
-| TeamID | `C3G77H8NM6` |
-| Workspace | `ios/App/App.xcworkspace`、Scheme `App` |
-| Signing | Xcode automatic(`match` 不使用) |
-| UI stack | **Native SwiftUI** (`FilmtoneRootView`)。React/Capacitor stack は 2026-05-09 に purge 済み(残骸なし) |
+| Rail | Bundle ID | Workspace / Scheme | Payload | Extension | Device family |
+|------|-----------|--------------------|---------|-----------|---------------|
+| iPhone | `com.chibatakumi.film.lab.ios` | `ios/App/App.xcworkspace` / `App` | `Payload/App.app` | `FilmtoneExportActivity.appex` | `[1]` |
+| iPad | `com.chibatakumi.film.lab.ipad` | `ios/App/App.xcworkspace` / `App-iPad` | `Payload/App-iPad.app` | `FilmtoneExportActivityIPad.appex` | `[2]` |
+
+TeamID は `C3G77H8NM6`。Signing は Xcode automatic(`match` 不使用)。
+UI stack は **Native SwiftUI** (`FilmtoneRootView`)。React/Capacitor stack
+は 2026-05-09 に purge 済み(残骸なし)。
 
 バージョンは Xcode build settings の `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` から `Info.plist` に注入。**plist 直接編集禁止**。
+
+iPhone / iPad を「iOS」とまとめて扱うのは禁止。release / TestFlight /
+ASC / screenshot / metadata の話では、必ず rail、bundle id、scheme、
+version/build を分けて書く。
+
+**絶対禁止:** iPad リリースで `scheme: App` を使い、bundle id / display
+name / `TARGETED_DEVICE_FAMILY` を上書きして `com.chibatakumi.film.lab.ipad`
+として出すこと。それは native iPad build ではなく、wrong-rail build として
+即失効対象。
 
 ---
 
@@ -73,6 +83,21 @@ Built-in Look / Source Profile catalog の不変条件は `docs/builtin-catalog.
 ## 6. Release rail
 
 詳細は `RELEASE.md`(同ディレクトリ)。lane (`archive` / `screenshots` / `metadata` / `beta` / `release` / `submit_review`) は **fail-fast** に保つ:IPA を勝手に作らない、screenshots 数のミスマッチで通さない。CI 化しても同じ振る舞い。
+
+iPhone / iPad の binary lane は、アップロード前に IPA を展開して
+`Payload` と `Info.plist` を検査する hard gate を必ず通す。
+
+- iPhone lane は `Payload/App.app`、`CFBundleExecutable=App`、
+  `CFBundleIdentifier=com.chibatakumi.film.lab.ios`、`UIDeviceFamily=[1]`、
+  `FilmtoneExportActivity.appex` 以外を拒否する。
+- iPad lane は `Payload/App-iPad.app`、`CFBundleExecutable=App-iPad`、
+  `CFBundleIdentifier=com.chibatakumi.film.lab.ipad`、`UIDeviceFamily=[2]`、
+  `FilmtoneExportActivityIPad.appex` 以外を拒否する。
+- `Payload/App.app` を含む IPA は、ファイル名や App Store Connect の
+  画面が iPad に見えても iPad build と呼ばない。
+- `Payload/App-iPad.app` を含む IPA は、iPhone lane に渡さない。
+- lane 名、出力ディレクトリ名、スクリーンショット見出し、過去 handoff を
+  identity の根拠にしない。実 IPA の `Info.plist` だけを根拠にする。
 
 ---
 

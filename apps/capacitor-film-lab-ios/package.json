@@ -21,6 +21,11 @@
     "release:release-notes": "./scripts/bundle.sh exec fastlane ios release_notes",
     "release:appstore-binary": "./scripts/bundle.sh exec fastlane ios release_binary",
     "release:beta": "./scripts/bundle.sh exec fastlane ios beta",
+    "release:ipad-archive": "./scripts/bundle.sh exec fastlane ios ipad_archive",
+    "release:ipad-preflight": "./scripts/bundle.sh exec fastlane ios ipad_preflight",
+    "release:ipad-assets": "./scripts/bundle.sh exec fastlane ios ipad_upload_assets",
+    "release:ipad-beta": "./scripts/bundle.sh exec fastlane ios ipad_beta",
+    "release:ipad-submit-review": "./scripts/bundle.sh exec fastlane ios ipad_submit_review",
     "release:appstore": "./scripts/bundle.sh exec fastlane ios release",
     "release:submit-review-notes": "./scripts/bundle.sh exec fastlane ios submit_review_release_notes",
     "release:submit-review": "./scripts/bundle.sh exec fastlane ios submit_review"

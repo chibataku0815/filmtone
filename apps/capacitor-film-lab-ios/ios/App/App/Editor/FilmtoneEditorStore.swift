@@ -454,6 +454,7 @@ final class FilmtoneEditorStore: ObservableObject {
     /// range. Splitting them lets the two disclosure sections each report
     /// their own activity state without double-counting.
     private static let quickParamKeys: Set<String> = ["exposure", "contrast", "saturation"]
+    private static let filmDamageParamKeys: Set<String> = ["dustAmount", "scratchAmount"]
 
     private func quickDelta(for key: String) -> Double {
         let raw = project.params.value(for: key)
@@ -481,8 +482,31 @@ final class FilmtoneEditorStore: ObservableObject {
         Self.quickParamKeys.contains { project.paramOverrides.values[$0] != nil }
     }
 
+    var hasFilmDamageAdjustments: Bool {
+        Self.filmDamageParamKeys.contains { project.paramOverrides.values[$0] != nil }
+    }
+
+    var filmDamageSummaryText: String {
+        let entries: [(label: String, key: String)] = [
+            (strings.paramLabel(for: "dustAmount"), "dustAmount"),
+            (strings.paramLabel(for: "scratchAmount"), "scratchAmount"),
+        ]
+        .filter { project.paramOverrides.values[$0.key] != nil }
+
+        if entries.isEmpty {
+            return strings.advancedDamageLabel
+        }
+
+        return entries
+            .map { "\($0.label) \(Self.percentLabel(for: project.params.value(for: $0.key)))" }
+            .joined(separator: " · ")
+    }
+
     var hasAdvancedAdjustments: Bool {
-        project.paramOverrides.values.contains { !Self.quickParamKeys.contains($0.key) }
+        project.paramOverrides.values.contains {
+            !Self.quickParamKeys.contains($0.key) &&
+                !Self.filmDamageParamKeys.contains($0.key)
+        }
     }
 
     var hasAnyAdjustments: Bool {
@@ -502,19 +526,21 @@ final class FilmtoneEditorStore: ObservableObject {
     }
 
     var adjustmentSummaryText: String {
-        if hasQuickAdjustments && hasAdvancedAdjustments {
-            return "\(quickSummaryText) · \(strings.advancedAdjustmentsActive)"
-        }
+        var entries: [String] = []
 
         if hasQuickAdjustments {
-            return quickSummaryText
+            entries.append(quickSummaryText)
+        }
+
+        if hasFilmDamageAdjustments {
+            entries.append(filmDamageSummaryText)
         }
 
         if hasAdvancedAdjustments {
-            return strings.advancedAdjustmentsActive
+            entries.append(strings.advancedAdjustmentsActive)
         }
 
-        return ""
+        return entries.joined(separator: " · ")
     }
 
     var previewMetaLabel: String? {
@@ -1899,6 +1925,10 @@ final class FilmtoneEditorStore: ObservableObject {
     private static func signedPercentLabel(for value: Double) -> String {
         let sign = value > 0 ? "+" : ""
         return "\(sign)\(Int((value * 100).rounded()))%"
+    }
+
+    private static func percentLabel(for value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
     }
 }
 

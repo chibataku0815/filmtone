@@ -1,10 +1,8 @@
 import SwiftUI
+import UIKit
 
-/// Root router. Source-less = empty picker view, source-loaded = fullscreen
-/// Liquid Glass editor. The legacy scroll-based main flow (Hero / Preset /
-/// Tuning / CameraProfileCard / Library cards) was deleted as part of the
-/// IA pivot to fullscreen-first. UnsavedExportPrompt / Toast / HdrPolicyNotice
-/// now live inside `FilmtoneFullscreenLutEditor` as overlays.
+/// Root router. iPad sessions mount the Desktop-derived workspace; iPhone
+/// sessions keep the fullscreen editor flow.
 struct FilmtoneRootView: View {
     @ObservedObject var store: FilmtoneEditorStore
     @State private var sourcePickerDialogPresented = false
@@ -24,36 +22,10 @@ struct FilmtoneRootView: View {
 
     var body: some View {
         ZStack {
-            if store.source == nil {
-                FilmtoneEmptyView(
-                    store: store,
-                    onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
-                    onPickFiles: { Task { await store.pickSource(route: .files) } },
-                    onRecordProductClip: presentCaptureSurfaceIfSupported,
-                    isRecordProductClipSupported: captureAvailability.isSupported,
-                    recordProductClipUnsupportedMessage: store.strings.recordProductClipUnsupported,
-                    onPickWithLook: { entry in
-                        pendingLookOnPickComplete = entry
-                        Task { await store.pickSource(route: .photoLibrary) }
-                    }
-                )
+            if usesPadWorkspace {
+                iPadRouteBody
             } else {
-                FilmtoneFullscreenLutEditor(
-                    store: store,
-                    onClose: { sourcePickerDialogPresented = true },
-                    onSaveLook: { savedLookSheet = .createCurrentLook },
-                    onExport: { exportSheetPresented = true },
-                    onSourceTap: { sourceSheetPresented = true },
-                    onAdvancedTap: { advancedSheetPresented = true },
-                    // S8-A: re-record entry from the editor. Cancel keeps the
-                    // current source (existing `.fullScreenCover` cancel
-                    // handler only flips the cover state); success replaces
-                    // the source via `adoptCaptureResult`. Old package /
-                    // unsaved-edit confirmation are out of scope for S8-A.
-                    onRecord: presentCaptureSurfaceIfSupported,
-                    isRecordSupported: captureAvailability.isSupported,
-                    recordUnsupportedMessage: store.strings.recordProductClipUnsupported
-                )
+                iPhoneRouteBody
             }
 
             if let sourceLoadState = store.sourceLoadState {
@@ -97,107 +69,13 @@ struct FilmtoneRootView: View {
         } message: { detail in
             Text(detail)
         }
-        .sheet(isPresented: $sourceSheetPresented) {
-            FilmtoneSourceProfileSheet(
-                store: store,
-                savedLookSheet: $savedLookSheet,
-                lutDeleteConfirmation: $lutDeleteConfirmation
-            ) {
-                sourceSheetPresented = false
-            }
-        }
-        .sheet(isPresented: $advancedSheetPresented) {
-            FilmtoneStrengthSheet(
-                store: store,
-                activeHelpTopic: $activeHelpTopic
-            ) {
-                advancedSheetPresented = false
-            }
-        }
-        .sheet(isPresented: $exportSheetPresented) {
-            FilmtoneExportPanel(store: store) {
-                exportSheetPresented = false
-            }
-        }
         .sheet(isPresented: $store.desktopHandoffPromptPresented) {
             FilmtoneDesktopHandoffSheet(strings: store.strings) {
                 store.desktopHandoffPromptPresented = false
             }
         }
         .fullScreenCover(isPresented: $captureSurfacePresented) {
-            // S8-D: snapshot the editor's current Look state at the
-            // moment the capture surface is presented.  The capture
-            // surface is a fullScreenCover so editor controls are not
-            // reachable while it is up — a single snapshot is correct
-            // and avoids re-binding to a published store inside the
-            // capture view (which would couple recording UI ticks to
-            // editor publishers).
-            let liveBundle = store.makeLivePreviewGradeProcessor()
-            // M11 / S11-B: resolve the chip-strip's initial selection
-            // from the editor's currently applied saved Look.  When the
-            // editor has a bundled Look applied, the capture chip
-            // matches it; otherwise (no saved Look, or a saved Look
-            // outside the chip strip) we fall back to .filmtone — the
-            // chip strip is intentionally narrow (M11 out-of-scope:
-            // surfacing arbitrary saved Looks in capture).
-            let initialCaptureLook = FilmtoneCaptureLook.resolve(
-                from: store.appliedSavedLookId
-            )
-            // S11-C: closure that maps a chip selection to a freshly
-            // built grade processor + diagnostics pair.  Filmtone (no
-            // override) defers to the existing `makeLivePreviewGradeProcessor()`
-            // path, preserving the editor's pre-capture custom adjustments;
-            // Bundled Looks resolve to a catalog `BuiltInLook` and
-            // build through the override variant so the live preview
-            // matches the chip without touching the editor's persisted
-            // state until `adoptCaptureResult` (S11-E).
-            let makeGradeProcessor: (FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle? = { chip in
-                if let lut = chip.parsedCreativeLut {
-                    return store.makeLivePreviewGradeProcessor(
-                        captureCreativeLut: lut
-                    )
-                }
-                let builtIn = chip.canonicalUUID.flatMap {
-                    FilmtoneBuiltInCatalog.look(matching: $0)
-                }
-                return store.makeLivePreviewGradeProcessor(
-                    overridingBuiltInLook: builtIn
-                )
-            }
-            FilmtoneCaptureView(
-                liveGradeProcessor: liveBundle?.processor,
-                liveDiagnostics: liveBundle?.diagnostics,
-                initialCaptureLook: initialCaptureLook,
-                makeGradeProcessor: makeGradeProcessor,
-                userLutEntries: store.library.recentLuts,
-                importUserLut: {
-                    await store.importCaptureUserLut()
-                },
-                loadUserLut: { entry in
-                    await store.loadCaptureUserLut(entry: entry)
-                },
-                makeTakePreviewGradeProcessor: { package in
-                    await store.makeCapturePackagePreviewGradeProcessor(package)
-                },
-                onCompleted: { package in
-                    captureSurfacePresented = false
-                    Task { await store.adoptCaptureResult(package) }
-                },
-                onCancelled: {
-                    captureSurfacePresented = false
-                },
-                onFailed: { failure in
-                    captureSurfacePresented = false
-                    store.recordingError = failure.displayMessage
-                }
-            )
-        }
-        .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
-            FilmtoneOnboardingView(
-                strings: store.strings,
-                onSkip: dismissOnboarding,
-                onPickMedia: finishOnboardingAndPickMedia
-            )
+            captureSurfaceCover
         }
         .onAppear {
             captureAvailability = FilmtoneCaptureAvailability.evaluate()
@@ -289,6 +167,137 @@ struct FilmtoneRootView: View {
             }
             Button(store.strings.savedLookSheetCancel, role: .cancel) {}
         }
+    }
+
+    // MARK: iPad route
+
+    @ViewBuilder
+    private var iPadRouteBody: some View {
+        FilmtonePadWorkspaceView(
+            store: store,
+            onClose: { sourcePickerDialogPresented = true },
+            onSaveLook: { savedLookSheet = .createCurrentLook },
+            onReplaceSource: { sourcePickerDialogPresented = true },
+            savedLookSheet: $savedLookSheet,
+            lutDeleteConfirmation: $lutDeleteConfirmation,
+            lookDeleteConfirmation: $lookDeleteConfirmation,
+            activeHelpTopic: $activeHelpTopic
+        )
+    }
+
+    // MARK: iPhone route
+
+    @ViewBuilder
+    private var iPhoneRouteBody: some View {
+        ZStack {
+            if store.source == nil {
+                FilmtoneEmptyView(
+                    store: store,
+                    onPickPhotoLibrary: { Task { await store.pickSource(route: .photoLibrary) } },
+                    onPickFiles: { Task { await store.pickSource(route: .files) } },
+                    onRecordProductClip: presentCaptureSurfaceIfSupported,
+                    isRecordProductClipSupported: captureAvailability.isSupported,
+                    recordProductClipUnsupportedMessage: store.strings.recordProductClipUnsupported,
+                    onPickWithLook: { entry in
+                        pendingLookOnPickComplete = entry
+                        Task { await store.pickSource(route: .photoLibrary) }
+                    }
+                )
+            } else {
+                FilmtoneFullscreenLutEditor(
+                    store: store,
+                    onClose: { sourcePickerDialogPresented = true },
+                    onSaveLook: { savedLookSheet = .createCurrentLook },
+                    onExport: { exportSheetPresented = true },
+                    onSourceTap: { sourceSheetPresented = true },
+                    onAdvancedTap: { advancedSheetPresented = true },
+                    onRecord: presentCaptureSurfaceIfSupported,
+                    isRecordSupported: captureAvailability.isSupported,
+                    recordUnsupportedMessage: store.strings.recordProductClipUnsupported
+                )
+            }
+        }
+        .sheet(isPresented: $sourceSheetPresented) {
+            FilmtoneSourceProfileSheet(
+                store: store,
+                savedLookSheet: $savedLookSheet,
+                lutDeleteConfirmation: $lutDeleteConfirmation
+            ) {
+                sourceSheetPresented = false
+            }
+        }
+        .sheet(isPresented: $advancedSheetPresented) {
+            FilmtoneStrengthSheet(
+                store: store,
+                activeHelpTopic: $activeHelpTopic
+            ) {
+                advancedSheetPresented = false
+            }
+        }
+        .sheet(isPresented: $exportSheetPresented) {
+            FilmtoneExportPanel(store: store) {
+                exportSheetPresented = false
+            }
+        }
+        .fullScreenCover(isPresented: $onboardingPresented, onDismiss: openSourcePickerIfNeeded) {
+            FilmtoneOnboardingView(
+                strings: store.strings,
+                onSkip: dismissOnboarding,
+                onPickMedia: finishOnboardingAndPickMedia
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var captureSurfaceCover: some View {
+        let liveBundle = store.makeLivePreviewGradeProcessor()
+        let initialCaptureLook = FilmtoneCaptureLook.resolve(
+            from: store.appliedSavedLookId
+        )
+        let makeGradeProcessor: (FilmtoneCaptureLook) -> FilmtoneLivePreviewBundle? = { chip in
+            if let lut = chip.parsedCreativeLut {
+                return store.makeLivePreviewGradeProcessor(
+                    captureCreativeLut: lut
+                )
+            }
+            let builtIn = chip.canonicalUUID.flatMap {
+                FilmtoneBuiltInCatalog.look(matching: $0)
+            }
+            return store.makeLivePreviewGradeProcessor(
+                overridingBuiltInLook: builtIn
+            )
+        }
+        FilmtoneCaptureView(
+            liveGradeProcessor: liveBundle?.processor,
+            liveDiagnostics: liveBundle?.diagnostics,
+            initialCaptureLook: initialCaptureLook,
+            makeGradeProcessor: makeGradeProcessor,
+            userLutEntries: store.library.recentLuts,
+            importUserLut: {
+                await store.importCaptureUserLut()
+            },
+            loadUserLut: { entry in
+                await store.loadCaptureUserLut(entry: entry)
+            },
+            makeTakePreviewGradeProcessor: { package in
+                await store.makeCapturePackagePreviewGradeProcessor(package)
+            },
+            onCompleted: { package in
+                captureSurfacePresented = false
+                Task { await store.adoptCaptureResult(package) }
+            },
+            onCancelled: {
+                captureSurfacePresented = false
+            },
+            onFailed: { failure in
+                captureSurfacePresented = false
+                store.recordingError = failure.displayMessage
+            }
+        )
+    }
+
+    private var usesPadWorkspace: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
     }
 
     private func presentCaptureSurfaceIfSupported() {
@@ -410,7 +419,9 @@ struct FilmtoneRootView: View {
     private func dismissAdjustmentHelp() {
         activeHelpTopic = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            advancedSheetPresented = true
+            if !usesPadWorkspace {
+                advancedSheetPresented = true
+            }
         }
     }
 
@@ -470,6 +481,10 @@ struct FilmtoneRootView: View {
     // MARK: Onboarding helpers
 
     private func presentOnboardingIfNeeded() {
+        guard !usesPadWorkspace else {
+            onboardingPresented = false
+            return
+        }
         guard !onboardingCompletedThisSession else {
             return
         }
