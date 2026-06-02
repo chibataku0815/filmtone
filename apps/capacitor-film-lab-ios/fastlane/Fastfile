@@ -11,13 +11,41 @@ IOS_PROJECT = File.join(APP_ROOT, "ios", "App", "App.xcodeproj", "project.pbxpro
 BUILD_OUTPUT_DIR = File.join(APP_ROOT, "build", "fastlane")
 DEVELOPMENT_TEAM_ID = "C3G77H8NM6"
 APP_IDENTIFIER = "com.chibatakumi.film.lab.ios"
+IPAD_APP_IDENTIFIER = "com.chibatakumi.film.lab.ipad"
 SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots")
+IPAD_SCREENSHOTS_PATH = File.join(FASTLANE_DIR, "screenshots-ipad")
 METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata")
+IPAD_METADATA_TEMPLATE_PATH = File.join(FASTLANE_DIR, "metadata-ipad")
 GENERATED_PATH = File.join(FASTLANE_DIR, ".generated")
 SCREENSHOT_CACHE_ROOT = File.expand_path("~/Library/Caches/tools.fastlane")
 SCREENSHOT_CACHE_PATH = File.join(SCREENSHOT_CACHE_ROOT, "screenshots")
 METADATA_LOCALES = ["ja", "en-US", "en-GB"].freeze
 SCREENSHOT_LOCALES = ["ja", "en-US"].freeze
+IPAD_SCREENSHOT_LOCALES = ["ja", "en-US", "en-GB"].freeze
+IPAD_METADATA_REQUIRED_FIELDS = [
+  "name",
+  "subtitle",
+  "promotional_text",
+  "description",
+  "keywords",
+].freeze
+IPAD_SCREENSHOT_COUNT = 5
+IPAD_SCREENSHOT_WIDTH = 2732
+IPAD_SCREENSHOT_HEIGHT = 2048
+IPAD_DEFAULT_NEXT_VERSION = "1.1"
+IPAD_FORBIDDEN_COPY_PATTERNS = [
+  /Filmtone for iPad/i,
+  /\bfor iPad\b/i,
+  /\biPad\b/,
+].freeze
+APP_STORE_FIELD_LIMITS = {
+  "name" => [:chars, 30],
+  "subtitle" => [:chars, 30],
+  "promotional_text" => [:chars, 170],
+  "description" => [:chars, 4000],
+  "keywords" => [:bytes, 100],
+  "release_notes" => [:chars, 4000],
+}.freeze
 SCREENSHOT_FILE_SUFFIXES = [
   "01_source_loaded_preview",
   "02_preset_row",
@@ -169,6 +197,13 @@ def localized_release_note_texts
   end
 end
 
+def localized_ipad_release_note_texts
+  IPAD_SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
+    text = read_text_if_present(File.join(IPAD_METADATA_TEMPLATE_PATH, locale, "release_notes.txt"))
+    memo[locale] = text if text
+  end
+end
+
 def localized_metadata_texts(filename)
   METADATA_LOCALES.each_with_object({}) do |locale, memo|
     text = read_text_if_present(File.join(METADATA_TEMPLATE_PATH, locale, filename))
@@ -203,6 +238,27 @@ def target_app_store_version!(version_string)
   version
 end
 
+def target_ipad_app_store_version!(version_string)
+  app = Spaceship::ConnectAPI::App.find(IPAD_APP_IDENTIFIER)
+  UI.user_error!("Could not find App Store Connect app #{IPAD_APP_IDENTIFIER}") unless app
+
+  versions = app.get_app_store_versions(
+    filter: { platform: Spaceship::ConnectAPI::Platform::IOS },
+    includes: nil
+  )
+  version = versions.find { |candidate| candidate.version_string == version_string }
+
+  unless version
+    available = versions
+      .sort_by { |candidate| Gem::Version.new(candidate.version_string) }
+      .map { |candidate| "#{candidate.version_string}(#{candidate.app_version_state})" }
+      .join(", ")
+    UI.user_error!("Could not find iPad App Store version #{version_string}. Available: #{available}")
+  end
+
+  version
+end
+
 def sync_release_notes_only!(version:)
   notes_by_locale = localized_release_note_texts
   UI.user_error!("No localized release_notes.txt files found under #{METADATA_TEMPLATE_PATH}") if notes_by_locale.empty?
@@ -221,6 +277,28 @@ def sync_release_notes_only!(version:)
     else
       version.create_app_store_version_localization(attributes: { locale: locale, whatsNew: notes })
       UI.message("Created release notes localization for #{locale}")
+    end
+  end
+end
+
+def sync_ipad_release_notes_only!(version:)
+  notes_by_locale = localized_ipad_release_note_texts
+  UI.user_error!("No localized release_notes.txt files found under #{IPAD_METADATA_TEMPLATE_PATH}") if notes_by_locale.empty?
+
+  localizations = version.get_app_store_version_localizations
+  notes_by_locale.each do |locale, notes|
+    localization = localizations.find { |candidate| candidate.locale == locale }
+
+    if localization
+      if localization.whats_new.to_s == notes
+        UI.message("iPad release notes already match for #{locale}")
+      else
+        localization.update(attributes: { whats_new: notes })
+        UI.message("Updated iPad release notes for #{locale}")
+      end
+    else
+      version.create_app_store_version_localization(attributes: { locale: locale, whatsNew: notes })
+      UI.message("Created iPad release notes localization for #{locale}")
     end
   end
 end
@@ -359,6 +437,35 @@ def explicit_ipa_path!(options, lane:)
   ipa_path
 end
 
+def explicit_ipad_ipa_path!(options, lane:)
+  explicit_path =
+    options[:ipa] ||
+    options["ipa"] ||
+    normalized_env("IPAD_IPA_PATH") ||
+    normalized_env("IPA_PATH")
+
+  UI.user_error!(
+    "Set IPAD_IPA_PATH, IPA_PATH, or pass ipa:... to `fastlane ios #{lane}`. Implicit archive fallback is disabled."
+  ) if explicit_path.nil?
+
+  ipa_path = File.expand_path(explicit_path, APP_ROOT)
+  UI.user_error!("iPad IPA not found at #{ipa_path}") unless File.exist?(ipa_path)
+  ipa_path
+end
+
+def ipad_app_review_information!
+  {
+    first_name: normalized_env("REVIEW_FIRST_NAME") || DEFAULT_REVIEW_FIRST_NAME,
+    last_name: normalized_env("REVIEW_LAST_NAME") || DEFAULT_REVIEW_LAST_NAME,
+    phone_number: env!("REVIEW_PHONE"),
+    email_address: normalized_env("REVIEW_EMAIL") || DEFAULT_REVIEW_EMAIL,
+    demo_user: normalized_env("REVIEW_DEMO_USER"),
+    demo_password: normalized_env("REVIEW_DEMO_PASSWORD"),
+    notes: normalized_env("REVIEW_NOTES") ||
+      "Filmtone Studio is local-first. Review the flow by importing a photo or video, choosing a Look, adjusting controls, comparing the result, then exporting and sharing or saving the output. No login, subscription, AI generation, or cloud sync is required.",
+  }.compact
+end
+
 def staged_release_screenshot_paths
   SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
     memo[locale] = Dir.glob(File.join(SCREENSHOTS_PATH, locale, "*.{png,jpg,jpeg}")).sort
@@ -398,6 +505,123 @@ def validate_release_screenshots!
   end
 
   screenshot_paths
+end
+
+def app_store_field_count(text, metric)
+  metric == :bytes ? text.bytesize : text.length
+end
+
+def validate_ipad_metadata!
+  missing = []
+  violations = []
+
+  IPAD_SCREENSHOT_LOCALES.each do |locale|
+    IPAD_METADATA_REQUIRED_FIELDS.each do |field|
+      path = File.join(IPAD_METADATA_TEMPLATE_PATH, locale, "#{field}.txt")
+      unless File.exist?(path)
+        missing << path
+        next
+      end
+
+      text = File.read(path).strip
+      missing << path if text.empty?
+
+      if (limit = APP_STORE_FIELD_LIMITS[field])
+        metric, max = limit
+        count = app_store_field_count(text, metric)
+        violations << "#{path} exceeds #{max} #{metric}: #{count}" if count > max
+      end
+
+      IPAD_FORBIDDEN_COPY_PATTERNS.each do |pattern|
+        violations << "#{path} contains forbidden App Store text: #{pattern.source}" if text.match?(pattern)
+      end
+    end
+  end
+
+  Dir.glob(File.join(IPAD_METADATA_TEMPLATE_PATH, "**", "*.txt")).each do |path|
+    text = File.read(path)
+    IPAD_FORBIDDEN_COPY_PATTERNS.each do |pattern|
+      violations << "#{path} contains forbidden App Store text: #{pattern.source}" if text.match?(pattern)
+    end
+  end
+
+  UI.user_error!("Missing iPad metadata fields: #{missing.join(', ')}") unless missing.empty?
+  UI.user_error!("iPad metadata preflight failed:\n#{violations.uniq.join("\n")}") unless violations.empty?
+
+  UI.message("Validated iPad metadata at #{IPAD_METADATA_TEMPLATE_PATH}")
+end
+
+def png_dimensions(path)
+  File.open(path, "rb") do |file|
+    signature = file.read(8)
+    UI.user_error!("Expected PNG signature for #{path}") unless signature == "\x89PNG\r\n\x1A\n".b
+
+    file.read(4)
+    chunk_type = file.read(4)
+    UI.user_error!("Expected IHDR chunk for #{path}") unless chunk_type == "IHDR"
+
+    [file.read(4).unpack1("N"), file.read(4).unpack1("N")]
+  end
+end
+
+def staged_ipad_screenshot_paths
+  IPAD_SCREENSHOT_LOCALES.each_with_object({}) do |locale, memo|
+    memo[locale] = Dir.glob(File.join(IPAD_SCREENSHOTS_PATH, locale, "*.png")).sort
+  end
+end
+
+def validate_ipad_screenshots!
+  screenshot_paths = staged_ipad_screenshot_paths
+  missing_locales = screenshot_paths.select { |_, paths| paths.empty? }.keys
+
+  unless missing_locales.empty?
+    UI.user_error!(
+      "Missing iPad screenshots for locales: #{missing_locales.join(', ')} under #{IPAD_SCREENSHOTS_PATH}."
+    )
+  end
+
+  counts = screenshot_paths.transform_values(&:count)
+  count_summary = counts.map { |locale, count| "#{locale}=#{count}" }.join(", ")
+  unless counts.values.all? { |count| count == IPAD_SCREENSHOT_COUNT }
+    UI.user_error!("Expected #{IPAD_SCREENSHOT_COUNT} iPad screenshots per locale. Current counts: #{count_summary}")
+  end
+
+  expected_basenames = nil
+  screenshot_paths.each do |locale, paths|
+    basenames = paths.map { |path| File.basename(path) }
+    expected_basenames ||= basenames
+    next if basenames == expected_basenames
+
+    UI.user_error!("iPad screenshot filenames must match across locales. #{locale} has #{basenames.join(', ')}.")
+  end
+
+  screenshot_paths.each_value do |paths|
+    paths.each do |path|
+      width, height = png_dimensions(path)
+      next if width == IPAD_SCREENSHOT_WIDTH && height == IPAD_SCREENSHOT_HEIGHT
+
+      UI.user_error!(
+        "Invalid iPad screenshot size for #{path}: #{width}x#{height}, expected #{IPAD_SCREENSHOT_WIDTH}x#{IPAD_SCREENSHOT_HEIGHT}."
+      )
+    end
+  end
+
+  UI.message("Validated iPad screenshots at #{IPAD_SCREENSHOTS_PATH}: #{count_summary}")
+  screenshot_paths
+end
+
+def ipad_app_store_version!
+  normalized_env("IPAD_APP_VERSION") ||
+    normalized_env("APP_VERSION") ||
+    IPAD_DEFAULT_NEXT_VERSION
+end
+
+def ipad_app_store_build_number!(options)
+  normalized_env("IPAD_BUILD_NUMBER") ||
+    normalized_env("BUILD_NUMBER") ||
+    options[:build_number] ||
+    options["build_number"] ||
+    UI.user_error!("Set IPAD_BUILD_NUMBER, BUILD_NUMBER, or pass build_number:")
 end
 
 platform :ios do
@@ -481,6 +705,108 @@ platform :ios do
     version = target_app_store_version!(app_store_version_number!)
     UI.message("Updating only What's New for #{APP_IDENTIFIER} #{version.version_string} (#{version.app_version_state})")
     sync_release_notes_only!(version: version)
+  end
+
+  desc "Validate staged Filmtone Studio App Store assets without uploading"
+  lane :ipad_preflight do
+    validate_ipad_metadata!
+    validate_ipad_screenshots!
+    UI.success("iPad preflight passed for #{IPAD_APP_IDENTIFIER}. No upload was performed.")
+  end
+
+  desc "Upload Filmtone Studio metadata and screenshots without binary or review submission"
+  lane :ipad_upload_assets do
+    validate_ipad_metadata!
+    validate_ipad_screenshots!
+
+    app_version = ipad_app_store_version!
+    UI.important(
+      "Uploading Filmtone Studio App Store assets for #{IPAD_APP_IDENTIFIER} #{app_version}. No binary upload or review submission will be performed."
+    )
+
+    upload_to_app_store(
+      api_key: load_asc_api_key!,
+      app_identifier: IPAD_APP_IDENTIFIER,
+      app_version: app_version,
+      platform: "ios",
+      metadata_path: IPAD_METADATA_TEMPLATE_PATH,
+      screenshots_path: IPAD_SCREENSHOTS_PATH,
+      skip_binary_upload: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      force: true,
+      overwrite_screenshots: true,
+      precheck_include_in_app_purchases: false,
+      copyright: File.read(File.join(IPAD_METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
+    )
+  end
+
+  desc "Upload Filmtone Studio binary, metadata, and screenshots to App Store Connect"
+  lane :ipad_release do |options|
+    ipa_path = explicit_ipad_ipa_path!(options, lane: "ipad_release")
+    validate_ipad_metadata!
+    validate_ipad_screenshots!
+
+    app_version = ipad_app_store_version!
+    UI.important("Uploading Filmtone Studio #{app_version} for #{IPAD_APP_IDENTIFIER}.")
+
+    upload_to_app_store(
+      api_key: load_asc_api_key!,
+      app_identifier: IPAD_APP_IDENTIFIER,
+      app_version: app_version,
+      ipa: ipa_path,
+      platform: "ios",
+      metadata_path: IPAD_METADATA_TEMPLATE_PATH,
+      screenshots_path: IPAD_SCREENSHOTS_PATH,
+      skip_binary_upload: false,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: truthy_env?("SUBMIT_FOR_REVIEW"),
+      automatic_release: truthy_env?("AUTOMATIC_RELEASE"),
+      force: true,
+      overwrite_screenshots: true,
+      precheck_include_in_app_purchases: false,
+      copyright: File.read(File.join(IPAD_METADATA_TEMPLATE_PATH, "copyright.txt")).strip,
+      release_notes: localized_ipad_release_note_texts,
+      app_review_information: ipad_app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
+    )
+  end
+
+  desc "Submit an already uploaded Filmtone Studio build without touching screenshots or binary"
+  lane :ipad_submit_review do |options|
+    app_version = ipad_app_store_version!
+    build_number = ipad_app_store_build_number!(options)
+    api_key = load_asc_api_key!
+
+    version = target_ipad_app_store_version!(app_version)
+    UI.message("Syncing iPad What's New before review submission for #{IPAD_APP_IDENTIFIER} #{version.version_string}")
+    sync_ipad_release_notes_only!(version: version)
+
+    upload_to_app_store(
+      api_key: api_key,
+      app_identifier: IPAD_APP_IDENTIFIER,
+      app_version: app_version,
+      build_number: build_number,
+      platform: "ios",
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: true,
+      automatic_release: truthy_env?("AUTOMATIC_RELEASE"),
+      force: true,
+      precheck_include_in_app_purchases: false,
+      app_review_information: ipad_app_review_information!,
+      submission_information: {
+        export_compliance_uses_encryption: false,
+      }
+    )
   end
 
   desc "Upload only the App Store binary without metadata or screenshots"

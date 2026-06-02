@@ -27,6 +27,11 @@ const metadataTargets = [
     locales: metadataLocales,
   },
   {
+    label: "iPad",
+    basePath: "apps/capacitor-film-lab-ios/fastlane/metadata-ipad",
+    locales: metadataLocales,
+  },
+  {
     label: "macOS",
     basePath: "apps/filmtone-desktop-macos/fastlane/metadata",
     locales: ["ja", "en-US"],

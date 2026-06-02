@@ -1,0 +1,14 @@
+Filmtone is a large-screen editor for finishing color while judging the result on a broad preview. It takes the Filmtone desktop editing model and adapts it to a touch-first workspace.
+
+The preview stays central. Source, Look, Adjust, and Export stay in a persistent inspector, so you can open media, choose a Look, tune the result, compare before and after, and export without moving through a chain of modal screens.
+
+Key features:
+- Source: adjust input handling with Auto and built-in source profiles
+- Look: apply Creative Pack 01, including Stone, Urban, and Noir; save, rename, favorite, and delete your own Looks
+- Adjust: use Material Field, Backlight Veil, and Advanced Adjust from a large-screen control surface
+- Preview: drag the still-image compare split, or toggle Compare during video playback
+- Export: save to the photo library, share, or export to a file, with each destination showing whether media, sidecar, or package files are included
+
+This edition is separate from the phone app. The phone app remains focused on fast save and share from your hand. The large-screen edition is for checking color on a larger preview and finishing from one workspace.
+
+No account is required for the main workflow. Open media, decide the color direction, compare the result, then save, share, or export to a file.

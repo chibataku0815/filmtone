@@ -47,6 +47,38 @@ Upload localized App Store metadata and review info
 
 Upload only localized What's New release notes
 
+### ios ipad_preflight
+
+```sh
+[bundle exec] fastlane ios ipad_preflight
+```
+
+Validate staged Filmtone Studio App Store assets without uploading
+
+### ios ipad_upload_assets
+
+```sh
+[bundle exec] fastlane ios ipad_upload_assets
+```
+
+Upload Filmtone Studio metadata and screenshots without binary or review submission
+
+### ios ipad_release
+
+```sh
+[bundle exec] fastlane ios ipad_release
+```
+
+Upload Filmtone Studio binary, metadata, and screenshots to App Store Connect
+
+### ios ipad_submit_review
+
+```sh
+[bundle exec] fastlane ios ipad_submit_review
+```
+
+Submit an already uploaded Filmtone Studio build without touching screenshots or binary
+
 ### ios release_binary
 
 ```sh
