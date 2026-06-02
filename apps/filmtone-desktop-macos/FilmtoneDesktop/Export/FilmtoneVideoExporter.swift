@@ -2,6 +2,7 @@ import AVFoundation
 import CoreImage
 import CoreMedia
 import CoreVideo
+import Dispatch
 import FilmLabSwiftCore
 import Foundation
 
@@ -215,6 +216,10 @@ enum FilmtoneVideoExporter {
             resolvedProfile: resolvedProfile,
             ciContext: exportContext
         )
+        let timing = FilmtoneExportTiming.makeIfEnabled(
+            kind: "highlight",
+            outputURL: request.outputURL
+        )
 
         try writer.start()
         try reader.start()
@@ -250,14 +255,19 @@ enum FilmtoneVideoExporter {
                     value: CMTimeValue(outputFrameIndex),
                     timescale: CMTimeScale(frameRate)
                 )
+                let readyStarted = FilmtoneExportTiming.now()
                 try await writer.waitForVideoInputReady()
+                timing?.record(.writerReadyWait, since: readyStarted)
                 let outputBuffer = try renderPixelBuffer(
                     from: selectedFrame,
                     frameTimeSeconds: sourceLookupTime,
                     writer: writer,
-                    renderContext: renderContext
+                    renderContext: renderContext,
+                    timing: timing
                 )
+                let appendStarted = FilmtoneExportTiming.now()
                 try await writer.append(buffer: outputBuffer, presentationTime: outputTime)
+                timing?.record(.append, since: appendStarted)
                 processed += 1
 
                 if processed == 1 || processed % 12 == 0 {
@@ -275,7 +285,9 @@ enum FilmtoneVideoExporter {
                 normalized: 0.99,
                 message: "Writing output…"
             ))
+            let finishStarted = FilmtoneExportTiming.now()
             try await writer.finish()
+            timing?.record(.finish, since: finishStarted)
         } catch {
             reader.cancel()
             writer.cancel()
@@ -288,7 +300,7 @@ enum FilmtoneVideoExporter {
             normalized: 1.0
         ))
 
-        return FilmtoneVideoExportResult(
+        let result = FilmtoneVideoExportResult(
             outputURL: request.outputURL,
             sidecarURL: nil,
             processedFrames: processed,
@@ -298,6 +310,12 @@ enum FilmtoneVideoExporter {
             videoTimingMode: .normal,
             outputFrameRate: frameRate
         )
+        timing?.printSummary(
+            processedFrames: processed,
+            estimatedTotalFrames: estimatedTotal,
+            outputURL: request.outputURL
+        )
+        return result
     }
 
     static func export(
@@ -327,11 +345,13 @@ enum FilmtoneVideoExporter {
             mode: request.videoTimingMode,
             sourceFPS: Double(probe.nominalFrameRate)
         )
+        let shouldPreserveAudio = probe.audioTrack != nil && !timingPolicy.isSlow24
         let reader = try FilmtoneVideoReader(
             probe: probe,
             contract: contract,
-            preserveAudio: !timingPolicy.isSlow24
+            preserveAudio: false
         )
+        let audioReader = shouldPreserveAudio ? try FilmtoneAudioReader(probe: probe) : nil
 
         // Display orientation (portrait capture etc. swaps width/height).
         let displaySize = reader.displaySize
@@ -351,11 +371,12 @@ enum FilmtoneVideoExporter {
             outputSize: outputSize,
             frameRate: frameRate,
             contract: contract,
-            preserveAudio: reader.hasAudioOutput && !timingPolicy.isSlow24
+            preserveAudio: shouldPreserveAudio
         )
 
         try writer.start()
         try reader.start()
+        try audioReader?.start()
 
         let resolvedGrade = FilmtoneGradeResolution.resolve(recipe: request.gradeRecipe)
             .applyingSourcePolicy(
@@ -390,16 +411,28 @@ enum FilmtoneVideoExporter {
             preferredTransform: preferredTransform,
             outputSize: outputSize
         )
+        let timing = FilmtoneExportTiming.makeIfEnabled(
+            kind: "video",
+            outputURL: request.outputURL
+        )
 
         var processed = 0
-        let audioTask = reader.hasAudioOutput && !timingPolicy.isSlow24
-            ? Task.detached(priority: .userInitiated) {
-                try await appendAudioSamples(from: reader, to: writer)
+        let audioTask: Task<Void, Error>? = if let audioReader {
+            Task.detached(priority: .userInitiated) {
+                try await writer.appendAudioSamples(from: audioReader)
             }
-            : nil
+        } else {
+            nil
+        }
         do {
-            while let pair = try reader.nextSampleBuffer() {
+            while true {
                 try Task.checkCancellation()
+                let readStarted = FilmtoneExportTiming.now()
+                let nextPair = try reader.nextSampleBuffer()
+                timing?.record(.frameRead, since: readStarted)
+                guard let pair = nextPair else {
+                    break
+                }
 
                 let presentationTime = CMSampleBufferGetPresentationTimeStamp(pair.sampleBuffer)
                 let validTime: CMTime = (presentationTime.isValid && presentationTime.isNumeric)
@@ -408,18 +441,23 @@ enum FilmtoneVideoExporter {
 
                 let frame = TimedVideoFrame(pixelBuffer: pair.pixelBuffer, seconds: CMTimeGetSeconds(validTime))
                 let frameTimeSeconds = frame.seconds.isFinite ? max(frame.seconds, 0) : 0
+                let readyStarted = FilmtoneExportTiming.now()
                 try await writer.waitForVideoInputReady()
+                timing?.record(.writerReadyWait, since: readyStarted)
                 let outputBuffer = try renderPixelBuffer(
                     from: frame,
                     frameTimeSeconds: frameTimeSeconds,
                     writer: writer,
-                    renderContext: renderContext
+                    renderContext: renderContext,
+                    timing: timing
                 )
 
                 let outputTime = timingPolicy.isSlow24
                     ? CMTime(value: CMTimeValue(processed), timescale: CMTimeScale(max(1, frameRate)))
                     : validTime
+                let appendStarted = FilmtoneExportTiming.now()
                 try await writer.append(buffer: outputBuffer, presentationTime: outputTime)
+                timing?.record(.append, since: appendStarted)
                 processed += 1
 
                 if processed == 1 || processed % 12 == 0 {
@@ -433,7 +471,9 @@ enum FilmtoneVideoExporter {
             }
 
             if let audioTask {
+                let audioStarted = FilmtoneExportTiming.now()
                 try await audioTask.value
+                timing?.record(.audio, since: audioStarted)
             }
             progress?(FilmtoneVideoExportProgress(
                 processedFrames: processed,
@@ -441,23 +481,37 @@ enum FilmtoneVideoExporter {
                 normalized: 0.99,
                 message: "Writing output…"
             ))
+            let finishStarted = FilmtoneExportTiming.now()
             try await writer.finish()
+            timing?.record(.finish, since: finishStarted)
         } catch {
             audioTask?.cancel()
             reader.cancel()
+            audioReader?.cancel()
             writer.cancel()
+            timing?.printSummary(
+                processedFrames: processed,
+                estimatedTotalFrames: estimatedTotal,
+                outputURL: request.outputURL
+            )
             throw error
         }
 
-        let audioPreserved = timingPolicy.isSlow24
-            ? false
-            : try await validateCompletedAudioPreservation(
+        let audioPreserved: Bool
+        if timingPolicy.isSlow24 {
+            audioPreserved = false
+        } else {
+            let validateStarted = FilmtoneExportTiming.now()
+            audioPreserved = try await validateCompletedAudioPreservation(
                 sourceHasAudio: probe.audioTrack != nil,
                 outputURL: request.outputURL
             )
+            timing?.record(.validation, since: validateStarted)
+        }
 
         var sidecarURL: URL? = nil
         if writeSidecar {
+            let sidecarStarted = FilmtoneExportTiming.now()
             let timingMetadata = FilmtoneVideoTimingMetadataDTO.make(
                 policy: timingPolicy,
                 sourceDurationSec: reader.durationSeconds,
@@ -469,6 +523,7 @@ enum FilmtoneVideoExporter {
                 resolvedSourceProfile: resolvedProfile,
                 videoTimingMetadata: timingMetadata
             )
+            timing?.record(.sidecar, since: sidecarStarted)
         }
 
         progress?(FilmtoneVideoExportProgress(
@@ -477,7 +532,7 @@ enum FilmtoneVideoExporter {
             normalized: 1.0
         ))
 
-        return FilmtoneVideoExportResult(
+        let result = FilmtoneVideoExportResult(
             outputURL: request.outputURL,
             sidecarURL: sidecarURL,
             processedFrames: processed,
@@ -487,16 +542,12 @@ enum FilmtoneVideoExporter {
             videoTimingMode: timingPolicy.resolvedMode,
             outputFrameRate: frameRate
         )
-    }
-
-    private static func appendAudioSamples(
-        from reader: FilmtoneVideoReader,
-        to writer: FilmtoneVideoWriter
-    ) async throws {
-        while let sampleBuffer = try reader.nextAudioSampleBuffer() {
-            try Task.checkCancellation()
-            try await writer.appendAudio(sampleBuffer: sampleBuffer)
-        }
+        timing?.printSummary(
+            processedFrames: processed,
+            estimatedTotalFrames: estimatedTotal,
+            outputURL: request.outputURL
+        )
+        return result
     }
 
     private static func constrainedOutputSize(
@@ -603,7 +654,8 @@ enum FilmtoneVideoExporter {
         from frame: TimedVideoFrame,
         frameTimeSeconds: Double,
         writer: FilmtoneVideoWriter,
-        renderContext: VideoFrameRenderContext
+        renderContext: VideoFrameRenderContext,
+        timing: FilmtoneExportTiming? = nil
     ) throws -> CVPixelBuffer {
         guard let pool = writer.pixelBufferPool else {
             throw FilmtoneVideoExportError.renderFailed(writer.outputURL)
@@ -615,6 +667,7 @@ enum FilmtoneVideoExporter {
         }
 
         autoreleasepool {
+            let graphStarted = FilmtoneExportTiming.now()
             let sourceImage = CIImage(
                 cvImageBuffer: frame.pixelBuffer,
                 options: renderContext.contract.sourceImageOptions(
@@ -647,7 +700,9 @@ enum FilmtoneVideoExporter {
                 opticalFilterIntensity: renderContext.opticalFilterIntensity,
                 sourceDetailBias: renderContext.sourceDetailBias
             ).cropped(to: renderContext.renderBounds)
+            timing?.record(.filterGraph, since: graphStarted)
 
+            let renderStarted = FilmtoneExportTiming.now()
             renderContext.ciContext.render(
                 graded,
                 to: outputBuffer,
@@ -655,6 +710,7 @@ enum FilmtoneVideoExporter {
                 colorSpace: renderContext.outputColorSpace
             )
             renderContext.contract.applyOutputMetadata(to: outputBuffer)
+            timing?.record(.render, since: renderStarted)
         }
 
         return outputBuffer
@@ -693,6 +749,121 @@ enum FilmtoneVideoExporter {
             return lookahead
         case (nil, nil):
             return nil
+        }
+    }
+}
+
+private final class FilmtoneExportTiming: @unchecked Sendable {
+    enum Stage: CaseIterable {
+        case frameRead
+        case writerReadyWait
+        case filterGraph
+        case render
+        case append
+        case audio
+        case finish
+        case validation
+        case sidecar
+
+        var label: String {
+            switch self {
+            case .frameRead:
+                return "read"
+            case .writerReadyWait:
+                return "writer_wait"
+            case .filterGraph:
+                return "filter_graph"
+            case .render:
+                return "render"
+            case .append:
+                return "append"
+            case .audio:
+                return "audio"
+            case .finish:
+                return "finish"
+            case .validation:
+                return "validation"
+            case .sidecar:
+                return "sidecar"
+            }
+        }
+    }
+
+    private let lock = NSLock()
+    private let kind: String
+    private let createdAt: UInt64
+    private var totals: [Stage: UInt64] = [:]
+    private var counts: [Stage: Int] = [:]
+
+    static func makeIfEnabled(kind: String, outputURL: URL) -> FilmtoneExportTiming? {
+        let rawValue = ProcessInfo.processInfo.environment["FILMTONE_EXPORT_TIMING"] ?? ""
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard ["1", "true", "yes", "summary"].contains(normalized) else {
+            return nil
+        }
+        return FilmtoneExportTiming(kind: kind, outputName: outputURL.lastPathComponent)
+    }
+
+    static func now() -> UInt64 {
+        DispatchTime.now().uptimeNanoseconds
+    }
+
+    private init(kind: String, outputName: String) {
+        self.kind = "\(kind):\(outputName)"
+        self.createdAt = Self.now()
+    }
+
+    func record(_ stage: Stage, since startedAt: UInt64) {
+        let endedAt = Self.now()
+        guard endedAt >= startedAt else { return }
+        lock.lock()
+        totals[stage, default: 0] += endedAt - startedAt
+        counts[stage, default: 0] += 1
+        lock.unlock()
+    }
+
+    func printSummary(
+        processedFrames: Int,
+        estimatedTotalFrames: Int,
+        outputURL: URL
+    ) {
+        let elapsedNanos = max(Self.now() - createdAt, 1)
+        let elapsedMs = Double(elapsedNanos) / 1_000_000.0
+        var lines: [String] = []
+        lines.append("[FilmtoneExportTiming] \(kind)")
+        lines.append(String(
+            format: "  frames=%d estimated=%d elapsed=%.1fms fps=%.2f output=%@",
+            processedFrames,
+            estimatedTotalFrames,
+            elapsedMs,
+            Double(processedFrames) / max(elapsedMs / 1000.0, 0.001),
+            outputURL.path
+        ))
+
+        lock.lock()
+        let snapshotTotals = totals
+        let snapshotCounts = counts
+        lock.unlock()
+
+        for stage in Stage.allCases {
+            let nanos = snapshotTotals[stage, default: 0]
+            let count = snapshotCounts[stage, default: 0]
+            guard nanos > 0 || count > 0 else { continue }
+            let totalMs = Double(nanos) / 1_000_000.0
+            let avgMs = totalMs / Double(max(count, 1))
+            let share = totalMs / max(elapsedMs, 0.001) * 100.0
+            lines.append(String(
+                format: "  %@ total=%.1fms avg=%.3fms count=%d share=%.1f%%",
+                stage.label,
+                totalMs,
+                avgMs,
+                count,
+                share
+            ))
+        }
+        lines.append("")
+        if let data = lines.joined(separator: "\n").data(using: .utf8) {
+            FileHandle.standardError.write(data)
         }
     }
 }

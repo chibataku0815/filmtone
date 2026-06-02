@@ -59,7 +59,7 @@ recent Film Damage passes.
 - [x] Compare visual probe timing and output.
 - [x] Run real-source Desktop export tests.
 - [x] Run verification.
-- [ ] Record results and archive this task.
+- [x] Record results and archive this task.
 
 ## Verification
 
@@ -163,5 +163,5 @@ Change-History Opportunity: Developer note.
   mode. This slice avoids silently lowering export resolution.
 - The latest pass changes procedural texture character: it keeps visible
   damage/grain but trades some smooth interpolation for cell-material hashes.
-  User confirmation on the original long 4K/slow24 workload is still needed
-  before archiving.
+  User confirmed the result was substantially better before the task was
+  archived.

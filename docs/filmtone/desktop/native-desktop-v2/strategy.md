@@ -542,6 +542,26 @@ update metadata on `latestVersion: 1.11`. iOS `1.10 (13)` is
 `READY_FOR_DISTRIBUTION` in App Store Connect; JP storefront lookup still lags
 at `1.9`. Archive `archive/2026-05-17-desktop-v1.11-ios-1.10-release.md`.
 
+2026-05-31: ARRI LogC3 Source Profile shipped across shared core, iOS, and
+native Desktop as a Filmtone-normalized LogC3 EI800/AWG3 -> Rec.709 transform.
+It stays manual/sticky; no official ARRI 709 look LUT was bundled. Archive
+`archive/2026-05-31-arri-logc3-source-profile.md`.
+
+2026-05-31: Desktop v1.14 shipped as a signed, notarized, stapled Developer ID
+DMG with public update metadata on `latestVersion: 1.14`; the fixed download
+page resolves to `Filmtone-1.14.dmg`. Archive
+`archive/2026-05-31-desktop-v1-14-arri-logc3-release.md`.
+
+2026-05-31: User-directed interrupt opened for cross-platform Film Damage on
+native Desktop and iPad after the generic `visual-effect-core` FilmDamageRecipe
+contract was created. Active task:
+`active.md`.
+
+2026-05-31: Desktop export filename follow-up fixed built-in Look exports using
+the underlying `reset` preset as the default save suffix. Stone / Urban / Noir
+now use Look-aware suffixes. Archive
+`archive/2026-05-31-export-filename-look-slug-fix.md`.
+
 2026-05-31: Cross-platform Film Damage interrupt completed for native Desktop
 and iPad using shared `dustAmount` / `scratchAmount` params with deterministic
 post-print native kernels. Archive `archive/2026-05-31-film-damage-cross-platform.md`.
@@ -616,6 +636,26 @@ Desktop/iPad kernels now move grain timing toward frame-material updates and
 re-grain damaged regions so dust, scratches, stains, and gate wear sit less like
 clean post masks. Archive
 `archive/2026-06-01-film-damage-grain-integration.md`.
+
+2026-06-01: Film Damage / Grain integration performance fix completed. Native
+Desktop/iPad kernels now skip damaged-region integration work on clean pixels,
+use cheaper cell-hash re-grain, and compute one grain pattern per output frame.
+Archive `archive/2026-06-01-film-damage-grain-integration-performance-fix.md`.
+
+2026-06-01: Film Damage export performance second pass completed. Native
+Desktop/iPad kernels now avoid absent-event work and Desktop export uses an
+export-only CIContext plus writer readiness handling. Archive
+`archive/2026-06-01-film-damage-export-performance-second-pass.md`.
+
+2026-06-01: Film Damage / Grain export profiling and embed pass completed.
+Desktop export timing now attributes per-stage cost, and damaged pixels inherit
+neutralized source texture to reduce overlay float. Archive
+`archive/2026-06-01-film-damage-grain-export-profiling-embed-pass.md`.
+
+2026-06-02: Desktop 60fps one-minute export 99% stall fix completed. Native
+Desktop audio preservation now uses a separate audio reader plus writer-ready
+audio pump, preventing 60fps/audio exports from blocking video input near the
+final frames. Archive `archive/2026-06-02-desktop-60fps-export-99-stall.md`.
 
 ## Constraints
 

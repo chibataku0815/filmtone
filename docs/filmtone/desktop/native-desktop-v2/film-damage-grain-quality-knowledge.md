@@ -115,6 +115,48 @@ depend on smooth multi-sample noise over the whole frame.
   separately so a final encoder flush does not look like a render hang.
 - Keep Desktop and iOS/iPad kernels aligned before judging visual parity.
 
+## Export Timing Rule
+
+Use `FILMTONE_EXPORT_TIMING=1` for real-source export diagnosis before guessing
+where performance was lost. The opt-in Desktop timing summary separates:
+
+- source frame read;
+- writer readiness wait;
+- CoreImage graph construction;
+- CoreImage render;
+- writer append;
+- audio, validation, sidecar, and final writer finish.
+
+On the 2026-06-01 4K/24fps 10s DJI heavy Grain + Film Damage stress export,
+`render` dominated the profile: 240 frames exported in 6.04s wall time, with
+render at 4356.7ms / 78.3% of measured elapsed time. `writer_wait`, `append`,
+and `finish` were not material bottlenecks in that run.
+
+On 2026-06-02, a 1080x1920 60fps ~59.67s source with AAC audio reproduced a
+different failure: heavy export reached the final frames then failed after about
+148s with `waitForReadyTimedOut`; the same source without audio completed in
+about 27.6s. Treat this as AVAssetWriter audio/video input coordination, not
+visual kernel cost. Desktop should preserve audio with a separate audio reader
+and an `audioInput.requestMediaDataWhenReady` pump, matching the iOS queue
+model; do not append audio through a polling async wait loop while the video
+render loop is also feeding the writer.
+
+## Embed Rule
+
+Do not solve floating damage by simply lowering opacity. Preserve visible
+defects, but reintroduce a neutralized version of the source tone into damaged
+pixels:
+
+- keep a pre-damage source RGB sample and source luma;
+- build a nearly monochrome source texture from that sample;
+- scale it by the damaged pixel's luma ratio;
+- blend it back only under the damage material mask;
+- apply neutral lock after this embed pass so source texture does not become
+warm/brown tint.
+
+This makes dirt, scratches, and damaged grain inherit a little of the source
+surface variation without turning defects into colorized overlays.
+
 ## Remaining Quality Ceiling
 
 This pass is still procedural. The next larger quality jump would come from:

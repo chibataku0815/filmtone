@@ -167,3 +167,71 @@ final class FilmtoneVideoReader: @unchecked Sendable {
         return CGSize(width: abs(rect.width), height: abs(rect.height))
     }
 }
+
+final class FilmtoneAudioReader: @unchecked Sendable {
+    let sourceURL: URL
+
+    private let reader: AVAssetReader
+    private let audioOutput: AVAssetReaderTrackOutput
+
+    init(probe: FilmtoneVideoTrackProbe) throws {
+        let sourceURL = probe.asset.url
+        guard let audioTrack = probe.audioTrack else {
+            throw FilmtoneVideoReaderError.unsupportedAudioTrack(sourceURL)
+        }
+        let reader: AVAssetReader
+        do {
+            reader = try AVAssetReader(asset: probe.asset)
+        } catch {
+            throw FilmtoneVideoReaderError.readerSetupFailed(sourceURL, underlying: error)
+        }
+        let audioOutput = AVAssetReaderTrackOutput(
+            track: audioTrack,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ]
+        )
+        guard reader.canAdd(audioOutput) else {
+            throw FilmtoneVideoReaderError.unsupportedAudioTrack(sourceURL)
+        }
+        reader.add(audioOutput)
+
+        self.sourceURL = sourceURL
+        self.reader = reader
+        self.audioOutput = audioOutput
+    }
+
+    func start() throws {
+        guard reader.startReading() else {
+            throw FilmtoneVideoReaderError.readerStartFailed(
+                sourceURL,
+                underlying: reader.error
+            )
+        }
+    }
+
+    func nextSampleBuffer() throws -> CMSampleBuffer? {
+        guard let sample = audioOutput.copyNextSampleBuffer() else {
+            switch reader.status {
+            case .completed:
+                return nil
+            case .failed, .cancelled:
+                throw FilmtoneVideoReaderError.readerFailedDuringRead(
+                    sourceURL,
+                    underlying: reader.error
+                )
+            default:
+                return nil
+            }
+        }
+        return sample
+    }
+
+    func cancel() {
+        reader.cancelReading()
+    }
+}

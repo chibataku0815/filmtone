@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreMedia
 import CoreVideo
+import Dispatch
 import Foundation
 
 enum FilmtoneVideoWriterError: Error, LocalizedError {
@@ -11,6 +12,7 @@ enum FilmtoneVideoWriterError: Error, LocalizedError {
     case appendFailed(URL, underlying: Error?)
     case audioAppendFailed(URL, underlying: Error?)
     case waitForReadyTimedOut(URL)
+    case finishTimedOut(URL, timeoutSeconds: Double)
     case finishIncomplete(URL, status: AVAssetWriter.Status, underlying: Error?)
 
     var errorDescription: String? {
@@ -29,6 +31,8 @@ enum FilmtoneVideoWriterError: Error, LocalizedError {
             return "Could not append audio to \(url.lastPathComponent)\(Self.underlyingMessage(underlying))"
         case .waitForReadyTimedOut(let url):
             return "The video writer stopped accepting frames for \(url.lastPathComponent)"
+        case .finishTimedOut(let url, let timeoutSeconds):
+            return "The video writer did not finish \(url.lastPathComponent) within \(Int(timeoutSeconds)) seconds"
         case .finishIncomplete(let url, let status, let underlying):
             return "The video writer did not complete \(url.lastPathComponent) (status: \(status))\(Self.underlyingMessage(underlying))"
         }
@@ -57,8 +61,11 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
 
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
-    private let audioInput: AVAssetWriterInput?
+    private let audioInput: FilmtoneAudioWriterInput?
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let inputFinishLock = NSLock()
+    private var videoInputFinished = false
+    private var audioInputFinished: Bool
 
     init(
         outputURL: URL,
@@ -108,7 +115,7 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         }
         writer.add(videoInput)
 
-        let audioInput: AVAssetWriterInput?
+        let audioInput: FilmtoneAudioWriterInput?
         if preserveAudio {
             let input = AVAssetWriterInput(
                 mediaType: .audio,
@@ -124,7 +131,7 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
                 throw FilmtoneVideoWriterError.audioInputCannotBeAdded(outputURL)
             }
             writer.add(input)
-            audioInput = input
+            audioInput = FilmtoneAudioWriterInput(input)
         } else {
             audioInput = nil
         }
@@ -146,6 +153,7 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         self.videoInput = videoInput
         self.audioInput = audioInput
         self.adaptor = adaptor
+        self.audioInputFinished = audioInput == nil
     }
 
     func start(atSourceTime startTime: CMTime = .zero) throws {
@@ -177,27 +185,80 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
         guard let audioInput else {
             throw FilmtoneVideoWriterError.audioInputCannotBeAdded(outputURL)
         }
-        try await waitForReadyForMoreMediaData(audioInput)
+        try await waitForReadyForMoreMediaData(audioInput.rawInput)
         if !audioInput.append(sampleBuffer) {
             throw FilmtoneVideoWriterError.audioAppendFailed(outputURL, underlying: writer.error)
         }
     }
 
-    func finish() async throws {
-        videoInput.markAsFinished()
-        audioInput?.markAsFinished()
+    func appendAudioSamples(from reader: FilmtoneAudioReader) async throws {
+        guard let audioInput else {
+            throw FilmtoneVideoWriterError.audioInputCannotBeAdded(outputURL)
+        }
+        let queue = DispatchQueue(label: "com.filmtone.desktop.export.audio-writer", qos: .userInitiated)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.scheduleFinishWriting(continuation: continuation)
+            let state = FilmtoneVideoWriterFinishState(continuation: continuation)
+            audioInput.requestMediaDataWhenReady(on: queue) { [self, reader, audioInput] in
+                while audioInput.isReadyForMoreMediaData {
+                    if state.isResolved {
+                        return
+                    }
+                    do {
+                        switch writer.status {
+                        case .failed, .cancelled:
+                            throw FilmtoneVideoWriterError.finishIncomplete(
+                                outputURL,
+                                status: writer.status,
+                                underlying: writer.error
+                            )
+                        default:
+                            break
+                        }
+                        guard let sampleBuffer = try reader.nextSampleBuffer() else {
+                            markAudioInputFinished()
+                            _ = state.resume()
+                            return
+                        }
+                        if !audioInput.append(sampleBuffer) {
+                            throw FilmtoneVideoWriterError.audioAppendFailed(
+                                outputURL,
+                                underlying: writer.error
+                            )
+                        }
+                    } catch {
+                        reader.cancel()
+                        _ = state.resume(throwing: error)
+                        return
+                    }
+                }
+            }
         }
     }
 
-    private func scheduleFinishWriting(continuation: CheckedContinuation<Void, Error>) {
+    func finish(timeoutSeconds: Double = 180) async throws {
+        markVideoInputFinished()
+        markAudioInputFinished()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let state = FilmtoneVideoWriterFinishState(continuation: continuation)
+            self.scheduleFinishWriting(state: state)
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeoutSeconds) { [self] in
+                if state.resume(throwing: FilmtoneVideoWriterError.finishTimedOut(
+                    outputURL,
+                    timeoutSeconds: timeoutSeconds
+                )) {
+                    writer.cancelWriting()
+                }
+            }
+        }
+    }
+
+    private func scheduleFinishWriting(state: FilmtoneVideoWriterFinishState) {
         let outURL = outputURL
         writer.finishWriting { [self] in
             if writer.status == .completed {
-                continuation.resume()
+                _ = state.resume()
             } else {
-                continuation.resume(throwing: FilmtoneVideoWriterError.finishIncomplete(
+                _ = state.resume(throwing: FilmtoneVideoWriterError.finishIncomplete(
                     outURL,
                     status: writer.status,
                     underlying: writer.error
@@ -208,6 +269,29 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
 
     func cancel() {
         writer.cancelWriting()
+    }
+
+    private func markVideoInputFinished() {
+        inputFinishLock.lock()
+        defer { inputFinishLock.unlock() }
+        guard !videoInputFinished else {
+            return
+        }
+        videoInput.markAsFinished()
+        videoInputFinished = true
+    }
+
+    private func markAudioInputFinished() {
+        guard let audioInput else {
+            return
+        }
+        inputFinishLock.lock()
+        defer { inputFinishLock.unlock() }
+        guard !audioInputFinished else {
+            return
+        }
+        audioInput.markAsFinished()
+        audioInputFinished = true
     }
 
     private func waitForReadyForMoreMediaData(
@@ -232,5 +316,73 @@ final class FilmtoneVideoWriter: @unchecked Sendable {
             }
             try await Task.sleep(nanoseconds: 2_000_000)
         }
+    }
+}
+
+private final class FilmtoneAudioWriterInput: @unchecked Sendable {
+    let rawInput: AVAssetWriterInput
+
+    init(_ input: AVAssetWriterInput) {
+        self.rawInput = input
+    }
+
+    var isReadyForMoreMediaData: Bool {
+        rawInput.isReadyForMoreMediaData
+    }
+
+    func requestMediaDataWhenReady(
+        on queue: DispatchQueue,
+        using block: @escaping @Sendable () -> Void
+    ) {
+        rawInput.requestMediaDataWhenReady(on: queue, using: block)
+    }
+
+    func append(_ sampleBuffer: CMSampleBuffer) -> Bool {
+        rawInput.append(sampleBuffer)
+    }
+
+    func markAsFinished() {
+        rawInput.markAsFinished()
+    }
+}
+
+private final class FilmtoneVideoWriterFinishState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume() -> Bool {
+        resume(with: .success(()))
+    }
+
+    func resume(throwing error: Error) -> Bool {
+        resume(with: .failure(error))
+    }
+
+    var isResolved: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return continuation == nil
+    }
+
+    private func resume(with result: Result<Void, Error>) -> Bool {
+        lock.lock()
+        guard let continuation else {
+            lock.unlock()
+            return false
+        }
+        self.continuation = nil
+        lock.unlock()
+
+        switch result {
+        case .success:
+            continuation.resume()
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
+        return true
     }
 }
