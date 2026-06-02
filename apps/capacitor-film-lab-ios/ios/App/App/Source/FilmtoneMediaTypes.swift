@@ -306,6 +306,8 @@ struct Phase0ParamsDTO: Codable {
     let shutterAngle: Double
     let trailIntensity: Double
     let filmBreathAmount: Double
+    let dustAmount: Double
+    let scratchAmount: Double
     let fade: Double
     let shadowTone: Double
     let shadowLatitude: Double
@@ -348,6 +350,8 @@ struct Phase0ParamsDTO: Codable {
         shutterAngle: Double,
         trailIntensity: Double,
         filmBreathAmount: Double = 0,
+        dustAmount: Double = 0,
+        scratchAmount: Double = 0,
         fade: Double,
         shadowTone: Double,
         shadowLatitude: Double,
@@ -389,6 +393,8 @@ struct Phase0ParamsDTO: Codable {
         self.shutterAngle = shutterAngle
         self.trailIntensity = trailIntensity
         self.filmBreathAmount = filmBreathAmount
+        self.dustAmount = dustAmount
+        self.scratchAmount = scratchAmount
         self.fade = fade
         self.shadowTone = shadowTone
         self.shadowLatitude = shadowLatitude
@@ -408,7 +414,7 @@ struct Phase0ParamsDTO: Codable {
         case halationIntensity, halationSpread, halationHue, halationThreshold, halationRadius
         case bloomSoftKnee, halationSoftKnee, compressionAmount, compressionRange
         case printContrast, cyan, magenta, yellow
-        case shutterAngle, trailIntensity, filmBreathAmount
+        case shutterAngle, trailIntensity, filmBreathAmount, dustAmount, scratchAmount
         case fade, shadowTone, shadowLatitude, blackPoint, toeContrast
         case highlightTone, shadowHue, highlightHue
         case vignette, grainIntensity
@@ -446,6 +452,8 @@ struct Phase0ParamsDTO: Codable {
         self.shutterAngle = try c.decode(Double.self, forKey: .shutterAngle)
         self.trailIntensity = try c.decode(Double.self, forKey: .trailIntensity)
         self.filmBreathAmount = try c.decodeIfPresent(Double.self, forKey: .filmBreathAmount) ?? 0
+        self.dustAmount = try c.decodeIfPresent(Double.self, forKey: .dustAmount) ?? 0
+        self.scratchAmount = try c.decodeIfPresent(Double.self, forKey: .scratchAmount) ?? 0
         self.fade = try c.decode(Double.self, forKey: .fade)
         self.shadowTone = try c.decode(Double.self, forKey: .shadowTone)
         self.shadowLatitude = try c.decode(Double.self, forKey: .shadowLatitude)

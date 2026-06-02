@@ -48,6 +48,13 @@ private struct Clog3CineGamutMacbethPatch: Decodable {
     let rec709LinearReference: [Double]
 }
 
+private struct ArriLogC3MacbethPatch: Decodable {
+    let index: Int
+    let logC3Encoded: [Double]
+    let rec709EncodedExpected: [Double]
+    let rec709LinearReference: [Double]
+}
+
 private struct DlogMMacbethPatch: Decodable {
     let index: Int
     let dlogMEncoded: [Double]
@@ -183,6 +190,74 @@ private func atan2deg(_ y: Double, _ x: Double) -> Double {
 
 private extension Double {
     var radians: Double { self * Double.pi / 180.0 }
+}
+
+// MARK: - ARRI LogC3 + AWG3 accuracy gate
+
+private func runArriLogC3LinearizationCheck(fixtureURL: URL) throws {
+    let samples: [LinearizationSample] = try loadJSON(fixtureURL.appendingPathComponent("linearization-ramp.json"))
+    try expect(samples.count == 4096, "ARRI LogC3 linearization ramp expected 4096 samples, got \(samples.count)")
+    var maxDelta = 0.0
+    for sample in samples {
+        let computed = FilmtoneSourceProfileMath.arriLogC3Decode(sample.vEncoded)
+        maxDelta = max(maxDelta, abs(computed - sample.lLinear))
+    }
+    try expect(
+        maxDelta <= 1e-3,
+        "ARRI LogC3 linearization drift max |Δ| = \(maxDelta) exceeds tolerance 1e-3"
+    )
+    print(String(format: "    ARRI LogC3 linearization max |Δ| = %.6f (budget 1e-3)", maxDelta))
+}
+
+private func runArriLogC3MacbethCheck(fixtureURL: URL) throws {
+    let patches: [ArriLogC3MacbethPatch] = try loadJSON(fixtureURL.appendingPathComponent("macbeth-patches.json"))
+    try expect(patches.count == 24, "ARRI LogC3 Macbeth fixture expected 24 patches, got \(patches.count)")
+
+    var maxDeltaE = 0.0
+    var sumDeltaE = 0.0
+    var maxFullFrame = 0.0
+    var sumFullFrame = 0.0
+    var fullFrameCount = 0
+
+    for patch in patches {
+        let computed = FilmtoneSourceProfileMath.arriLogC3PixelToRec709(
+            red: patch.logC3Encoded[0],
+            green: patch.logC3Encoded[1],
+            blue: patch.logC3Encoded[2]
+        )
+
+        let computedLinear = (
+            r: rec709InverseEncode(computed.red),
+            g: rec709InverseEncode(computed.green),
+            b: rec709InverseEncode(computed.blue)
+        )
+        let expectedLinear = (
+            r: rec709InverseEncode(patch.rec709EncodedExpected[0]),
+            g: rec709InverseEncode(patch.rec709EncodedExpected[1]),
+            b: rec709InverseEncode(patch.rec709EncodedExpected[2])
+        )
+        let lab1 = xyzToLab(rec709LinearToXYZ(computedLinear))
+        let lab2 = xyzToLab(rec709LinearToXYZ(expectedLinear))
+        let dE = deltaE2000(lab1, lab2)
+        maxDeltaE = max(maxDeltaE, dE)
+        sumDeltaE += dE
+
+        for ch in 0..<3 {
+            let drift = abs(channel(computed, ch) - patch.rec709EncodedExpected[ch]) * 255.0
+            maxFullFrame = max(maxFullFrame, drift)
+            sumFullFrame += drift
+            fullFrameCount += 1
+        }
+    }
+    let meanDeltaE = sumDeltaE / Double(patches.count)
+    let meanFullFrame = sumFullFrame / Double(fullFrameCount)
+
+    try expect(maxDeltaE <= 2.0, "ARRI LogC3 Macbeth ΔE2000 max = \(maxDeltaE) exceeds budget 2.0")
+    try expect(meanDeltaE <= 1.0, "ARRI LogC3 Macbeth ΔE2000 mean = \(meanDeltaE) exceeds budget 1.0")
+    try expect(maxFullFrame <= 2.0, "ARRI LogC3 full-frame max = \(maxFullFrame)/255 exceeds budget 2/255")
+    try expect(meanFullFrame <= 0.5, "ARRI LogC3 full-frame mean = \(meanFullFrame)/255 exceeds budget 0.5/255")
+    print(String(format: "    ARRI LogC3 Macbeth ΔE2000 max = %.3f mean = %.3f (budget 2.0/1.0)", maxDeltaE, meanDeltaE))
+    print(String(format: "    ARRI LogC3 Macbeth full-frame max = %.3f mean = %.3f /255 (budget 2.0/0.5)", maxFullFrame, meanFullFrame))
 }
 
 // MARK: - DJI D-Log accuracy gate
@@ -667,6 +742,12 @@ struct TestSourceProfileMath {
         try expect(args.count >= 1, "usage: test-source-profile-math <fixtures-root>")
         let fixturesRoot = URL(fileURLWithPath: args[0])
 
+        let arriLogC3Fixture = fixturesRoot.appendingPathComponent("arri-logc3")
+        if FileManager.default.fileExists(atPath: arriLogC3Fixture.path) {
+            print("==> ARRI LogC3 + AWG3 accuracy gate")
+            try runArriLogC3LinearizationCheck(fixtureURL: arriLogC3Fixture)
+            try runArriLogC3MacbethCheck(fixtureURL: arriLogC3Fixture)
+        }
         let dlogFixture = fixturesRoot.appendingPathComponent("dji-dlog")
         if FileManager.default.fileExists(atPath: dlogFixture.path) {
             print("==> D-Log accuracy gate")

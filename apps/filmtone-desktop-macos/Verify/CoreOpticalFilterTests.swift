@@ -1,4 +1,5 @@
 import FilmLabSwiftCore
+import CoreImage
 import Foundation
 
 func registerCoreOpticalFilterTests() {
@@ -521,6 +522,32 @@ func registerCoreOpticalFilterTests() {
             newPath, legacyPath,
             "lookSlug=nil + Veil through new path must match legacy flat-patch result"
         )
+    }
+
+    runner.test("filmDamage kernel compiles and renders through CoreImage") {
+        guard let kernel = FilmtoneGradeKernels.filmDamage else {
+            throw AssertionError(description: "filmDamage CIColorKernel failed to compile")
+        }
+        let extent = CGRect(x: 0, y: 0, width: 96, height: 96)
+        let input = CIImage(color: CIColor(red: 0.48, green: 0.46, blue: 0.42, alpha: 1.0))
+            .cropped(to: extent)
+        guard let output = kernel.apply(
+            extent: extent,
+            arguments: [
+                input,
+                0.85,
+                0.80,
+                1.25,
+                0.43,
+                CIVector(x: extent.origin.x, y: extent.origin.y),
+                CIVector(x: extent.width, y: extent.height),
+            ]
+        ) else {
+            throw AssertionError(description: "filmDamage CIColorKernel failed to apply")
+        }
+        guard CIContext().createCGImage(output, from: extent) != nil else {
+            throw AssertionError(description: "filmDamage CIColorKernel output failed to render")
+        }
     }
 
     // ---------------------------------------------------------------------------

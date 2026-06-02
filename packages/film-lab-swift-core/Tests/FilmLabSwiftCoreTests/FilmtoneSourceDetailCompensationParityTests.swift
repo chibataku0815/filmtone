@@ -73,6 +73,20 @@ final class FilmtoneSourceDetailCompensationParityTests: XCTestCase {
         XCTAssertEqual(profile.recommendedBias, 0.06, accuracy: 1e-12)
     }
 
+    func testArriLogC3ViaSourceProfileId() {
+        let profile = FilmtoneSourceDetailCompensation.resolve(
+            FilmtoneSourceDetailCompensationInput(
+                cameraMake: "Panasonic",
+                cameraModel: "LUMIX S1II",
+                sourceProfileId: "built-in:source-profile.arri-logc3"
+            )
+        )
+        XCTAssertEqual(profile.id, .arriLogC3)
+        XCTAssertEqual(profile.transferClass, .logCinema)
+        XCTAssertEqual(profile.confidence, .high)
+        XCTAssertEqual(profile.recommendedBias, 0.02, accuracy: 1e-12)
+    }
+
     func testDjiViaCameraMake() {
         let profile = FilmtoneSourceDetailCompensation.resolve(
             FilmtoneSourceDetailCompensationInput(
@@ -189,6 +203,7 @@ final class FilmtoneSourceDetailCompensationParityTests: XCTestCase {
     func testBiasAlwaysWithinClamp() {
         let cases: [FilmtoneSourceDetailCompensationInput] = [
             FilmtoneSourceDetailCompensationInput(cameraMake: "Apple", codecFamily: "hevc"),
+            FilmtoneSourceDetailCompensationInput(sourceProfileId: "built-in:source-profile.arri-logc3"),
             FilmtoneSourceDetailCompensationInput(cameraMake: "DJI"),
             FilmtoneSourceDetailCompensationInput(cameraMake: "GoPro"),
             FilmtoneSourceDetailCompensationInput(cameraMake: "Sony"),

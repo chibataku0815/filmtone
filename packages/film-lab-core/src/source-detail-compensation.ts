@@ -43,6 +43,7 @@ export interface SourceDetailProfile {
   readonly id:
     | "iphone-sdr-hevc"
     | "apple-log"
+    | "arri-logc3"
     | "dji-action"
     | "gopro-action"
     | "sony-slog3"
@@ -89,6 +90,10 @@ const APPLE_LOG_INPUT_STRATEGIES = new Set<string>([
 const APPLE_LOG_SOURCE_PROFILE_IDS = new Set<string>([
   "built-in:source-profile.apple-log",
   "built-in:source-profile.apple-log-2",
+]);
+
+const ARRI_LOG_SOURCE_PROFILE_IDS = new Set<string>([
+  "built-in:source-profile.arri-logc3",
 ]);
 
 const DJI_SOURCE_PROFILE_IDS = new Set<string>([
@@ -195,6 +200,16 @@ export function resolveSourceDetailCompensation(
       "log-consumer",
       0.06,
       "apple-log-smaller-positive",
+    );
+  }
+
+  if (ARRI_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "arri") {
+    return makeProfile(
+      "arri-logc3",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "arri-logc3-near-zero",
     );
   }
 

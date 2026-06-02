@@ -38,10 +38,10 @@ enum ExportInputLutBuilder {
         }
     }
 
-    // v1.3 Camera Profiles Phase E: synthesized 33³ cubes (V-Log, S-Log3)
-    // are recomputed once per app run and reused across exports. Keyed by
-    // a curve identity string so the cache survives multiple exports of
-    // the same source profile without rebuilding ~575 KB of cube data.
+    // v1.3 Camera Profiles Phase E: synthesized 33³ cubes are recomputed
+    // once per app run and reused across exports. Keyed by a curve identity
+    // string so the cache survives multiple exports of the same source
+    // profile without rebuilding ~575 KB of cube data.
     private static let synthesizedInputLutCache = NSCache<NSString, NSData>()
 
     /// v1.3 Camera Profiles Phase E entry point. When `selection` is nil
@@ -100,6 +100,8 @@ enum ExportInputLutBuilder {
         }
         let rgb: [Float]
         switch curve {
+        case .arriLogC3:
+            rgb = FilmtoneSourceProfileMath.makeArriLogC3ToRec709Cube(size: cubeSize)
         case .djiDLog:
             rgb = FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: cubeSize)
         case .djiDLogM:

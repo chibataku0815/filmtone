@@ -72,6 +72,7 @@ enum CameraProfileSelection: Equatable, Sendable, Codable, Hashable {
 enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
     case appleLog              = "apple-log"
     case appleLog2             = "apple-log-2"
+    case arriLogC3             = "arri-logc3"
     case djiDLog               = "dji-dlog"
     case djiDLogM              = "dji-dlog-m"
     case canonCLog             = "canon-clog"
@@ -110,6 +111,14 @@ enum FilmtoneSourceProfileCatalog {
             englishName: "Apple Log 2",
             curve: .appleLog2,
             detectionHint: .appleLog2,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
+            id: "built-in:source-profile.arri-logc3",
+            englishName: "ARRI LogC3",
+            curve: .arriLogC3,
+            detectionHint: nil,
             bundled: true,
             immutable: true
         ),

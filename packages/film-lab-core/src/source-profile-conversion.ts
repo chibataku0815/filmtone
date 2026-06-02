@@ -4,9 +4,9 @@
  * Catalog + math ported from `FilmtoneSourceProfileMath.swift` /
  * `FilmtoneSourceProfileCatalog.swift` so Filmtone Desktop's Log Conversion
  * lane (lut1) gets the same built-in input transforms iOS ships in v1.4:
- * Apple Log / Apple Log 2 / DJI D-Log / DJI D-Log M / Canon C-Log /
- * Canon Log 3 + Cinema Gamut / Panasonic V-Log / Sony S-Log3, plus
- * Rec.709 passthrough.
+ * Apple Log / Apple Log 2 / ARRI LogC3 / DJI D-Log / DJI D-Log M /
+ * Canon C-Log / Canon Log 3 + Cinema Gamut / Panasonic V-Log /
+ * Sony S-Log3, plus Rec.709 passthrough.
  *
  * Math constants are copied verbatim from the Swift SSOT. Drift between
  * Swift and TS is a hard product-quality bug — fixture parity tests in
@@ -23,6 +23,7 @@
 export type SourceProfileCurve =
   | "apple-log"
   | "apple-log-2"
+  | "arri-logc3"
   | "dji-dlog"
   | "dji-dlog-m"
   | "canon-clog"
@@ -39,6 +40,7 @@ export type SourceProfileId =
   | "built-in:source-profile.rec709"
   | "built-in:source-profile.apple-log"
   | "built-in:source-profile.apple-log-2"
+  | "built-in:source-profile.arri-logc3"
   | "built-in:source-profile.dji-dlog"
   | "built-in:source-profile.dji-dlog-m"
   | "built-in:source-profile.canon-clog"
@@ -77,6 +79,14 @@ export const SOURCE_PROFILE_CATALOG: readonly SourceProfileCatalogEntry[] = [
     displayName: "Apple Log 2",
     curve: "apple-log-2",
     impl: "native-policy",
+    builtIn: true,
+    immutable: true,
+  },
+  {
+    id: "built-in:source-profile.arri-logc3",
+    displayName: "ARRI LogC3",
+    curve: "arri-logc3",
+    impl: "synthesized",
     builtIn: true,
     immutable: true,
   },
@@ -197,6 +207,8 @@ function generateCubeForEntry(
       return makeAppleLogToRec709Cube(size, false);
     case "apple-log-2":
       return makeAppleLogToRec709Cube(size, true);
+    case "arri-logc3":
+      return makeArriLogC3ToRec709Cube(size);
     case "dji-dlog":
       return makeDlogToRec709Cube(size);
     case "dji-dlog-m":
@@ -290,6 +302,58 @@ function appleLogPixelToRec709(
     rec709Encode(filmtoneSdrShoulder(lr)),
     rec709Encode(filmtoneSdrShoulder(lg)),
     rec709Encode(filmtoneSdrShoulder(lb)),
+  ];
+}
+
+// ---------- ARRI LogC3 + ARRI Wide Gamut 3 ----------
+
+/**
+ * ARRI LogC3 EI 800 → linear exposure-value decoder. Constants are from
+ * ARRI's *ALEXA Log C Curve - Usage in VFX* exposure-value parameter table
+ * for EI 800. Filmtone uses the EI 800 recommendation for normalized source
+ * profiles when clip-specific EI metadata is unavailable.
+ */
+export function arriLogC3Decode(encoded: number): number {
+  const cut = 0.010591;
+  const a = 5.555556;
+  const b = 0.052272;
+  const c = 0.24719;
+  const d = 0.385537;
+  const e = 5.367655;
+  const f = 0.092809;
+  const threshold = e * cut + f;
+  if (encoded > threshold) {
+    return (Math.pow(10.0, (encoded - d) / c) - b) / a;
+  }
+  return (encoded - f) / e;
+}
+
+/** Linear ARRI Wide Gamut 3 → Rec.709 matrix from ARRI's LogC3 VFX guide. */
+function arriWideGamut3ToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  return [
+    1.617523 * red - 0.537287 * green - 0.080237 * blue,
+    -0.070573 * red + 1.334613 * green - 0.26404 * blue,
+    -0.021102 * red - 0.226954 * green + 1.248056 * blue,
+  ];
+}
+
+export function arriLogC3PixelToRec709(
+  red: number,
+  green: number,
+  blue: number,
+): [number, number, number] {
+  const lr = arriLogC3Decode(red);
+  const lg = arriLogC3Decode(green);
+  const lb = arriLogC3Decode(blue);
+  const m = arriWideGamut3ToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2])),
   ];
 }
 
@@ -626,6 +690,10 @@ export function makeAppleLogToRec709Cube(
   return buildCubeRgba(size, (r, g, b) =>
     appleLogPixelToRec709(r, g, b, rec2020GamutMap),
   );
+}
+
+export function makeArriLogC3ToRec709Cube(size: number = 33): Float32Array {
+  return buildCubeRgba(size, arriLogC3PixelToRec709);
 }
 
 export function makeDlogToRec709Cube(size: number = 33): Float32Array {

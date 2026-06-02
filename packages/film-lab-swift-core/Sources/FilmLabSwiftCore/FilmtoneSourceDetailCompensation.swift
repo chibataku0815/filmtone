@@ -32,6 +32,7 @@ public enum FilmtoneSourceDetailTransferClass: String, Equatable, Sendable {
 public enum FilmtoneSourceDetailProfileId: String, Equatable, Sendable {
     case iphoneSdrHevc   = "iphone-sdr-hevc"
     case appleLog        = "apple-log"
+    case arriLogC3       = "arri-logc3"
     case djiAction       = "dji-action"
     case goproAction     = "gopro-action"
     case sonySLog3       = "sony-slog3"
@@ -116,6 +117,10 @@ public enum FilmtoneSourceDetailCompensation {
     private static let appleLogSourceProfileIds: Set<String> = [
         "built-in:source-profile.apple-log",
         "built-in:source-profile.apple-log-2",
+    ]
+
+    private static let arriLogSourceProfileIds: Set<String> = [
+        "built-in:source-profile.arri-logc3",
     ]
 
     private static let djiSourceProfileIds: Set<String> = [
@@ -209,6 +214,16 @@ public enum FilmtoneSourceDetailCompensation {
                 transferClass: .logConsumer,
                 bias: 0.06,
                 reason: "apple-log-smaller-positive"
+            )
+        }
+
+        if arriLogSourceProfileIds.contains(profileId) || make == "arri" {
+            return makeProfile(
+                id: .arriLogC3,
+                confidence: profileId.isEmpty ? .medium : .high,
+                transferClass: .logCinema,
+                bias: 0.02,
+                reason: "arri-logc3-near-zero"
             )
         }
 

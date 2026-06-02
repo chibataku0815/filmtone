@@ -10,6 +10,7 @@
     "gen:fixtures:dlogm": "uv run --with numpy --with pillow --with scipy python Tests/Fixtures/source-profile/dji-dlog-m/encode-ramp.py",
     "gen:fixtures:clog": "uv run --with numpy --with pillow python Tests/Fixtures/source-profile/canon-clog/encode-ramp.py",
     "gen:fixtures:clog3": "uv run --with numpy --with pillow python Tests/Fixtures/source-profile/canon-log3-cinema-gamut/encode-ramp.py",
+    "gen:fixtures:arri-logc3": "uv run --with numpy --with pillow python Tests/Fixtures/source-profile/arri-logc3/encode-ramp.py",
     "gen:fixtures:vlog": "uv run --with colour-science --with numpy --with pillow python Tests/Fixtures/source-profile/panasonic-vlog/encode-ramp.py",
     "gen:fixtures:slog3": "uv run --with colour-science --with numpy --with pillow python Tests/Fixtures/source-profile/sony-slog3/encode-ramp.py",
     "release:bundle:install": "./scripts/bundle.sh install",

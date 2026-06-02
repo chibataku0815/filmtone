@@ -55,6 +55,20 @@ final class Phase0CodableTests: XCTestCase {
         // must round-trip with its default 0 like every other listed key.
         XCTAssertEqual(decoded.detailSoftness, original.detailSoftness)
         XCTAssertEqual(decoded.filmBreathAmount, original.filmBreathAmount)
+        XCTAssertEqual(decoded.dustAmount, original.dustAmount)
+        XCTAssertEqual(decoded.scratchAmount, original.scratchAmount)
+    }
+
+    func testParamsDecodeMissingFilmDamageFieldsAsNeutral() throws {
+        var payload = try JSONSerialization.jsonObject(with: encoder.encode(FilmtonePhase0Generated.resetParams)) as! [String: Any]
+        payload.removeValue(forKey: "dustAmount")
+        payload.removeValue(forKey: "scratchAmount")
+
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        let decoded = try decoder.decode(FilmtonePhase0Params.self, from: data)
+
+        XCTAssertEqual(decoded.dustAmount, 0.0)
+        XCTAssertEqual(decoded.scratchAmount, 0.0)
     }
 
     func testParamsValueAndSetByKey() {
@@ -98,6 +112,8 @@ final class Phase0CodableTests: XCTestCase {
             "fade": 0.3,
             "detailSoftness": 0.12,
             "filmBreathAmount": 0.28,
+            "dustAmount": 0.36,
+            "scratchAmount": 0.22,
             "madeUpKey": 9.9
         ])
 
@@ -108,8 +124,10 @@ final class Phase0CodableTests: XCTestCase {
         XCTAssertEqual(decoded.values["fade"], 0.3)
         XCTAssertEqual(decoded.values["detailSoftness"], 0.12)
         XCTAssertEqual(decoded.values["filmBreathAmount"], 0.28)
+        XCTAssertEqual(decoded.values["dustAmount"], 0.36)
+        XCTAssertEqual(decoded.values["scratchAmount"], 0.22)
         XCTAssertNil(decoded.values["madeUpKey"])
-        XCTAssertEqual(decoded.values.count, 4)
+        XCTAssertEqual(decoded.values.count, 6)
     }
 
     func testEmptyPatchRoundTrip() throws {

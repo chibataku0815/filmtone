@@ -45,9 +45,12 @@ final class ExportCoordinator {
         let panel = NSSavePanel()
         panel.allowedContentTypes = state.exportFormat == .jpeg ? [.jpeg, .png] : [.png, .jpeg]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent
-            + "-" + state.presetName
-            + "." + state.exportFormat.fileExtension
+        panel.nameFieldStringValue = FilmtoneExportFilename.defaultFilename(
+            sourceURL: sourceURL,
+            presetName: state.presetName,
+            lookSlug: state.lookSlug,
+            fileExtension: state.exportFormat.fileExtension
+        )
         panel.message = "Export the still + sidecar JSON"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
 
@@ -130,7 +133,12 @@ final class ExportCoordinator {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.mpeg4Movie]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = sourceURL.deletingPathExtension().lastPathComponent + "-" + state.presetName + ".mp4"
+        panel.nameFieldStringValue = FilmtoneExportFilename.defaultFilename(
+            sourceURL: sourceURL,
+            presetName: state.presetName,
+            lookSlug: state.lookSlug,
+            fileExtension: "mp4"
+        )
         panel.message = "Export the video + sidecar JSON"
         guard panel.runModal() == .OK, let outputURL = panel.url else { return }
 

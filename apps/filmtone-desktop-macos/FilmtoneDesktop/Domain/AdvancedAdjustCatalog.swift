@@ -223,6 +223,30 @@ enum AdvancedAdjustCatalog {
                 recipes: grainRecipes(strings: strings)
             ),
             .init(
+                id: "damage",
+                title: strings.groupDamage,
+                controls: [
+                    .init(key: "dustAmount",    label: strings.paramLabel(for: "dustAmount"),    range: 0...1, digits: 2),
+                    .init(key: "scratchAmount", label: strings.paramLabel(for: "scratchAmount"), range: 0...1, digits: 2),
+                ],
+                videoOnly: false,
+                recipes: standardAdvancedRecipes(
+                    strings: strings,
+                    defaultValues: { base in
+                        [
+                            "dustAmount": max(base.dustAmount, 0.20),
+                            "scratchAmount": max(base.scratchAmount, 0.16),
+                        ]
+                    },
+                    strongValues: { base in
+                        [
+                            "dustAmount": max(base.dustAmount, 0.52),
+                            "scratchAmount": max(base.scratchAmount, 0.56),
+                        ]
+                    }
+                )
+            ),
+            .init(
                 id: "motion",
                 title: strings.groupMotion,
                 controls: [
@@ -363,6 +387,8 @@ enum AdvancedAdjustCatalog {
              "fade",
              "vignette",
              "toeContrast",
+             "dustAmount",
+             "scratchAmount",
              "filmBreathAmount":
             return max(0, min(1, value))
         default:

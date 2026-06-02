@@ -348,8 +348,9 @@ struct SidecarRenderStageMetric: Encodable {
 ///   is `"built-in"` or when `.auto` resolved through the catalog at
 ///   export time.
 /// - `curve`: the `SourceProfileCurve` raw value (`"apple-log"` /
-///   `"apple-log-2"` / `"dji-dlog"` / `"dji-dlog-m"` / `"canon-clog"` /
-///   `"canon-log3-cinema-gamut"` / `"panasonic-vlog"` / `"sony-slog3"`),
+///   `"apple-log-2"` / `"arri-logc3"` / `"dji-dlog"` / `"dji-dlog-m"` /
+///   `"canon-clog"` / `"canon-log3-cinema-gamut"` / `"panasonic-vlog"` /
+///   `"sony-slog3"`),
 ///   nil for `nilProfile` / `userImport`.
 /// - `impl`: the `SourceProfileImpl` discriminator (`"native-policy"` /
 ///   `"synthesized"` / `"nil-profile"` / `"bundled-cube"`), nil only when

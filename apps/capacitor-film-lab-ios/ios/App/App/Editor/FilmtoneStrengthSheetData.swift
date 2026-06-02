@@ -22,6 +22,8 @@ extension FilmtoneStrengthSheet {
             return .glow
         case "grain":
             return .grain
+        case "damage":
+            return .grain
         case "motion":
             return .motion
         default:
@@ -58,6 +60,8 @@ extension FilmtoneStrengthSheet {
         case "diffusion":
             return .diffusion
         case "grainIntensity", "grainSize", "grainRadialMix":
+            return .grain
+        case "dustAmount", "scratchAmount":
             return .grain
         case "shutterAngle", "trailIntensity", "filmBreathAmount":
             return .motion
@@ -178,6 +182,28 @@ extension FilmtoneStrengthSheet {
                     control("grainIntensity", range: 0...FilmtonePhase0Generated.grainIntensityMax),
                     control("grainSize", range: 0...1),
                     control("grainRadialMix", range: 0...1),
+                ]
+            ),
+            .init(
+                id: "damage",
+                title: store.strings.advancedDamageLabel,
+                recipes: standardAdvancedRecipes(
+                    defaultValues: { base in
+                        [
+                            "dustAmount": max(base.dustAmount, 0.20),
+                            "scratchAmount": max(base.scratchAmount, 0.16),
+                        ]
+                    },
+                    strongValues: { base in
+                        [
+                            "dustAmount": max(base.dustAmount, 0.52),
+                            "scratchAmount": max(base.scratchAmount, 0.56),
+                        ]
+                    }
+                ),
+                controls: [
+                    control("dustAmount", range: 0...1),
+                    control("scratchAmount", range: 0...1),
                 ]
             ),
         ]

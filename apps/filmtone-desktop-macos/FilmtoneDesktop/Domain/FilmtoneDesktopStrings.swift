@@ -27,6 +27,7 @@ struct FilmtoneDesktopStrings: Sendable {
     let groupOptics: String
     let groupGlow: String
     let groupGrain: String
+    let groupDamage: String
     let groupMotion: String
     let presetNone: String
     let presetDefault: String
@@ -66,6 +67,7 @@ struct FilmtoneDesktopStrings: Sendable {
         groupOptics: "Optics",
         groupGlow: "Glow",
         groupGrain: "Grain",
+        groupDamage: "Film Damage",
         groupMotion: "Motion",
         presetNone: "None",
         presetDefault: "Default",
@@ -107,6 +109,7 @@ struct FilmtoneDesktopStrings: Sendable {
         groupOptics: "Optics",
         groupGlow: "Glow",
         groupGrain: "Grain",
+        groupDamage: "フィルムダメージ",
         groupMotion: "Motion",
         presetNone: "なし",
         presetDefault: "標準",
@@ -165,6 +168,8 @@ private let englishParamLabels: [String: String] = [
     "grainIntensity": "Grain Strength",
     "grainSize": "Grain Size",
     "grainRadialMix": "Grain edge emphasis",
+    "dustAmount": "Dust",
+    "scratchAmount": "Scratches",
     "compressionAmount": "Highlight softness",
     "compressionRange": "Tone span",
     "printContrast": "Print Contrast",
@@ -203,6 +208,8 @@ private let japaneseParamLabels: [String: String] = [
     "grainIntensity": "Grain Strength",
     "grainSize": "Grain Size",
     "grainRadialMix": "Grain edge emphasis",
+    "dustAmount": "Dust",
+    "scratchAmount": "Scratches",
     "compressionAmount": "Highlight softness",
     "compressionRange": "Tone span",
     "printContrast": "Print Contrast",

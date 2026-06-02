@@ -25,9 +25,9 @@ enum FilmtoneSourceProfileMath {
 
     /// Filmtone identity SDR shoulder. Applied to linearized + gamut-mapped
     /// scene-referred RGB on its way out to Rec.709 SDR. Identical math
-    /// across every Camera Profile (Apple Log, Apple Log 2, D-Log, C-Log,
-    /// V-Log, S-Log3, Rec.709 passthrough) so cross-source exports share
-    /// one display look.
+    /// across every Camera Profile (Apple Log, Apple Log 2, ARRI LogC3,
+    /// D-Log, C-Log, V-Log, S-Log3, Rec.709 passthrough) so cross-source
+    /// exports share one display look.
     ///
     /// Anchors `0.18` linear ≈ middle gray and rolls highlights via a
     /// soft-knee Reinhard-style curve. Output is clamped to [0, 1].
@@ -143,6 +143,91 @@ enum FilmtoneSourceProfileMath {
                 for r in 0..<size {
                     let redIn = Double(r) / denom
                     let converted = dlogPixelToRec709(
+                        red: redIn,
+                        green: greenIn,
+                        blue: blueIn
+                    )
+                    cube[index]     = Float(converted.red)
+                    cube[index + 1] = Float(converted.green)
+                    cube[index + 2] = Float(converted.blue)
+                    index += 3
+                }
+            }
+        }
+        return cube
+    }
+
+    // MARK: - ARRI LogC3 + ARRI Wide Gamut 3
+
+    /// ARRI LogC3 EI 800 → linear exposure-value decoder. Constants are
+    /// from ARRI's "ALEXA Log C Curve - Usage in VFX" exposure-value table.
+    /// Filmtone uses EI 800 as ARRI's recommended normalized transform when
+    /// clip-specific EI metadata is unavailable.
+    @inline(__always)
+    static func arriLogC3Decode(_ encoded: Double) -> Double {
+        let cut = 0.010591
+        let a = 5.555556
+        let b = 0.052272
+        let c = 0.247190
+        let d = 0.385537
+        let e = 5.367655
+        let f = 0.092809
+        let threshold = e * cut + f
+        if encoded > threshold {
+            return (pow(10.0, (encoded - d) / c) - b) / a
+        }
+        return (encoded - f) / e
+    }
+
+    /// Linear ARRI Wide Gamut 3 → Rec.709 matrix from ARRI's LogC3 VFX guide.
+    @inline(__always)
+    static func arriWideGamut3ToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.617523 * red - 0.537287 * green - 0.080237 * blue,
+            green: -0.070573 * red + 1.334613 * green - 0.264040 * blue,
+            blue:  -0.021102 * red - 0.226954 * green + 1.248056 * blue
+        )
+    }
+
+    /// End-to-end ARRI LogC3 / AWG3 → Rec.709 SDR pixel pipeline.
+    @inline(__always)
+    static func arriLogC3PixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = arriLogC3Decode(red)
+        let linearGreen = arriLogC3Decode(green)
+        let linearBlue = arriLogC3Decode(blue)
+        let mapped = arriWideGamut3ToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    /// Build a 33³ ARRI LogC3 → Rec.709 cube for `CIColorCubeWithColorSpace`.
+    static func makeArriLogC3ToRec709Cube(size: Int = 33) -> [Float] {
+        precondition(size >= 2, "cube size must be ≥ 2")
+        let denom = Double(size - 1)
+        var cube = [Float](repeating: 0, count: size * size * size * 3)
+        var index = 0
+        for b in 0..<size {
+            let blueIn = Double(b) / denom
+            for g in 0..<size {
+                let greenIn = Double(g) / denom
+                for r in 0..<size {
+                    let redIn = Double(r) / denom
+                    let converted = arriLogC3PixelToRec709(
                         red: redIn,
                         green: greenIn,
                         blue: blueIn

@@ -2,6 +2,7 @@ import Foundation
 
 registerCoreQuickSidecarStateTests()
 registerCoreCatalogStoreStringTests()
+registerExportFilenameTests()
 registerCoreOpticalFilterTests()
 registerImportedGradeRuntimeTests()
 registerDBM13GradeResolutionTests()

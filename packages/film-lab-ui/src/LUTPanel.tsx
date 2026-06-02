@@ -47,6 +47,7 @@ interface LUTPanelProps {
 const SOURCE_PROFILE_CHIP_ORDER = [
   "built-in:source-profile.apple-log",
   "built-in:source-profile.apple-log-2",
+  "built-in:source-profile.arri-logc3",
   "built-in:source-profile.dji-dlog",
   "built-in:source-profile.dji-dlog-m",
   "built-in:source-profile.canon-clog",
@@ -399,7 +400,7 @@ export function LUTPanel({ viewport, onCubeLutLoaded, onLutChange }: LUTPanelPro
               {tFilmLab("lutPanel.cameraProfileHelp")}
             </p>
 
-            {/* Built-in Camera Profile chip selector. None / Rec.709 + 6 curves. */}
+            {/* Built-in Camera Profile chip selector. None / Rec.709 + manual curves. */}
             <div className="mb-4 flex flex-wrap gap-1.5">
               <button
                 type="button"

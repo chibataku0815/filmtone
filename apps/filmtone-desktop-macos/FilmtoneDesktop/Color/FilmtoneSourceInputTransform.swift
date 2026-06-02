@@ -121,6 +121,8 @@ enum FilmtoneSourceInputTransform {
             return FilmtoneSourceProfileMath.makeAppleLogToRec709Cube(size: size, rec2020GamutMap: true)
         case .appleLog2:
             return FilmtoneSourceProfileMath.makeAppleLogToRec709Cube(size: size, rec2020GamutMap: true)
+        case .arriLogC3:
+            return FilmtoneSourceProfileMath.makeArriLogC3ToRec709Cube(size: size)
         case .djiDLog:
             return FilmtoneSourceProfileMath.makeDlogToRec709Cube(size: size)
         case .djiDLogM:

@@ -266,7 +266,7 @@ declare const PHASE0_RGB_SHIFT_MAX = 0.005;
 declare const PHASE0_SCHEMA_VERSION: 2;
 declare const PHASE0_PRESET_DEFAULT = "reset";
 declare const PHASE0_PRESET_STRENGTH_DEFAULT = 1;
-declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "filmBreathAmount", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "filmBreathAmount", "dustAmount", "scratchAmount", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type Phase0ParamKey = (typeof PHASE0_PARAM_KEYS)[number];
 type Phase0Params = Pick<Params, Phase0ParamKey>;
 declare const PHASE0_MAX_SOURCE_DURATION_SEC: number;
@@ -316,6 +316,8 @@ declare const phase0ParamsSchema: z.ZodObject<{
     shutterAngle: z.ZodDefault<z.ZodNumber>;
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     filmBreathAmount: z.ZodDefault<z.ZodNumber>;
+    dustAmount: z.ZodDefault<z.ZodNumber>;
+    scratchAmount: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
     shadowLatitude: z.ZodDefault<z.ZodNumber>;
@@ -381,6 +383,8 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         shutterAngle: z.ZodOptional<z.ZodNumber>;
         trailIntensity: z.ZodOptional<z.ZodNumber>;
         filmBreathAmount: z.ZodOptional<z.ZodNumber>;
+        dustAmount: z.ZodOptional<z.ZodNumber>;
+        scratchAmount: z.ZodOptional<z.ZodNumber>;
         fade: z.ZodOptional<z.ZodNumber>;
         shadowTone: z.ZodOptional<z.ZodNumber>;
         shadowLatitude: z.ZodOptional<z.ZodNumber>;
@@ -492,6 +496,8 @@ declare const phase0ProjectSchema: z.ZodPipe<z.ZodObject<{
         shutterAngle?: number | undefined;
         trailIntensity?: number | undefined;
         filmBreathAmount?: number | undefined;
+        dustAmount?: number | undefined;
+        scratchAmount?: number | undefined;
         fade?: number | undefined;
         shadowTone?: number | undefined;
         shadowLatitude?: number | undefined;
@@ -1722,7 +1728,7 @@ declare const FILMTONE_IOS_PRESET_NAMES: readonly ["reset", "iphone", "softBlue"
 type FilmtoneIosPresetName = (typeof FILMTONE_IOS_PRESET_NAMES)[number];
 
 declare const IOS_PHASE0_SCHEMA_VERSION: 2;
-declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "filmBreathAmount", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
+declare const IOS_PHASE0_PARAM_KEYS: readonly ["exposure", "contrast", "saturation", "temperature", "tint", "rgbShift", "lensSoftness", "detailSoftness", "grainRadialMix", "grainSize", "bloomThreshold", "bloomStrength", "bloomRadius", "diffusion", "halationIntensity", "halationSpread", "halationHue", "halationThreshold", "halationRadius", "bloomSoftKnee", "halationSoftKnee", "compressionAmount", "compressionRange", "printContrast", "cyan", "magenta", "yellow", "shutterAngle", "trailIntensity", "filmBreathAmount", "dustAmount", "scratchAmount", "fade", "shadowTone", "shadowLatitude", "blackPoint", "toeContrast", "highlightTone", "shadowHue", "highlightHue", "vignette", "grainIntensity"];
 type IosPhase0ParamKey = Phase0ParamKey;
 type IosPhase0Params = Phase0Params;
 declare const iosPhase0ParamsSchema: z.ZodObject<{
@@ -1756,6 +1762,8 @@ declare const iosPhase0ParamsSchema: z.ZodObject<{
     shutterAngle: z.ZodDefault<z.ZodNumber>;
     trailIntensity: z.ZodDefault<z.ZodNumber>;
     filmBreathAmount: z.ZodDefault<z.ZodNumber>;
+    dustAmount: z.ZodDefault<z.ZodNumber>;
+    scratchAmount: z.ZodDefault<z.ZodNumber>;
     fade: z.ZodDefault<z.ZodNumber>;
     shadowTone: z.ZodDefault<z.ZodNumber>;
     shadowLatitude: z.ZodDefault<z.ZodNumber>;
@@ -1920,6 +1928,8 @@ declare const iosPhase0ExportPayloadSchema: z.ZodObject<{
         shutterAngle: z.ZodDefault<z.ZodNumber>;
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         filmBreathAmount: z.ZodDefault<z.ZodNumber>;
+        dustAmount: z.ZodDefault<z.ZodNumber>;
+        scratchAmount: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
         shadowLatitude: z.ZodDefault<z.ZodNumber>;
@@ -2157,6 +2167,8 @@ declare const iosPhase0LocalProjectSchema: z.ZodObject<{
         shutterAngle: z.ZodDefault<z.ZodNumber>;
         trailIntensity: z.ZodDefault<z.ZodNumber>;
         filmBreathAmount: z.ZodDefault<z.ZodNumber>;
+        dustAmount: z.ZodDefault<z.ZodNumber>;
+        scratchAmount: z.ZodDefault<z.ZodNumber>;
         fade: z.ZodDefault<z.ZodNumber>;
         shadowTone: z.ZodDefault<z.ZodNumber>;
         shadowLatitude: z.ZodDefault<z.ZodNumber>;
@@ -2681,9 +2693,9 @@ declare function findCreativePack01Look(slug: string): CreativePackLook | undefi
  * Catalog + math ported from `FilmtoneSourceProfileMath.swift` /
  * `FilmtoneSourceProfileCatalog.swift` so Filmtone Desktop's Log Conversion
  * lane (lut1) gets the same built-in input transforms iOS ships in v1.4:
- * Apple Log / Apple Log 2 / DJI D-Log / DJI D-Log M / Canon C-Log /
- * Canon Log 3 + Cinema Gamut / Panasonic V-Log / Sony S-Log3, plus
- * Rec.709 passthrough.
+ * Apple Log / Apple Log 2 / ARRI LogC3 / DJI D-Log / DJI D-Log M /
+ * Canon C-Log / Canon Log 3 + Cinema Gamut / Panasonic V-Log /
+ * Sony S-Log3, plus Rec.709 passthrough.
  *
  * Math constants are copied verbatim from the Swift SSOT. Drift between
  * Swift and TS is a hard product-quality bug — fixture parity tests in
@@ -2696,9 +2708,9 @@ declare function findCreativePack01Look(slug: string): CreativePackLook | undefi
  * fastest), so `viewport.setLUT1` / WebGPU `Lut3DTexture.upload` accept
  * built-in and custom `.cube` data interchangeably.
  */
-type SourceProfileCurve = "apple-log" | "apple-log-2" | "dji-dlog" | "dji-dlog-m" | "canon-clog" | "canon-log3-cinema-gamut" | "panasonic-vlog" | "sony-slog3";
+type SourceProfileCurve = "apple-log" | "apple-log-2" | "arri-logc3" | "dji-dlog" | "dji-dlog-m" | "canon-clog" | "canon-log3-cinema-gamut" | "panasonic-vlog" | "sony-slog3";
 type SourceProfileImplKind = "nil-profile" | "native-policy" | "synthesized";
-type SourceProfileId = "built-in:source-profile.rec709" | "built-in:source-profile.apple-log" | "built-in:source-profile.apple-log-2" | "built-in:source-profile.dji-dlog" | "built-in:source-profile.dji-dlog-m" | "built-in:source-profile.canon-clog" | "built-in:source-profile.canon-log3-cinema-gamut" | "built-in:source-profile.panasonic-vlog" | "built-in:source-profile.sony-slog3";
+type SourceProfileId = "built-in:source-profile.rec709" | "built-in:source-profile.apple-log" | "built-in:source-profile.apple-log-2" | "built-in:source-profile.arri-logc3" | "built-in:source-profile.dji-dlog" | "built-in:source-profile.dji-dlog-m" | "built-in:source-profile.canon-clog" | "built-in:source-profile.canon-log3-cinema-gamut" | "built-in:source-profile.panasonic-vlog" | "built-in:source-profile.sony-slog3";
 interface SourceProfileCatalogEntry {
     readonly id: SourceProfileId;
     readonly displayName: string;
@@ -2802,7 +2814,7 @@ interface SourceDetailProfile {
      * Stable diagnostic id for the resolved source class. Safe to log /
      * surface in developer sidecar; not a user-facing label.
      */
-    readonly id: "iphone-sdr-hevc" | "apple-log" | "dji-action" | "gopro-action" | "sony-slog3" | "canon-clog" | "panasonic-vlog" | "rec709-unknown" | "log-unknown" | "metadata-missing";
+    readonly id: "iphone-sdr-hevc" | "apple-log" | "arri-logc3" | "dji-action" | "gopro-action" | "sony-slog3" | "canon-clog" | "panasonic-vlog" | "rec709-unknown" | "log-unknown" | "metadata-missing";
     readonly confidence: SourceDetailConfidence;
     readonly transferClass: SourceDetailTransferClass;
     /**

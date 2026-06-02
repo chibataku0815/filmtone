@@ -1013,6 +1013,8 @@ final class FilmtoneExportSession {
         profileRenderSubstage(.creativeLut, image: current, outputSize: stageProfilingOutputSize)
         current = gradeRenderPipeline.applyPrintStage(to: current, params: params)
         profileRenderSubstage(.printStage, image: current, outputSize: stageProfilingOutputSize)
+        current = applyFilmDamageStage(to: current, params: params, timeSeconds: timeSeconds)
+        profileRenderSubstage(.filmDamage, image: current, outputSize: stageProfilingOutputSize)
 
         return current.cropped(to: image.extent)
     }
@@ -1110,6 +1112,31 @@ final class FilmtoneExportSession {
         ]) ?? image
     }
 
+    private func applyFilmDamageStage(
+        to image: CIImage,
+        params: Phase0ParamsDTO,
+        timeSeconds: Double
+    ) -> CIImage {
+        let dustAmount = max(0, min(1, params.dustAmount))
+        let scratchAmount = max(0, min(1, params.scratchAmount))
+        guard dustAmount > 0.0001 || scratchAmount > 0.0001 else {
+            return image
+        }
+        guard let kernel = OpticalKernels.filmDamage else {
+            return image
+        }
+        let normalizedTime = timeSeconds.isFinite ? max(timeSeconds, 0) : 0
+        return kernel.apply(extent: image.extent, arguments: [
+            image,
+            dustAmount,
+            scratchAmount,
+            normalizedTime,
+            sourceSeed,
+            OpticsResampling.extentOriginVector(for: image.extent),
+            OpticsResampling.extentSizeVector(for: image.extent),
+        ]) ?? image
+    }
+
     private func paramsApplyingFilmBreath(
         to params: Phase0ParamsDTO,
         timeSeconds: Double
@@ -1153,6 +1180,8 @@ final class FilmtoneExportSession {
             shutterAngle: params.shutterAngle,
             trailIntensity: params.trailIntensity,
             filmBreathAmount: params.filmBreathAmount,
+            dustAmount: params.dustAmount,
+            scratchAmount: params.scratchAmount,
             fade: params.fade,
             shadowTone: params.shadowTone,
             shadowLatitude: params.shadowLatitude,

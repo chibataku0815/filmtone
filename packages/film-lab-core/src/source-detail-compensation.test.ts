@@ -68,6 +68,18 @@ describe("resolveSourceDetailCompensation — tuning table", () => {
     expect(profile.recommendedBias).toBe(0.06);
   });
 
+  test("ARRI LogC3 via source-profile id produces log-cinema near-zero bias", () => {
+    const profile = resolveSourceDetailCompensation({
+      cameraMake: "Panasonic",
+      cameraModel: "LUMIX S1II",
+      sourceProfileId: "built-in:source-profile.arri-logc3",
+    });
+    expect(profile.id).toBe("arri-logc3");
+    expect(profile.transferClass).toBe("log-cinema");
+    expect(profile.confidence).toBe("high");
+    expect(profile.recommendedBias).toBe(0.02);
+  });
+
   test("DJI metadata produces positive bias", () => {
     const profile = resolveSourceDetailCompensation({
       cameraMake: "DJI",
@@ -177,6 +189,7 @@ describe("resolveSourceDetailCompensation — invariants", () => {
   test("recommendedBias is always within [0, DETAIL_SOFTNESS_EFFECTIVE_MAX]", () => {
     const cases = [
       { cameraMake: "Apple", codecFamily: "hevc" as const },
+      { sourceProfileId: "built-in:source-profile.arri-logc3" },
       { cameraMake: "DJI" },
       { cameraMake: "GoPro" },
       { cameraMake: "Sony" },

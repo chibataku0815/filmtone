@@ -2,8 +2,8 @@ import SwiftUI
 
 // M5-C.1: right-rail Source Profile Picker. Sits above the Look panel so the
 // user picks the source-side normalization (Auto / Apple Log / Apple Log 2 /
-// DJI D-Log / D-Log M / Canon C-Log / Canon Log 3 + Cinema Gamut / V-Log /
-// S-Log3 / Rec.709) before the Look layer.
+// ARRI LogC3 / DJI D-Log / D-Log M / Canon C-Log / Canon Log 3 + Cinema
+// Gamut / V-Log / S-Log3 / Rec.709) before the Look layer.
 //
 // Visual posture matches the right-rail controls (Pass 4 readability fix):
 // white labels on dark-tinted .clear Liquid Glass, with `.colorScheme(.dark)` on the

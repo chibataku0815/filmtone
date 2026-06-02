@@ -7,7 +7,7 @@ import Foundation
 // Adds two Apple Log cube builders that on iOS live in
 // `FilmtoneExportSession.makeAppleLogToRec709Lut` (Desktop has no equivalent
 // host class, so the cube builder lives here next to the decoder for
-// symmetry with V-Log / S-Log3 / D-Log / C-Log).
+// symmetry with synthesized manufacturer-log curves.
 enum FilmtoneSourceProfileMath {
 
     // MARK: - Filmtone shared SDR display mapping
@@ -105,6 +105,67 @@ enum FilmtoneSourceProfileMath {
             }
         }
         return cube
+    }
+
+    // MARK: - ARRI LogC3 + ARRI Wide Gamut 3
+
+    /// ARRI LogC3 EI 800 → linear exposure-value decoder. Constants are
+    /// from ARRI's "ALEXA Log C Curve - Usage in VFX" exposure-value table.
+    @inline(__always)
+    static func arriLogC3Decode(_ encoded: Double) -> Double {
+        let cut = 0.010591
+        let a = 5.555556
+        let b = 0.052272
+        let c = 0.247190
+        let d = 0.385537
+        let e = 5.367655
+        let f = 0.092809
+        let threshold = e * cut + f
+        if encoded > threshold {
+            return (pow(10.0, (encoded - d) / c) - b) / a
+        }
+        return (encoded - f) / e
+    }
+
+    /// Linear ARRI Wide Gamut 3 → Rec.709 matrix from ARRI's LogC3 VFX guide.
+    @inline(__always)
+    static func arriWideGamut3ToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        (
+            red:    1.617523 * red - 0.537287 * green - 0.080237 * blue,
+            green: -0.070573 * red + 1.334613 * green - 0.264040 * blue,
+            blue:  -0.021102 * red - 0.226954 * green + 1.248056 * blue
+        )
+    }
+
+    @inline(__always)
+    static func arriLogC3PixelToRec709(
+        red: Double,
+        green: Double,
+        blue: Double
+    ) -> (red: Double, green: Double, blue: Double) {
+        let linearRed = arriLogC3Decode(red)
+        let linearGreen = arriLogC3Decode(green)
+        let linearBlue = arriLogC3Decode(blue)
+        let mapped = arriWideGamut3ToRec709(
+            red: linearRed,
+            green: linearGreen,
+            blue: linearBlue
+        )
+        return (
+            rec709Encode(filmtoneSdrShoulder(mapped.red)),
+            rec709Encode(filmtoneSdrShoulder(mapped.green)),
+            rec709Encode(filmtoneSdrShoulder(mapped.blue))
+        )
+    }
+
+    static func makeArriLogC3ToRec709Cube(size: Int = 33) -> [Float] {
+        return makeRGBCube(size: size) { r, g, b in
+            arriLogC3PixelToRec709(red: r, green: g, blue: b)
+        }
     }
 
     // MARK: - DJI D-Log

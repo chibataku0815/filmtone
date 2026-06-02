@@ -1461,6 +1461,8 @@ var PHASE0_PARAM_KEYS = [
   "shutterAngle",
   "trailIntensity",
   "filmBreathAmount",
+  "dustAmount",
+  "scratchAmount",
   "fade",
   "shadowTone",
   "shadowLatitude",
@@ -1520,6 +1522,8 @@ var phase0ParamsSchema = z3.object({
   shutterAngle: z3.number().min(0).max(720).default(PRESETS.reset.shutterAngle),
   trailIntensity: z3.number().min(0).max(0.95).default(PRESETS.reset.trailIntensity),
   filmBreathAmount: z3.number().min(0).max(1).default(PRESETS.reset.filmBreathAmount),
+  dustAmount: z3.number().min(0).max(1).default(PRESETS.reset.dustAmount),
+  scratchAmount: z3.number().min(0).max(1).default(PRESETS.reset.scratchAmount),
   fade: z3.number().min(0).max(1).default(PRESETS.reset.fade),
   shadowTone: z3.number().min(0).max(1).default(PRESETS.reset.shadowTone),
   shadowLatitude: z3.number().min(0).max(1).default(PRESETS.reset.shadowLatitude),
@@ -1562,6 +1566,8 @@ var phase0ParamsPatchSchema = z3.object({
   shutterAngle: z3.number().min(0).max(720).optional(),
   trailIntensity: z3.number().min(0).max(0.95).optional(),
   filmBreathAmount: z3.number().min(0).max(1).optional(),
+  dustAmount: z3.number().min(0).max(1).optional(),
+  scratchAmount: z3.number().min(0).max(1).optional(),
   fade: z3.number().min(0).max(1).optional(),
   shadowTone: z3.number().min(0).max(1).optional(),
   shadowLatitude: z3.number().min(0).max(1).optional(),
@@ -3918,6 +3924,14 @@ var SOURCE_PROFILE_CATALOG = [
     immutable: true
   },
   {
+    id: "built-in:source-profile.arri-logc3",
+    displayName: "ARRI LogC3",
+    curve: "arri-logc3",
+    impl: "synthesized",
+    builtIn: true,
+    immutable: true
+  },
+  {
     id: "built-in:source-profile.dji-dlog",
     displayName: "DJI D-Log",
     curve: "dji-dlog",
@@ -4005,6 +4019,8 @@ function generateCubeForEntry(entry, size) {
       return makeAppleLogToRec709Cube(size, false);
     case "apple-log-2":
       return makeAppleLogToRec709Cube(size, true);
+    case "arri-logc3":
+      return makeArriLogC3ToRec709Cube(size);
     case "dji-dlog":
       return makeDlogToRec709Cube(size);
     case "dji-dlog-m":
@@ -4070,6 +4086,38 @@ function appleLogPixelToRec709(red, green, blue, rec2020GamutMap) {
     rec709Encode(filmtoneSdrShoulder(lr)),
     rec709Encode(filmtoneSdrShoulder(lg)),
     rec709Encode(filmtoneSdrShoulder(lb))
+  ];
+}
+function arriLogC3Decode(encoded) {
+  const cut = 0.010591;
+  const a = 5.555556;
+  const b = 0.052272;
+  const c = 0.24719;
+  const d = 0.385537;
+  const e = 5.367655;
+  const f = 0.092809;
+  const threshold = e * cut + f;
+  if (encoded > threshold) {
+    return (Math.pow(10, (encoded - d) / c) - b) / a;
+  }
+  return (encoded - f) / e;
+}
+function arriWideGamut3ToRec709(red, green, blue) {
+  return [
+    1.617523 * red - 0.537287 * green - 0.080237 * blue,
+    -0.070573 * red + 1.334613 * green - 0.26404 * blue,
+    -0.021102 * red - 0.226954 * green + 1.248056 * blue
+  ];
+}
+function arriLogC3PixelToRec709(red, green, blue) {
+  const lr = arriLogC3Decode(red);
+  const lg = arriLogC3Decode(green);
+  const lb = arriLogC3Decode(blue);
+  const m = arriWideGamut3ToRec709(lr, lg, lb);
+  return [
+    rec709Encode(filmtoneSdrShoulder(m[0])),
+    rec709Encode(filmtoneSdrShoulder(m[1])),
+    rec709Encode(filmtoneSdrShoulder(m[2]))
   ];
 }
 function dlogDecode(encoded) {
@@ -4273,6 +4321,9 @@ function makeAppleLogToRec709Cube(size = 33, rec2020GamutMap = false) {
     (r, g, b) => appleLogPixelToRec709(r, g, b, rec2020GamutMap)
   );
 }
+function makeArriLogC3ToRec709Cube(size = 33) {
+  return buildCubeRgba(size, arriLogC3PixelToRec709);
+}
 function makeDlogToRec709Cube(size = 33) {
   return buildCubeRgba(size, dlogPixelToRec709);
 }
@@ -4376,6 +4427,9 @@ var APPLE_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
   "built-in:source-profile.apple-log",
   "built-in:source-profile.apple-log-2"
 ]);
+var ARRI_LOG_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
+  "built-in:source-profile.arri-logc3"
+]);
 var DJI_SOURCE_PROFILE_IDS = /* @__PURE__ */ new Set([
   "built-in:source-profile.dji-dlog",
   "built-in:source-profile.dji-dlog-m"
@@ -4435,6 +4489,15 @@ function resolveSourceDetailCompensation(input = {}) {
       "log-consumer",
       0.06,
       "apple-log-smaller-positive"
+    );
+  }
+  if (ARRI_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "arri") {
+    return makeProfile(
+      "arri-logc3",
+      profileId ? "high" : "medium",
+      "log-cinema",
+      0.02,
+      "arri-logc3-near-zero"
     );
   }
   if (SONY_LOG_SOURCE_PROFILE_IDS.has(profileId) || make === "sony") {

@@ -39,6 +39,8 @@ extension FilmtonePhase0Params {
             shutterAngle: shutterAngle,
             trailIntensity: trailIntensity,
             filmBreathAmount: filmBreathAmount,
+            dustAmount: dustAmount,
+            scratchAmount: scratchAmount,
             fade: fade,
             shadowTone: shadowTone,
             shadowLatitude: shadowLatitude,
@@ -529,7 +531,7 @@ enum FilmtonePhase0Math {
             return clamped < 90 ? 0 : max(180, clamped)
         case "trailIntensity":
             return max(0, min(0.95, value))
-        case "filmBreathAmount":
+        case "filmBreathAmount", "dustAmount", "scratchAmount":
             return max(0, min(1, value))
         case "rgbShift":
             return max(0, min(rgbShiftMax, value))

@@ -950,6 +950,7 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	    float seed = sourceSeed * 19.0;
 	    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
 	    float sourceLuma = luma;
+	    vec3 sourceRgb = color.rgb;
 	    float edge = damageEdge(pixelCoord, extentSize);
 	    float driver = max(dust, scratch);
 	    float profileT = smoothstep(0.18, 1.0, driver);
@@ -1095,9 +1096,12 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	        float brightDamageBlend = clamp(max(sparkleBlend, scratchBlend * lightScratch), 0.0, 1.0);
 	        float whiteSoil = brightDamageBlend * mix(0.008, 0.028, driver) * edgeRagged * (1.0 - smoothstep(0.92, 1.0, sourceLuma));
 	        color.rgb -= vec3(whiteSoil);
-	        float sourceToneReturn = materialFeather * mix(0.030, 0.080, profileT) * smoothstep(0.12, 0.72, sourceLuma);
 	        float postDamageLuma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
-	        color.rgb = mix(color.rgb, vec3(mix(postDamageLuma, sourceLuma, 0.28)), sourceToneReturn);
+	        float sourceToneReturn = materialFeather * mix(0.036, 0.112, profileT) * smoothstep(0.10, 0.76, sourceLuma);
+	        float lumaRatio = clamp(postDamageLuma / max(sourceLuma, 0.08), 0.0, 1.28);
+	        vec3 sourceNeutralTexture = vec3(sourceLuma) + (sourceRgb - vec3(sourceLuma)) * mix(0.020, 0.055, globalChroma);
+	        vec3 embeddedTone = clamp(sourceNeutralTexture * lumaRatio, 0.0, 1.0);
+	        color.rgb = mix(color.rgb, embeddedTone, sourceToneReturn);
 	        float neutralLock = materialFeather * mix(0.035, 0.095, driver);
 	        color.rgb = mix(color.rgb, vec3(dot(color.rgb, vec3(0.2126, 0.7152, 0.0722))), neutralLock);
 	    }

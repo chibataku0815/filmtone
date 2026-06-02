@@ -31,6 +31,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
     public var shutterAngle: Double
     public var trailIntensity: Double
     public var filmBreathAmount: Double
+    public var dustAmount: Double
+    public var scratchAmount: Double
     public var fade: Double
     public var shadowTone: Double
     public var shadowLatitude: Double
@@ -73,6 +75,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         shutterAngle: Double,
         trailIntensity: Double,
         filmBreathAmount: Double,
+        dustAmount: Double = 0,
+        scratchAmount: Double = 0,
         fade: Double,
         shadowTone: Double,
         shadowLatitude: Double,
@@ -114,6 +118,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         self.shutterAngle = shutterAngle
         self.trailIntensity = trailIntensity
         self.filmBreathAmount = filmBreathAmount
+        self.dustAmount = dustAmount
+        self.scratchAmount = scratchAmount
         self.fade = fade
         self.shadowTone = shadowTone
         self.shadowLatitude = shadowLatitude
@@ -124,6 +130,61 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         self.highlightHue = highlightHue
         self.vignette = vignette
         self.grainIntensity = grainIntensity
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: ParamCodingKey.self)
+
+        func decode(_ key: String) throws -> Double {
+            try c.decode(Double.self, forKey: ParamCodingKey(key))
+        }
+
+        func decodeDefaultingZero(_ key: String) throws -> Double {
+            try c.decodeIfPresent(Double.self, forKey: ParamCodingKey(key)) ?? 0
+        }
+
+        self.exposure = try decode("exposure")
+        self.contrast = try decode("contrast")
+        self.saturation = try decode("saturation")
+        self.temperature = try decode("temperature")
+        self.tint = try decode("tint")
+        self.rgbShift = try decode("rgbShift")
+        self.lensSoftness = try decode("lensSoftness")
+        self.detailSoftness = try decodeDefaultingZero("detailSoftness")
+        self.grainRadialMix = try decode("grainRadialMix")
+        self.grainSize = try decode("grainSize")
+        self.bloomThreshold = try decode("bloomThreshold")
+        self.bloomStrength = try decode("bloomStrength")
+        self.bloomRadius = try decode("bloomRadius")
+        self.diffusion = try decode("diffusion")
+        self.halationIntensity = try decode("halationIntensity")
+        self.halationSpread = try decode("halationSpread")
+        self.halationHue = try decode("halationHue")
+        self.halationThreshold = try decode("halationThreshold")
+        self.halationRadius = try decode("halationRadius")
+        self.bloomSoftKnee = try decode("bloomSoftKnee")
+        self.halationSoftKnee = try decode("halationSoftKnee")
+        self.compressionAmount = try decode("compressionAmount")
+        self.compressionRange = try decode("compressionRange")
+        self.printContrast = try decode("printContrast")
+        self.cyan = try decode("cyan")
+        self.magenta = try decode("magenta")
+        self.yellow = try decode("yellow")
+        self.shutterAngle = try decode("shutterAngle")
+        self.trailIntensity = try decode("trailIntensity")
+        self.filmBreathAmount = try decodeDefaultingZero("filmBreathAmount")
+        self.dustAmount = try decodeDefaultingZero("dustAmount")
+        self.scratchAmount = try decodeDefaultingZero("scratchAmount")
+        self.fade = try decode("fade")
+        self.shadowTone = try decode("shadowTone")
+        self.shadowLatitude = try decode("shadowLatitude")
+        self.blackPoint = try decodeDefaultingZero("blackPoint")
+        self.toeContrast = try decodeDefaultingZero("toeContrast")
+        self.highlightTone = try decode("highlightTone")
+        self.shadowHue = try decode("shadowHue")
+        self.highlightHue = try decode("highlightHue")
+        self.vignette = try decode("vignette")
+        self.grainIntensity = try decode("grainIntensity")
     }
 
     public static let reset = FilmtonePhase0Generated.resetParams
@@ -161,6 +222,8 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
         "shutterAngle": \.shutterAngle,
         "trailIntensity": \.trailIntensity,
         "filmBreathAmount": \.filmBreathAmount,
+        "dustAmount": \.dustAmount,
+        "scratchAmount": \.scratchAmount,
         "fade": \.fade,
         "shadowTone": \.shadowTone,
         "shadowLatitude": \.shadowLatitude,
@@ -196,6 +259,23 @@ public struct FilmtonePhase0Params: Codable, Equatable, Hashable, Sendable {
             next.setValue(value, for: key)
         }
         return next
+    }
+
+    private struct ParamCodingKey: CodingKey {
+        let stringValue: String
+        let intValue: Int? = nil
+
+        init(_ stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            return nil
+        }
     }
 }
 

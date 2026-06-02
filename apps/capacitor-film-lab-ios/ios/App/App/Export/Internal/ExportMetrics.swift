@@ -15,6 +15,7 @@ enum FilmtoneExportRenderSubstage: String, CaseIterable {
     case grain = "Grain"
     case creativeLut = "CreativeLut"
     case printStage = "PrintStage"
+    case filmDamage = "FilmDamage"
     case motion = "Motion"
 }
 

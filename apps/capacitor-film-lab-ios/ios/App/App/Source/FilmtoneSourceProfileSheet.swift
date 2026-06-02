@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Source / Camera profile sheet — picks the input source profile (Apple Log
-/// / S-Log3 / V-Log etc.), imports a custom input LUT, and surfaces the
+/// / ARRI LogC3 / S-Log3 / V-Log etc.), imports a custom input LUT, and surfaces the
 /// saved-LUT strip. Creative-LUT (look) selection lives in the Look carousel
 /// in fullscreen + the Library sheet (B6).
 ///

@@ -14,10 +14,10 @@ func registerCoreCatalogStoreStringTests() {
 
     runner.test("AdvancedAdjustCatalog group + control counts match the spec") {
         let allKeys = AdvancedAdjustCatalog.allGroups.flatMap { $0.controls.map(\.key) }
-        try assertEqual(AdvancedAdjustCatalog.allGroups.count, 6, "expected 6 groups")
-        try assertEqual(allKeys.count, 35, "expected 35 controls total (32 base + filmBreathAmount + blackPoint + toeContrast)")
+        try assertEqual(AdvancedAdjustCatalog.allGroups.count, 7, "expected 7 groups")
+        try assertEqual(allKeys.count, 37, "expected 37 controls total (35 prior controls + dustAmount + scratchAmount)")
         try assertEqual(
-            Set(allKeys).count, 35,
+            Set(allKeys).count, 37,
             "control key collision — every key must appear exactly once"
         )
     }
@@ -27,8 +27,8 @@ func registerCoreCatalogStoreStringTests() {
             .flatMap { $0.controls.map(\.key) }
         let videoKeys = AdvancedAdjustCatalog.groups(forVideo: true)
             .flatMap { $0.controls.map(\.key) }
-        try assertEqual(stillKeys.count, 32, "still mode = 35 - 3 motion (shutterAngle + trailIntensity + filmBreathAmount)")
-        try assertEqual(videoKeys.count, 35, "video mode exposes all 35")
+        try assertEqual(stillKeys.count, 34, "still mode = 37 - 3 motion (shutterAngle + trailIntensity + filmBreathAmount)")
+        try assertEqual(videoKeys.count, 37, "video mode exposes all 37")
         if stillKeys.contains("shutterAngle") || stillKeys.contains("trailIntensity") || stillKeys.contains("filmBreathAmount") {
             throw AssertionError(description: "still mode must not surface motion params")
         }
@@ -149,6 +149,8 @@ func registerCoreCatalogStoreStringTests() {
         "grainIntensity": "Grain Strength",
         "grainSize": "Grain Size",
         "grainRadialMix": "Grain edge emphasis",
+        "dustAmount": "Dust",
+        "scratchAmount": "Scratches",
         "compressionAmount": "Highlight softness",
         "compressionRange": "Tone span",
         "printContrast": "Print Contrast",
@@ -186,7 +188,7 @@ func registerCoreCatalogStoreStringTests() {
 
     runner.test("AdvancedAdjustCatalog group titles include Tone (renamed from Process)") {
         let titles = AdvancedAdjustCatalog.allGroups(strings: .english).map(\.title)
-        let expected = ["Basic", "Tone", "Optics", "Glow", "Grain", "Motion"]
+        let expected = ["Basic", "Tone", "Optics", "Glow", "Grain", "Film Damage", "Motion"]
         try assertEqual(titles, expected, "group title order + spelling")
     }
 
@@ -221,12 +223,12 @@ func registerCoreCatalogStoreStringTests() {
     runner.test("AdvancedAdjustCatalog visible recipe chip groups match first-open Desktop surface") {
         try assertEqual(
             AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: false),
-            ["process", "optics", "glow", "grain"],
+            ["process", "optics", "glow", "grain", "damage"],
             "still mode should expose all still recipe chip groups and omit basic"
         )
         try assertEqual(
             AdvancedAdjustCatalog.visibleRecipeChipGroupIds(forVideo: true),
-            ["process", "optics", "glow", "grain", "motion"],
+            ["process", "optics", "glow", "grain", "damage", "motion"],
             "video mode should add the motion recipe chip group"
         )
     }
@@ -756,7 +758,7 @@ func registerCoreCatalogStoreStringTests() {
     runner.test("AdvancedAdjustCatalog with .japanese surfaces 階調 + tone JA recipe chips") {
         let groups = AdvancedAdjustCatalog.allGroups(strings: .japanese)
         let titles = groups.map(\.title)
-        try assertEqual(titles, ["Basic", "階調", "Optics", "Glow", "Grain", "Motion"], "JA group title order")
+        try assertEqual(titles, ["Basic", "階調", "Optics", "Glow", "Grain", "フィルムダメージ", "Motion"], "JA group title order")
         guard let process = groups.first(where: { $0.id == "process" }) else {
             throw AssertionError(description: "process group missing under .japanese")
         }
@@ -1274,6 +1276,39 @@ func registerCoreCatalogStoreStringTests() {
         )
     }
 
+    runner.test("Source profile catalog includes ARRI LogC3 as sticky manual profile") {
+        let ids = FilmtoneSourceProfileCatalog.allProfiles.map(\.id)
+        try assertEqual(
+            Array(ids.prefix(4)),
+            [
+                "built-in:source-profile.apple-log",
+                "built-in:source-profile.apple-log-2",
+                "built-in:source-profile.arri-logc3",
+                "built-in:source-profile.dji-dlog",
+            ],
+            "ARRI LogC3 should sit after Apple Log 2 and before DJI manual profiles"
+        )
+        guard let arri = FilmtoneSourceProfileCatalog.entry(forCatalogId: "built-in:source-profile.arri-logc3") else {
+            throw AssertionError(description: "ARRI LogC3 catalog row missing")
+        }
+        try assertEqual(arri.englishName, "ARRI LogC3", "ARRI LogC3 display name")
+        try assertEqual(arri.curve, .arriLogC3, "ARRI LogC3 curve")
+        try assertEqual(arri.detectionHint, nil, "ARRI LogC3 stays manual because probe metadata is not reliable")
+    }
+
+    runner.test("ARRI LogC3 source profile prepares a 33 cubed input cube") {
+        guard let cube = FilmtoneSourceInputTransform.prepareCube(for: .arriLogC3) else {
+            throw AssertionError(description: "ARRI LogC3 prepared cube missing")
+        }
+        try assertEqual(cube.curve, .arriLogC3, "ARRI LogC3 prepared cube curve")
+        try assertEqual(cube.size, 33, "ARRI LogC3 prepared cube dimension")
+        try assertEqual(
+            cube.cubeData.count,
+            33 * 33 * 33 * 4 * MemoryLayout<Float>.stride,
+            "ARRI LogC3 prepared cube should be RGBA Float32"
+        )
+    }
+
     runner.test("Source profile source-change policy resets detectable mismatches to Auto") {
         let appleLogSelection = CameraProfileSelection.builtIn(
             catalogId: "built-in:source-profile.apple-log"
@@ -1308,8 +1343,19 @@ func registerCoreCatalogStoreStringTests() {
     }
 
     runner.test("Source profile source-change policy keeps non-detectable manual picks sticky") {
+        let arriLogC3Selection = CameraProfileSelection.builtIn(
+            catalogId: "built-in:source-profile.arri-logc3"
+        )
         let vLogSelection = CameraProfileSelection.builtIn(
             catalogId: "built-in:source-profile.panasonic-vlog"
+        )
+        try assertEqual(
+            FilmtoneSourceProfileCatalog.selectionAfterSourceChange(
+                arriLogC3Selection,
+                probedColorClass: .sdrBt709
+            ),
+            arriLogC3Selection,
+            "ARRI LogC3 stays sticky because container metadata cannot prove mismatch"
         )
         try assertEqual(
             FilmtoneSourceProfileCatalog.selectionAfterSourceChange(

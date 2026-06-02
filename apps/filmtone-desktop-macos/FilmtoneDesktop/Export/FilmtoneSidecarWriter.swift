@@ -356,6 +356,8 @@ enum FilmtoneSidecarWriter {
             "shutterAngle": p.shutterAngle,
             "trailIntensity": p.trailIntensity,
             "filmBreathAmount": p.filmBreathAmount,
+            "dustAmount": p.dustAmount,
+            "scratchAmount": p.scratchAmount,
             "fade": p.fade,
             "shadowTone": p.shadowTone,
             "shadowLatitude": p.shadowLatitude,

@@ -15,6 +15,9 @@ import Foundation
 ///   under `rec2020GamutMap: true`. Apple Log 2 v1.3 ships with the
 ///   Rec.2020 matrix as a known limitation (D-CP6); v1.4 refines via
 ///   AVFoundation native gamut info.
+/// - `(S)` ARRI LogC3 → `synthesized(.arriLogC3)` — LogC3 EI 800 exposure
+///   value decode + ARRI Wide Gamut 3 → Rec.709. Verified against
+///   `Tests/Fixtures/source-profile/arri-logc3/`.
 /// - `(S)` D-Log → `synthesized(.djiDLog)` — DJI D-Gamut → Rec.709.
 ///   Verified against `Tests/Fixtures/source-profile/dji-dlog/`.
 /// - `(S)` D-Log M → `synthesized(.djiDLogM)` — DJI D-Gamut M → Rec.709.
@@ -54,6 +57,17 @@ enum FilmtoneSourceProfileCatalog {
             curve: .appleLog2,
             impl: .nativePolicy(.appleLog2ToRec709),
             detectionHint: .appleLog2,
+            bundled: true,
+            immutable: true
+        ),
+        CameraProfileCatalogEntry(
+            id: "built-in:source-profile.arri-logc3",
+            englishName: "ARRI LogC3",
+            curve: .arriLogC3,
+            impl: .synthesized(.arriLogC3),
+            // LUMIX / ARRI LogC3 is not reliably exposed as a probe-visible
+            // transfer-function signal, so keep this as a sticky manual pick.
+            detectionHint: nil,
             bundled: true,
             immutable: true
         ),

@@ -6,7 +6,7 @@ import FilmLabSwiftCore
 /// or accidental hand-edits of the generated Swift artifact.
 final class GeneratedLandmarkTests: XCTestCase {
     func testParamKeysCountAndOrder() {
-        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 40)
+        XCTAssertEqual(FilmtonePhase0Generated.paramKeys.count, 42)
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.first, "exposure")
         XCTAssertEqual(FilmtonePhase0Generated.paramKeys.last, "grainIntensity")
 
@@ -42,10 +42,16 @@ final class GeneratedLandmarkTests: XCTestCase {
 
         let trailIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "trailIntensity")
         let breathIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "filmBreathAmount")
+        let dustIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "dustAmount")
+        let scratchIndex = FilmtonePhase0Generated.paramKeys.firstIndex(of: "scratchAmount")
         XCTAssertNotNil(trailIndex)
         XCTAssertNotNil(breathIndex)
-        if let trailIndex, let breathIndex {
+        XCTAssertNotNil(dustIndex)
+        XCTAssertNotNil(scratchIndex)
+        if let trailIndex, let breathIndex, let dustIndex, let scratchIndex {
             XCTAssertEqual(breathIndex, trailIndex + 1)
+            XCTAssertEqual(dustIndex, breathIndex + 1)
+            XCTAssertEqual(scratchIndex, dustIndex + 1)
         }
 
         // blackPoint / toeContrast land immediately after shadowLatitude:
@@ -64,6 +70,8 @@ final class GeneratedLandmarkTests: XCTestCase {
         let r = FilmtonePhase0Generated.resetParams
         XCTAssertEqual(r.blackPoint, 0.0)
         XCTAssertEqual(r.toeContrast, 0.0)
+        XCTAssertEqual(r.dustAmount, 0.0)
+        XCTAssertEqual(r.scratchAmount, 0.0)
     }
 
     func testQuickAxisLandmarks() {
@@ -111,6 +119,8 @@ final class GeneratedLandmarkTests: XCTestCase {
         XCTAssertEqual(r.saturation, 1.0)
         XCTAssertEqual(r.grainIntensity, 0.0)
         XCTAssertEqual(r.filmBreathAmount, 0.0)
+        XCTAssertEqual(r.dustAmount, 0.0)
+        XCTAssertEqual(r.scratchAmount, 0.0)
         XCTAssertEqual(r.shadowHue, 180.0)
         XCTAssertEqual(r.highlightHue, 60.0)
     }

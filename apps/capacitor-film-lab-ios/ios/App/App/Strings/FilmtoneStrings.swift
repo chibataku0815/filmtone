@@ -111,6 +111,7 @@ struct FilmtoneStrings {
     let advancedGrainFineLabel: String
     let advancedGrainClassicLabel: String
     let advancedGrainPushLabel: String
+    let advancedDamageLabel: String
     let advancedMotionLabel: String
     let advancedToneLabel: String
     let advancedPresetNoneLabel: String
@@ -156,6 +157,7 @@ struct FilmtoneStrings {
     /// v1.3 Camera Profiles Phase D — built-in source profile catalog labels.
     let cameraAppleLog: String
     let cameraAppleLog2: String
+    let cameraARRILogC3: String
     let cameraDLog: String
     let cameraDLogM: String
     let cameraCLog: String
@@ -336,6 +338,7 @@ extension FilmtoneStrings {
         switch slug {
         case "apple-log":      return cameraAppleLog
         case "apple-log-2":    return cameraAppleLog2
+        case "arri-logc3":              return cameraARRILogC3
         case "dji-dlog":                return cameraDLog
         case "dji-dlog-m":              return cameraDLogM
         case "canon-clog":              return cameraCLog
@@ -613,6 +616,10 @@ extension FilmtoneStrings {
             return paramHelpCopy(id: key, title: label, jaBody: "粒の大きさを調整します。", enBody: "Controls the size of the grain pattern.", jaEffect: "上げると粒が大きく荒く見えます。", enEffect: "Higher values make grain larger and rougher.")
         case "grainRadialMix":
             return paramHelpCopy(id: key, title: label, jaBody: "画面の周辺で粒を少し強く見せる量です。", enBody: "Controls how much grain is emphasized toward the frame edges.", jaEffect: "上げると端の質感が少し濃くなります。", enEffect: "Higher values make edge texture denser.")
+        case "dustAmount":
+            return paramHelpCopy(id: key, title: label, jaBody: "小さな埃の点を後段に重ねます。", enBody: "Adds small dust marks after the grade.", jaEffect: "上げると白や黒の点が増えます。", enEffect: "Higher values add more white and black specks.")
+        case "scratchAmount":
+            return paramHelpCopy(id: key, title: label, jaBody: "細い縦傷を後段に重ねます。", enBody: "Adds thin vertical scratches after the grade.", jaEffect: "上げると傷の本数と濃さが増えます。", enEffect: "Higher values add more visible scratch lines.")
         case "shutterAngle":
             return paramHelpCopy(id: key, title: label, jaBody: "動画のシャッター感を調整します。大きいほど動きにブラーが残りやすくなります。", enBody: "Controls video shutter feel. Larger values let motion blur carry farther.", jaEffect: "上げると動きが滑らかに流れます。", enEffect: "Higher values make motion flow more smoothly.")
         case "trailIntensity":
@@ -1000,6 +1007,11 @@ extension FilmtoneStrings {
             defaultValue: prefersJapanese ? "粗粒子" : "Push",
             comment: "Grain recipe chip for coarser pushed film grain."
         )
+        advancedDamageLabel = filmtoneLocalized(
+            "filmtone.advanced.group.damage",
+            defaultValue: prefersJapanese ? "フィルムダメージ" : "Film Damage",
+            comment: "Group title for dust and scratch advanced params."
+        )
         advancedMotionLabel = filmtoneLocalized(
             "filmtone.advanced.group.motion",
             defaultValue: "Motion",
@@ -1097,6 +1109,8 @@ extension FilmtoneStrings {
             "grainIntensity": filmtoneLocalized("filmtone.param.grain_intensity", defaultValue: "Grain Strength", comment: "Advanced parameter label."),
             "grainSize": filmtoneLocalized("filmtone.param.grain_size", defaultValue: "Grain Size", comment: "Advanced parameter label."),
             "grainRadialMix": filmtoneLocalized("filmtone.param.grain_radial_mix", defaultValue: "Grain edge emphasis", comment: "Advanced parameter label."),
+            "dustAmount": filmtoneLocalized("filmtone.param.dust_amount", defaultValue: "Dust", comment: "Advanced parameter label."),
+            "scratchAmount": filmtoneLocalized("filmtone.param.scratch_amount", defaultValue: "Scratches", comment: "Advanced parameter label."),
             "compressionAmount": filmtoneLocalized("filmtone.param.compression_amount", defaultValue: "Highlight softness", comment: "Advanced parameter label."),
             "compressionRange": filmtoneLocalized("filmtone.param.compression_range", defaultValue: "Tone span", comment: "Advanced parameter label."),
             "printContrast": filmtoneLocalized("filmtone.param.print_contrast", defaultValue: "Print Contrast", comment: "Advanced parameter label."),
@@ -1251,6 +1265,11 @@ extension FilmtoneStrings {
             "filmtone.camera.apple_log2",
             defaultValue: "Apple Log 2",
             comment: "Built-in camera source profile name (Apple Log 2)."
+        )
+        cameraARRILogC3 = filmtoneLocalized(
+            "filmtone.camera.arri_logc3",
+            defaultValue: "ARRI LogC3",
+            comment: "Built-in camera source profile name (ARRI LogC3 / ARRI Wide Gamut 3). Proper-noun preserved across locales."
         )
         cameraDLog = filmtoneLocalized(
             "filmtone.camera.dji_dlog",

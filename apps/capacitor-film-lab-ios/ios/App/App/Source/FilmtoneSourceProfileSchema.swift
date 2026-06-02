@@ -5,7 +5,7 @@ import Foundation
 /// v1.3 Camera Profiles Phase A — user-facing Camera Profile selection that
 /// lives on `FilmtoneProjectState`. Distinct from `LutLibraryEntry`'s
 /// content-addressed model on purpose (D-CP2): (P) Apple Log paths and (S)
-/// V-Log/S-Log3 synthesized curves do not have a `dataRef` blob, so mixing
+/// manufacturer-log synthesized curves do not have a `dataRef` blob, so mixing
 /// the two ontologies into a single `LutLibraryEntry` would pollute the
 /// content-hash invariants enforced by `FilmtoneLutBlobCodec`.
 ///
@@ -21,8 +21,9 @@ import Foundation
 /// `Profile.version` stays at 4 (CLAUDE.md §5).
 enum CameraProfileSelection: Equatable, Sendable, Codable {
     /// Automatic detection — current behaviour. Resolves to Apple Log /
-    /// Apple Log 2 / Rec.709 from the source probe at export time. v1.3 does
-    /// not auto-detect V-Log / S-Log3 (no reliable container metadata).
+    /// Apple Log 2 / Rec.709 from the source probe at export time. Other
+    /// manufacturer-log profiles stay manual when no reliable container
+    /// metadata exists.
     case auto
     /// Built-in catalog entry. The `catalogId` is the namespaced string
     /// (`"built-in:source-profile.<slug>"`) — kept as a `String` rather than
@@ -85,6 +86,7 @@ enum CameraProfileSelection: Equatable, Sendable, Codable {
 enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
     case appleLog              = "apple-log"
     case appleLog2             = "apple-log-2"
+    case arriLogC3             = "arri-logc3"
     case djiDLog               = "dji-dlog"
     case djiDLogM              = "dji-dlog-m"
     case canonCLog             = "canon-clog"
@@ -104,8 +106,8 @@ enum SourceProfileCurve: String, Codable, CaseIterable, Sendable {
 ///   path. Apple Log / Apple Log 2 ride this lane, sharing
 ///   `makeAppleLogToRec709Lut` from `ExportInputLutBuilder`.
 /// - `.synthesized` — Filmtone-implemented decoder + gamut matrix +
-///   `filmtoneSdrShoulder` + Rec.709 encode. D-Log, C-Log, V-Log, and S-Log3 ride this
-///   lane (Camera Profiles Phases B and C). Each (S) curve must ship with
+///   `filmtoneSdrShoulder` + Rec.709 encode. ARRI LogC3, D-Log, C-Log,
+///   V-Log, and S-Log3 ride this lane. Each (S) curve must ship with
 ///   a math doc + accuracy fixture + accuracy test in the same PR.
 /// - `.bundledCube` — bundled `.cube` resolved from the LUT library by id.
 ///   Reserved for v1.4+ (e.g. ARRI LogC4 once licensed); v1.3 catalog
@@ -180,9 +182,9 @@ enum SourceProfileImpl: Equatable, Sendable, Codable {
 /// `detectionHint` is consulted only when the user's selection is `.auto`;
 /// the export pipeline matches it against the source probe's `colorClass`
 /// to decide which catalog entry to materialize. nil means "this entry
-/// cannot be inferred from the probe" — the (S) V-Log / S-Log3 entries set
-/// this to nil because container metadata cannot reliably distinguish those
-/// curves (D-CP4 retention rule keeps them sticky once the user picks them).
+/// cannot be inferred from the probe" — manual (S) profiles set this to nil
+/// when container metadata cannot reliably distinguish those curves (D-CP4
+/// retention rule keeps them sticky once the user picks them).
 struct CameraProfileCatalogEntry: Equatable, Sendable {
     let id: String
     let englishName: String

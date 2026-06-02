@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import {
   SOURCE_PROFILE_CATALOG,
+  arriLogC3Decode,
+  arriLogC3PixelToRec709,
   buildSourceProfileLut,
   canonClogPixelToRec709,
   canonLog3CineGamutPixelToRec709,
@@ -12,6 +14,7 @@ import {
   dlogMPixelToRec709,
   dlogPixelToRec709,
   getSourceProfile,
+  makeArriLogC3ToRec709Cube,
   makeAppleLogToRec709Cube,
   makeDlogToRec709Cube,
   slog3Decode,
@@ -50,11 +53,12 @@ async function loadJson<T>(path: string): Promise<T> {
 }
 
 describe("source profile catalog", () => {
-  test("exposes the v1.4 built-in catalog (Rec.709 + 8 curves)", () => {
+  test("exposes the built-in catalog (Rec.709 + 9 curves)", () => {
     expect(SOURCE_PROFILE_CATALOG.map((entry) => entry.id)).toEqual([
       "built-in:source-profile.rec709",
       "built-in:source-profile.apple-log",
       "built-in:source-profile.apple-log-2",
+      "built-in:source-profile.arri-logc3",
       "built-in:source-profile.dji-dlog",
       "built-in:source-profile.dji-dlog-m",
       "built-in:source-profile.canon-clog",
@@ -78,6 +82,9 @@ describe("source profile catalog", () => {
     expect(
       getSourceProfile("built-in:source-profile.apple-log-2")?.impl,
     ).toBe("native-policy");
+    expect(getSourceProfile("built-in:source-profile.arri-logc3")?.impl).toBe(
+      "synthesized",
+    );
     expect(getSourceProfile("built-in:source-profile.dji-dlog")?.impl).toBe(
       "synthesized",
     );
@@ -153,13 +160,16 @@ describe("buildSourceProfileLut", () => {
     expect(small?.size).toBe(8);
   });
 
-  test("builds the v1.4 D-Log M and Canon Log 3 source-profile cubes", () => {
+  test("builds ARRI LogC3, D-Log M, and Canon Log 3 source-profile cubes", () => {
+    const arri = buildSourceProfileLut("built-in:source-profile.arri-logc3");
     const dlogM = buildSourceProfileLut("built-in:source-profile.dji-dlog-m");
     const clog3 = buildSourceProfileLut(
       "built-in:source-profile.canon-log3-cinema-gamut",
     );
+    expect(arri?.displayName).toBe("ARRI LogC3");
     expect(dlogM?.displayName).toBe("DJI D-Log M");
     expect(clog3?.displayName).toBe("Canon Log 3 / Cinema Gamut");
+    expect(arri?.data.length).toBe(33 * 33 * 33 * 4);
     expect(dlogM?.data.length).toBe(33 * 33 * 33 * 4);
     expect(clog3?.data.length).toBe(33 * 33 * 33 * 4);
   });
@@ -180,6 +190,13 @@ const CURVE_FIXTURES: Array<{
   decode: (encoded: number) => number;
   pixel: (r: number, g: number, b: number) => [number, number, number];
 }> = [
+  {
+    curve: "arri-logc3",
+    dirName: "arri-logc3",
+    encodedKey: "logC3Encoded",
+    decode: arriLogC3Decode,
+    pixel: arriLogC3PixelToRec709,
+  },
   {
     curve: "dji-dlog",
     dirName: "dji-dlog",
@@ -300,11 +317,34 @@ describe("source profile math — iOS fixture parity", () => {
     }
     expect(differ).toBe(true);
   });
+
+  test("ARRI LogC3 cube generation matches the per-pixel function (33³ smoke)", () => {
+    const cube = makeArriLogC3ToRec709Cube(33);
+    expect(cube.length).toBe(33 * 33 * 33 * 4);
+    const size = 33;
+    const samples: Array<[number, number, number]> = [
+      [0, 0, 0],
+      [size - 1, 0, 0],
+      [0, size - 1, 0],
+      [0, 0, size - 1],
+      [size - 1, size - 1, size - 1],
+      [16, 16, 16],
+    ];
+    for (const [r, g, b] of samples) {
+      const denom = size - 1;
+      const expected = arriLogC3PixelToRec709(r / denom, g / denom, b / denom);
+      const idx = ((b * size + g) * size + r) * 4;
+      expect(cube[idx]).toBeCloseTo(expected[0], 5);
+      expect(cube[idx + 1]).toBeCloseTo(expected[1], 5);
+      expect(cube[idx + 2]).toBeCloseTo(expected[2], 5);
+      expect(cube[idx + 3]).toBe(1);
+    }
+  });
 });
 
 // Small type-only assertion so the SourceProfileId union stays in sync with
 // the catalog at compile time. (No runtime expect — TS would fail compile
 // if a known id became unknown.)
 const _ID_GUARD: SourceProfileId =
-  "built-in:source-profile.canon-log3-cinema-gamut";
+  "built-in:source-profile.arri-logc3";
 void _ID_GUARD;

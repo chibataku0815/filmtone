@@ -42,6 +42,7 @@
 		FT0000000000000000000A4E /* filmtone-creative-pack-01-stone-rec709-safe.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4D /* filmtone-creative-pack-01-stone-rec709-safe.cube */; };
 		FT0000000000000000000A4F /* filmtone-creative-pack-01-urban-rec709-safe.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4E /* filmtone-creative-pack-01-urban-rec709-safe.cube */; };
 		FT0000000000000000000A50 /* filmtone-creative-pack-01-noir-rec709-safe.cube in Resources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B4F /* filmtone-creative-pack-01-noir-rec709-safe.cube */; };
+		FT0000000000000000000A51 /* FilmtoneExportFilename.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B50 /* FilmtoneExportFilename.swift */; };
 		FT0000000000000000000A25 /* FilmtoneSourceProfileMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B25 /* FilmtoneSourceProfileMath.swift */; };
 		FT0000000000000000000A26 /* FilmtoneSourceProfileCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B26 /* FilmtoneSourceProfileCatalog.swift */; };
 		FT0000000000000000000A27 /* FilmtoneSourceInputTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = FT0000000000000000000B27 /* FilmtoneSourceInputTransform.swift */; };
@@ -161,6 +162,7 @@
 		FT0000000000000000000B4A /* ImportedGradeLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedGradeLibraryViewModel.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B4B /* ImportedGradeLibraryControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportedGradeLibraryControls.swift; sourceTree = "<group>"; };
 		FT0000000000000000000B4C /* FilmtoneGradeRecipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneGradeRecipe.swift; sourceTree = "<group>"; };
+		FT0000000000000000000B50 /* FilmtoneExportFilename.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportFilename.swift; sourceTree = "<group>"; };
 		FT0000000000000000000C01 /* FilmtoneDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FilmtoneDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -259,6 +261,7 @@
 				FT0000000000000000000B31 /* AdvancedAdjustCatalog.swift */,
 				FT0000000000000000000B3D /* FilmtoneCompareSplitMath.swift */,
 				FT0000000000000000000B40 /* FilmtoneOpticalScatterMath.swift */,
+				FT0000000000000000000B50 /* FilmtoneExportFilename.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -477,6 +480,7 @@
 				FT0000000000000000000A30 /* FilmtoneExportSnapshot.swift in Sources */,
 				FT0000000000000000000A37 /* FilmtoneDesktopStrings.swift in Sources */,
 				FT0000000000000000000A32 /* AdvancedAdjustCatalog.swift in Sources */,
+				FT0000000000000000000A51 /* FilmtoneExportFilename.swift in Sources */,
 				FT0000000000000000000A33 /* AdvancedAdjustEditor.swift in Sources */,
 				FT0000000000000000000A34 /* EditorState+ParamOverrides.swift in Sources */,
 				FT0000000000000000000A43 /* FilmtoneCapturePackageImport.swift in Sources */,
@@ -629,7 +633,7 @@
 				CODE_SIGN_ENTITLEMENTS = FilmtoneDesktop/FilmtoneDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -640,7 +644,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.12;
+				MARKETING_VERSION = 1.14;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
 				PRODUCT_NAME = Filmtone;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -657,7 +661,7 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = C3G77H8NM6;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -668,7 +672,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.12;
+				MARKETING_VERSION = 1.14;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.chibatakumi.film-lab-desktop";
 				PRODUCT_NAME = Filmtone;

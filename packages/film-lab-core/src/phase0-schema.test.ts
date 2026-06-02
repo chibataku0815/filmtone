@@ -34,6 +34,8 @@ describe("phase0 schema", () => {
     expect(phase0.shutterAngle).toBe(PRESETS.cinematic.shutterAngle);
     expect(phase0.trailIntensity).toBe(PRESETS.cinematic.trailIntensity);
     expect(phase0.filmBreathAmount).toBe(PRESETS.cinematic.filmBreathAmount);
+    expect(phase0.dustAmount).toBe(PRESETS.cinematic.dustAmount);
+    expect(phase0.scratchAmount).toBe(PRESETS.cinematic.scratchAmount);
     expect(phase0.grainIntensity).toBe(PRESETS.cinematic.grainIntensity);
     expect(phase0.detailSoftness).toBe(PRESETS.cinematic.detailSoftness);
     expect(phase0.shadowLatitude).toBe(PRESETS.cinematic.shadowLatitude);
@@ -200,6 +202,20 @@ describe("phase0 schema", () => {
     expect(breathIndex).toBe(trailIndex + 1);
   });
 
+  test("film damage params default to 0 and land after filmBreathAmount", () => {
+    const reset = pickPhase0Params(PRESETS.reset);
+    const { dustAmount: _omitDust, scratchAmount: _omitScratch, ...sparse } = reset;
+    const parsed = phase0ParamsSchema.parse(sparse);
+    const breathIndex = PHASE0_PARAM_KEYS.indexOf("filmBreathAmount");
+    const dustIndex = PHASE0_PARAM_KEYS.indexOf("dustAmount");
+    const scratchIndex = PHASE0_PARAM_KEYS.indexOf("scratchAmount");
+
+    expect(parsed.dustAmount).toBe(0);
+    expect(parsed.scratchAmount).toBe(0);
+    expect(dustIndex).toBe(breathIndex + 1);
+    expect(scratchIndex).toBe(dustIndex + 1);
+  });
+
   test("rejects out-of-range reduced params", () => {
     const result = phase0ParamsSchema.safeParse({
       ...pickPhase0Params(PRESETS.reset),
@@ -263,6 +279,18 @@ describe("phase0 schema", () => {
       phase0ParamsSchema.safeParse({
         ...pickPhase0Params(PRESETS.reset),
         filmBreathAmount: 1.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        dustAmount: -0.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      phase0ParamsSchema.safeParse({
+        ...pickPhase0Params(PRESETS.reset),
+        scratchAmount: 1.001,
       }).success,
     ).toBe(false);
   });
