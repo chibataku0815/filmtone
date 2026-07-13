@@ -12,7 +12,7 @@ Filmtone は色再現・LUT・smart-look を提供するクロスプラットフ
 
 | 面 | 技術 |
 |----|------|
-| Desktop | Electron + Vite + Playwright golden（macOS arm64 + notarization） |
+| Desktop | Native macOS app (`apps/filmtone-desktop-macos/`); Electron は legacy / rollback 専用 |
 | iOS | Capacitor 7.4.3 + Native Swift（Xcode automatic signing） |
 | Renderer | WebGL / WebGPU（Three.js, three-stdlib） |
 | Runtime | Bun |
@@ -67,7 +67,7 @@ Native Desktop v2 は 2-layer model を使う。
 - **postinstall 尊重**: `bun install` 後の `build:core` → `build:renderer` → `build:smart-look` を skip しない
 - **kernel 改変は core 経由**: `packages/film-lab-core` を canonical とし Desktop / iOS で独自分岐させない
 - **不変条件 gate**: iOS は `apps/capacitor-film-lab-ios/CLAUDE.md` の commit gate / Profile schema を逸脱しない
-- **release 番号**: Desktop = `apps/desktop-film-lab-batch/package.json`、iOS = pbxproj。両者を同時に動かさない（リリース面ごとに 1 commit）
+- **release 状態・番号**: `docs/filmtone/filmtone-release-version-sources.md` と life の truth scripts を正本とする。通常の Desktop は `apps/filmtone-desktop-macos/` を確認し、Electron package.json を正式 Desktop の version source にしない。
 
 ---
 

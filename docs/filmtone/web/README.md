@@ -10,9 +10,10 @@ This Filmtone repo is product truth. Update portfolio only through
 `vendor/filmtone` after this repo is pushed, unless the task is explicitly about
 the public web surface.
 
-## Current Handoffs
+## Reference Handoff
 
-- `filmtone-lp-copy-handoff-2026-05-05-jst.md`
+- `filmtone-lp-copy-handoff-2026-05-05-jst.md` is historical discussion
+  evidence. Make a fresh copy decision before editing public copy.
 
 ## Archive
 

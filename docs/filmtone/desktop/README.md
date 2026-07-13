@@ -20,9 +20,9 @@ rollback.
   Desktop v2 subtask is currently open.
 - Native Desktop v2 completed task logs:
   `native-desktop-v2/archive/`
-- Release cutover runbook:
+- Historical release-cutover record:
   `release-cutover/README.md`
-- Mac App Store readiness:
+- Historical Mac App Store readiness record:
   `mac-app-store-readiness/README.md`
 
 ## Historical Docs

@@ -4,27 +4,6 @@ This directory is the current entry point for Filmtone iOS documentation.
 Historical handoffs are archived below so release state and implementation
 entry points stay visible.
 
-## Release State
-
-- App Store Connect public release: `1.10 (13)` is
-  `READY_FOR_DISTRIBUTION` as of the 2026-05-17 release check.
-- Public storefront lookup is country-specific during propagation:
-  US / GB / CA / AU / DE / FR / KR return `1.10`, while JP still returns `1.9`
-  from the iTunes lookup used by `check-filmtone-ios-truth.sh`.
-- Local Xcode version fields: `1.11` build `15`; this is the post-owner-QA
-  release candidate that includes the Rec.709-safe color cube changes.
-- Current TestFlight reference build: `1.11 (14)` processed and distributed to
-  Internal testers on 2026-05-17 JST. Treat it as superseded for App Review.
-- App Store review: `1.11 (15)` was submitted for review on 2026-05-17 JST
-  after owner visual QA passed on `千葉工のiPhone (7)`. It is the current App
-  Review candidate; `1.11 (14)` remains superseded.
-- Release handoff for the pre-public submission state:
-  [`2026-05-10-filmtone-ios-1.8-release-handoff.md`](./2026-05-10-filmtone-ios-1.8-release-handoff.md)
-  and the current 1.10 candidate:
-  [`2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md`](./2026-05-16-filmtone-ios-1.10-dlog-preview-parity-handoff.md)
-  plus the current 1.11 release check:
-  [`2026-05-17-filmtone-ios-1.11-rec709-safe-look-release-check.md`](./2026-05-17-filmtone-ios-1.11-rec709-safe-look-release-check.md)
-
 ## Current Truth
 
 Before stating public App Store state, local Xcode candidate state, or release
@@ -35,6 +14,10 @@ scope, run:
 ```
 
 Report public App Store state and local implementation state separately.
+
+The dated release handoffs in this directory are historical evidence, not the
+current release state. iPhone Filmtone and iPad Filmtone Studio are separate
+release rails; name the rail explicitly whenever a release claim is needed.
 
 ## Current Implementation Entry
 
@@ -85,3 +68,6 @@ move to `<lane>/archive/`.
 - Per-lane archives (`<lane>/archive/`) record sub-task PASS/REJECT logs
   for that lane only. The lane's `strategy.md` Completion Log is the
   index into them.
+- Dated files directly under `ios/` are historical release or handoff evidence.
+  Use the truth script above before relying on any version, App Store, or
+  TestFlight statement in them.

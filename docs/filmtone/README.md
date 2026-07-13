@@ -1,7 +1,10 @@
 # Filmtone — Documentation
 
-Filmtone (Desktop / iOS / Web support) のリリース・実装 handoff ドキュメント。
-パッケージ単位の SSoT (terminology / LUT / preset versioning) は `packages/film-lab-core/docs/` にある。
+Filmtone の現在の正本、運用ルール、歴史記録への入口。
+この索引に固定した release / App Store / version 状態は置かない。現在状態は
+`filmtone-release-version-sources.md` の truth scripts で確認する。
+パッケージ単位の SSoT (terminology / LUT / preset versioning) は
+`packages/film-lab-core/docs/` にある。
 
 ## ディレクトリ構成
 
@@ -10,6 +13,16 @@ Filmtone (Desktop / iOS / Web support) のリリース・実装 handoff ドキ�
 | [`desktop/`](./desktop/) | Desktop / Native Desktop v2 リリース・QA・実装 handoff |
 | [`ios/`](./ios/) | iOS (Capacitor + SwiftUI) docs index and archive |
 | [`web/`](./web/) | Web support / LP copy docs index and archive |
+| [`documentation-governance/`](./documentation-governance/) | 横断ドキュメントの情報設計・整理作業の計画と進行書 |
+
+## Documentation Governance
+
+- 長期の整理方針と運用規則:
+  [`documentation-governance/strategy.md`](./documentation-governance/strategy.md)
+- 現在の作業: なし。完了記録は
+  [`documentation-governance/archive/`](./documentation-governance/archive/) を参照。
+- 全文書の役割・所有領域・現在性:
+  [`documentation-governance/inventory.md`](./documentation-governance/inventory.md)
 
 ## ルートの cross-cutting docs
 
@@ -28,7 +41,7 @@ Filmtone (Desktop / iOS / Web support) のリリース・実装 handoff ドキ�
 |---|---|
 | [`desktop/README.md`](./desktop/README.md) | Desktop docs index and current routing |
 | [`desktop/native-desktop-v2/strategy.md`](./desktop/native-desktop-v2/strategy.md) | Native Desktop v2 current strategy |
-| [`desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md`](./desktop/filmtone-desktop-v1.0.3-qa-handoff-2026-04-24-jst.md) | Legacy Electron Desktop v1.0.3 QA handoff |
+| [`desktop/archive/`](./desktop/archive/) | Legacy Electron を含む過去の Desktop handoff |
 
 ## iOS
 
