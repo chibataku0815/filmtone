@@ -154,6 +154,8 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 - [ ] **発売ゲート(未通過)**: Resend 実送達確認(実メール到達・添付検証)/
   正しいTurnstile hostname/action成功と欠落・不正・mismatch拒否 / trial使用済み
   購入者の優先発行例外を購入メールに明記
+- [x] 本番Workerの安全な失敗系: token欠落は`400 invalid_request`、不正tokenは
+  `403 verification_failed`。いずれもメール送信なし(2026-07-19)
 - [x] 請求フォームの受け口を製品ページのTurnstile付きフォーム -> Worker直叩き
   に決定(Polar $0 checkoutはWorkerへの自動bridgeを持たないため)
 - [ ] テスト購入 -> 受領メール -> ライセンス発行(手動 L1)の一巡確認
@@ -291,3 +293,7 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   hostname/action bindingとResend 409種別判定を含むWorkerを本番へ再deployし、
   Version ID `627b6337-15d3-441c-a695-8accb47f9f9d`を記録。実trial請求・実送達・
   添付検証は発売ゲートとして未実施。
+- 2026-07-19 (改訂 12 / Worker本番失敗系): 許可originからのtoken欠落を
+  `400 invalid_request`、不正tokenを`403 verification_failed`として拒否することを
+  本番endpointで確認。メール送信は発生していない。有効token、action/hostname
+  mismatch、実送達、添付license検証は未完了。

@@ -52,7 +52,9 @@ Filmtone Finish の 14 日 trial ライセンスを自動発行する Cloudflare
   現行 UI / API にない。超過課金はオフを維持し、Resend Usage と Worker の
   Turnstile・IP throttle・email単位制限で管理する。
 - current sourceの再deployまでは完了。公開endpointへの実trial請求、実メール
-  送達、添付license検証は別の発売ゲートとして未実施。
+  送達、添付license検証は別の発売ゲートとして未実施。2026-07-19に本番endpointで
+  token欠落=`400 invalid_request`、不正token=`403 verification_failed`を確認済み
+  (メール送信なし)。
 
 ## デプロイ(オーナー操作、初回のみ)
 
