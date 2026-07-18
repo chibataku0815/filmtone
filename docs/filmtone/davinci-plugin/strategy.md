@@ -1,7 +1,7 @@
 # Filmtone DaVinci Resolve Plugin Strategy
 
 Date opened: 2026-07-18 JST
-Status: feature source integrated; INTEGRATION dispatched
+Status: Integration source accepted; QUALITY awaits explicit verification authorization
 
 This file is the long-term source of truth for the Filmtone DaVinci Resolve
 OpenFX lane. Current coordination state lives in `progress.md`. Each bounded
