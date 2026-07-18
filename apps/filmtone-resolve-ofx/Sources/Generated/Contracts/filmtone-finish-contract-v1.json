@@ -78,7 +78,7 @@
   },
   "filmDamage": {
     "contractVersion": 2,
-    "contractRevision": "2.2",
+    "contractRevision": "2.3",
     "gateWeaveFieldContract": {
       "amount": {
         "defaultValue": 0,

@@ -29,9 +29,42 @@ All dispatches follow `delegation.md`. Master states are:
   integrated; verification debt is retained.
 - Integration wave: source accepted and integrated. One Filter now owns the
   generated parameter surface and the deterministic Breath -> Weave -> Damage
-  pass graph; compiled and Resolve proof remains explicit verification debt.
-- QUALITY build, bundle, installation, and Resolve verification: explicitly
-  authorized and running; packaging and release remain not started.
+  pass graph; its build, Metal, bundle, and Resolve Color-host path are proved.
+- QUALITY build, bundle, recoverable installation, Resolve discovery, actual
+  Color-page instantiation, default identity, per-module output, combined
+  output, and same-frame determinism: passed on Resolve 21.0.2.4 / Apple M4 Max.
+- Current task: **closed by owner with partial acceptance**. Film Damage passes
+  the current internal cycle; Film Breath and Gate Weave remain below the owner
+  quality bar and move to future independent iterations. Packaging and release
+  remain not started.
+- Fresh-chat quality prompts are prepared for independent detailed work:
+  [Film Breath](workstreams/film-breath-quality-chat-prompt.md),
+  [Gate Weave](workstreams/gate-weave-quality-chat-prompt.md), and
+  [Film Damage](workstreams/film-damage-quality-chat-prompt.md). Each freezes
+  its own source/progress scope and requires research before implementation.
+- Film Breath quality correction is [statically accepted and working-tree
+  integrated](workstreams/progress/film-breath-quality.md): temperature/tint
+  now use positive per-channel gains instead of additive RGB offsets. The
+  revised combined bundle builds, installs, and is enumerated by Resolve;
+  product acceptance now waits only for the owner visual verdict.
+- Film Damage detailed quality correction is [statically accepted and
+  working-tree integrated](workstreams/progress/film-damage-quality.md): all
+  five material families were rebuilt around richer procedural and temporal
+  behavior. Coordinator follow-up removed hidden Scratch/Fiber length
+  multipliers so the frozen recipe remains authoritative. The revised combined
+  bundle builds, installs, and is enumerated by Resolve; family-isolated and
+  combined owner viewing remain.
+- Gate Weave quality correction is [source-integrated through the canonical
+  owner](workstreams/progress/gate-weave-quality.md): Film Damage contract
+  revision 2.3 now owns the bounded correlated multi-band drift/scatter model,
+  and Filmtone consumes its regenerated handoff with an exact motion envelope.
+  The revised combined bundle builds, installs, and is enumerated by Resolve;
+  its owner motion/crop/softness verdict remains.
+- Current-cycle disposition: **closed, not Internal Core Baseline Complete**.
+  All three research-backed corrections build and install, but only Film Damage
+  received owner pass. Breath/Weave detail capture and tuning become later
+  feature-specific work. This is not a packaging, distribution, parity, or
+  public-release claim.
 
 ## Workstream Status
 
@@ -43,8 +76,8 @@ All dispatches follow `delegation.md`. Master states are:
 | `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
-| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Accepted — source integrated; compiled/Resolve verification debt retained |
-| `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Running — build and Resolve proof dispatched |
+| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Accepted — source integrated and actual Resolve host path proved |
+| `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Closed with partial acceptance — Damage pass; Breath/Weave below pass and deferred |
 
 ## Parallel Launch Order
 
@@ -72,7 +105,7 @@ path, plugin interface, and clean integration base.
 | WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc` |
 | DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `3ddc56cb95aeb093712a56d301358ff796f3d1f7` |
 | INTEGRATION | `019f74a1-81dc-7572-bf8c-3dea21472755` | `/Users/chibatakumi/.codex/worktrees/97f1/filmtone` | `eb860dfeea7a4d45fa159839ad5454a371afbab9` | Accepted as `57434fc1187df8a8175d74b69c18e63c94ee5a52`; integrated as `915012a` |
-| QUALITY | `019f74bc-834b-7ce0-9a22-0297ab4a84cc` | `/Users/chibatakumi/.codex/worktrees/1433/filmtone` | `f16aa4a6bdeaff740f59a60c5029af40c491e905` | Running — owner authorized build/Metal/install/Resolve verification |
+| QUALITY | `019f74bc-834b-7ce0-9a22-0297ab4a84cc` | `/Users/chibatakumi/.codex/worktrees/1433/filmtone` | `f16aa4a6bdeaff740f59a60c5029af40c491e905` | Running — Resolve host gate passed; visual tuning continues |
 
 ## Foundation Integration Record
 
@@ -126,9 +159,30 @@ path, plugin interface, and clean integration base.
   they alias, Integration renders to one distinct output-bounds temporary and
   copies the requested window back on the same Metal queue.
 - Static source review found no remaining acceptance blocker. Retained QUALITY
-  debt: UHD intermediate-memory measurement, Resolve full-frame/bounds proof,
-  Metal ordering/resource-lifetime proof, and optional Makefile header-
+  debt: broader fps/random-access/format coverage, real-image visual tuning,
+  CinePrint35 coexistence, owner acceptance, and optional Makefile header-
   dependency hardening.
+
+## Resolve Host Verification Record
+
+- Resolve `21.0.2.4` loaded `com.chibatakumi.filmtone.finish`; the disposable
+  project `Filmtone Finish QUALITY 2026-07-18` contains the dedicated timeline
+  `Filmtone Finish QUALITY Host 24fps FHD` and no owner project was touched.
+- The Color page instantiated one `OFX: Filmtone Finish` tool on a real ProRes
+  media clip and exposed the generated Film Breath, Gate Weave, Film Damage,
+  and Variation controls.
+- Resolve 16-bit PNG exports at frame `86412` proved exact default identity:
+  node disabled and node enabled decoded to the same raw-frame MD5
+  `2691d0207dd971aff6209202cca93c0a` with zero differing pixels.
+- Film Breath, Gate Weave, and Film Damage Dust each changed host output when
+  enabled alone. The combined render changed output and two repeated exports
+  decoded to the identical raw-frame MD5
+  `e8ce94223a5e2ab2b4cdadbe1715f958`, with zero differing pixels.
+- Every Resolve render job completed. No Filmtone-specific render, Metal, or
+  OFX error was recorded during the host matrix.
+- Untracked evidence remains under
+  `apps/filmtone-resolve-ofx/build/quality-evidence/resolve-host/`; it is not
+  release packaging or tracked test infrastructure.
 
 ## Proposed File Ownership
 
@@ -183,6 +237,9 @@ Foundation Freeze is complete. Feature dispatch base:
 - Integrated Filmtone source commit: `fcb3e85`.
 - External owner commit: `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f`.
 - Film Damage contract: version 2, revision 2.2.
+- Quality supersession: the current working-tree contract, generated handoff,
+  and Gate Weave resolver consume revision 2.3. Revision 2.2 above remains the
+  historical Foundation Freeze value.
 - Generic Gate Weave: amount, short-axis X/Y amplitude, clockwise rotation
   amplitude, cycles/second cadence, deterministic jitter, and travel axis.
 - Deterministic render context: version 1. Resolve conversion is
@@ -219,7 +276,14 @@ Foundation Freeze is complete. Feature dispatch base:
 - Integration source implementation: accepted and integrated after static
   correction review for invalid-fps configured identity and single-Gate
   aliased Host buffers.
-- Builds/tests/Resolve launch: not run.
+- Authorized arm64 build, bundle inspection, embedded Metal compilation,
+  recoverable evaluation install, Resolve launch/discovery, actual Color-page
+  instantiation, module-isolation exports, combined export, default identity,
+  and same-frame repeat: passed.
+- Still open: real-image visual acceptance, fps/random-access/cache/project-
+  reopen matrix, UHD/proxy/portrait/non-square formats, supplied-host alpha,
+  Damage-family balance/tiling/sparkle, Film Breath mean/periodicity, and
+  CinePrint35 coexistence.
 - Test files: not created or modified.
 - `/Library/OFX/Plugins`: not modified.
 - External CONTRACT source was committed locally as the recorded owner commit;

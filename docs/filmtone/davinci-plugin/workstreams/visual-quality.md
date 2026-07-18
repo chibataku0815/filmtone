@@ -24,6 +24,30 @@ Real-time playback is not required. The quality bar is deterministic output,
 credible temporal/material behavior, practical stopped-frame adjustment,
 CinePrint coexistence, and no hidden loss of wide-gamut or alpha information.
 
+## Current Cycle Boundary
+
+The current cycle targets **Internal Core Baseline**, not complete product or
+release acceptance. Close it after:
+
+- one research-backed quality correction for each of Film Breath, Gate Weave,
+  and Film Damage is integrated;
+- one rebuilt combined bundle retains default identity, isolated activity,
+  combined activity, and same-frame deterministic repeat in Resolve;
+- one representative personal-footage owner pass finds no disqualifying normal-
+  setting defect in Breath colour/temporal response, Weave sampling/edge
+  behavior, or Damage material/temporal balance;
+- any disqualifying finding is corrected once and rechecked.
+
+Do not keep this cycle open for optional control expansion, exhaustive profile
+tuning, full Damage-family perfection, the complete evaluation matrix below,
+or CinePrint/packaging/release work. Record those as future feature or product-
+acceptance work. The matrix below remains the later full-quality gate and is
+not erased by closing the Internal Core Baseline.
+
+Closure disposition: the owner ended the 2026-07-18 task with partial
+acceptance rather than declaring Internal Core Baseline Complete. Film Damage
+passed; Film Breath and Gate Weave remain future independent quality work.
+
 ## Required Evaluation Matrix
 
 Temporal:

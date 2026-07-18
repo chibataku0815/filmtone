@@ -1,7 +1,7 @@
 # Filmtone DaVinci Resolve Plugin Strategy
 
 Date opened: 2026-07-18 JST
-Status: Integration source accepted; QUALITY verification running
+Status: Resolve host gate passed; QUALITY visual tuning running
 
 This file is the long-term source of truth for the Filmtone DaVinci Resolve
 OpenFX lane. Current coordination state lives in `progress.md`. Each bounded
@@ -135,17 +135,17 @@ which CinePrint node to disable. No preset may silently stack both versions.
 |---|---|---|
 | Film Breath amount and temporal character | `packages/film-lab-core/src/film-breath.ts` | Reuse the Filmtone behavior through a generated/versioned C++ handoff; do not tune an unrelated OFX clone. |
 | Film Breath Swift parity evidence | `packages/film-lab-swift-core/.../FilmtoneFilmBreath.swift` | Read-only parity evidence for the OFX port. |
-| Generic Film Damage / Gate Weave recipe | `@forestone/visual-effect-core` Film Damage contract v2 / revision 2.2 | Consume the frozen public handoff; never add a second Filmtone-local contract. |
+| Generic Film Damage / Gate Weave recipe | `@forestone/visual-effect-core` Film Damage contract v2 / revision 2.3 | Consume the frozen public handoff; never add a second Filmtone-local contract. |
 | Generic deterministic reference | `@forestone/visual-render-core` Film Damage reference | Use as the semantic and fixture authority for the Metal realization. |
 | Filmtone taste and compatibility mapping | `@forestone/filmtone-pack` | Add a finish-specific public mapping instead of hiding Dust/Scratch as lossy grade fields. |
 | OFX host wrapper, product IDs, UI groups, bundle | Filmtone `apps/filmtone-resolve-ofx/` | Product-specific only; no generic contract ownership. |
 | Package/LUT/DCTL/Lua workflow | Existing Filmtone DaVinci Bridge | Preserve as a distinct fallback/orchestration rail. |
 
-The current generic Gate Weave contract supplies amount, frequency, jitter, and
-travel axis, but not rotation or independent X/Y amplitudes. The contract
-workstream must resolve that gap in the owning repo before the feature modules
-freeze their uniforms. Edge compensation is host/render behavior and does not
-belong in the generic recipe.
+The current generic Gate Weave contract supplies amount, independent X/Y
+amplitudes, clockwise rotation, a frequency anchor, bounded deterministic
+registration scatter, travel axis, and an authoritative correlated temporal
+reference. Edge compensation remains host/render behavior and does not belong
+in the generic recipe.
 
 ## OpenFX Architecture
 
@@ -243,6 +243,66 @@ must remain practically interactive. The provisional quality target is a
 normal-strength UHD frame update within 500 ms median on the owner target Mac;
 the quality workstream records the actual machine and may revise the threshold
 before acceptance.
+
+The 2026-07-18 QUALITY cycle used this focus after the Resolve host gate:
+
+1. rebuild the integrated Film Breath v2, Gate Weave 2.3, and Film Damage v2
+   source, then obtain the owner verdict on personal footage;
+2. tune only those demonstrated visual failures, with restrained Filmtone
+   defaults;
+3. validate temporal behavior, formats, and CinePrint35 coexistence after the
+   still-image character is accepted;
+4. defer packaging and release shell until owner visual acceptance.
+
+## Current Milestone Cut Line: Internal Core Baseline
+
+The current development cycle closes at **Internal Core Baseline**. It does
+not wait for every possible refinement of every module.
+
+Close this milestone when all of the following are true:
+
+1. Film Breath, Gate Weave, and Film Damage each have one research-backed,
+   coordinator-accepted quality correction integrated from the same base.
+2. One bundle rebuilt from that combined source loads in Resolve; default
+   identity, isolated activity for all three modules, combined activity, and
+   same-frame deterministic repeat still pass.
+3. The owner checks one representative personal clip and finds no baseline-
+   blocking defect at restrained normal settings:
+   - Film Breath has no obvious black-floor lift, destructive colour wobble,
+     cumulative drift, or unusable onset;
+   - Gate Weave has no black gaps, disqualifying crop/softness, or camera-shake
+     character;
+   - Film Damage has no dominant white sparkle, visible grid/tiling, one-frame
+     random popping, or unusable cross-family balance.
+4. Any blocking defect found in that single closure pass is corrected once and
+   rechecked. Non-blocking taste refinements are recorded for later work rather
+   than extending this cycle.
+5. The three feature-quality progress records and the QUALITY progress record
+   contain the final source verdict, owner verdict, and remaining debt.
+
+Internal Core Baseline explicitly does **not** require:
+
+- exhaustive tuning of every Damage family or every strength/profile;
+- the full fps, cache, reopen, random-access, UHD/proxy, portrait, and alpha
+  matrix;
+- CinePrint35 coexistence proof;
+- real-time playback;
+- installer, signing, notarization, licensing, packaging, or release copy;
+- Dehancer feature parity or final public product acceptance.
+
+After this cut, each new Film Breath, Gate Weave, or Film Damage improvement is
+a separate feature iteration with its own evidence and owner verdict. The Core
+Baseline is reopened only for a crash, identity failure, deterministic failure,
+destructive colour/range failure, black-frame/black-edge failure at normal
+settings, or a similarly disqualifying defect.
+
+### 2026-07-18 Cycle Closure
+
+The owner closed the current long-running task with partial acceptance. Film
+Damage passed the internal visual bar. Film Breath and Gate Weave did not pass
+and are deferred to separate future iterations beginning with concrete owner-
+observed defects. `Internal Core Baseline Complete`, packaging, parity, and
+public product acceptance are not declared.
 
 ## Measurable Done Conditions
 

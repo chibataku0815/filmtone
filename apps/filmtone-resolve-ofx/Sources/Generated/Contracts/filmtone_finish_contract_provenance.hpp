@@ -11,9 +11,9 @@ namespace filmtone::resolve::contracts::provenance {
 
 inline constexpr std::uint32_t kAdapterHandoffVersion = 1u;
 inline constexpr std::string_view kExternalManifestPath = "packages/filmtone-pack/artifacts/filmtone-finish-contract-v1.json";
-inline constexpr std::string_view kExternalManifestSha256 = "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3";
+inline constexpr std::string_view kExternalManifestSha256 = "cf90a1e838470acd7a7f7272a77561eb254d057742e70a150a6cd28823f8710b";
 inline constexpr std::string_view kFilmDamageRecipePath = "packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp";
-inline constexpr std::string_view kFilmDamageRecipeSha256 = "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687";
+inline constexpr std::string_view kFilmDamageRecipeSha256 = "4cb78c964cc29270f2fb10bcd2f29d64438f2ab052ee86d3a61366bca032e874";
 inline constexpr std::string_view kDeterministicRenderContextPath = "packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp";
 inline constexpr std::string_view kDeterministicRenderContextSha256 = "cf8c442a6ba7fbfe0331b7cfa71b36855cc39bca5ec99051e134d704c4379916";
 inline constexpr std::string_view kFilmtoneFinishMappingPath = "packages/filmtone-pack/artifacts/cpp/forestone_filmtone_finish_mapping.hpp";

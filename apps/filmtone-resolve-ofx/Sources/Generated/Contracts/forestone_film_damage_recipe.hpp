@@ -10,7 +10,7 @@
 namespace forestone::visual_effect {
 
 inline constexpr std::uint32_t kFilmDamageRecipeContractVersion = 2u;
-inline constexpr std::string_view kFilmDamageRecipeContractRevision = "2.2";
+inline constexpr std::string_view kFilmDamageRecipeContractRevision = "2.3";
 inline constexpr std::uint32_t kFilmDamageStreamSalt = 1178881351u;
 inline constexpr std::uint32_t kGateWeaveStreamSalt = 1196901718u;
 

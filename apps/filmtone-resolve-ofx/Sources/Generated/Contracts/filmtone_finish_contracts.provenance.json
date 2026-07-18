@@ -6,12 +6,12 @@
     "repository": "visual-effect-core",
     "manifest": {
       "path": "packages/filmtone-pack/artifacts/filmtone-finish-contract-v1.json",
-      "sha256": "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3"
+      "sha256": "cf90a1e838470acd7a7f7272a77561eb254d057742e70a150a6cd28823f8710b"
     },
     "contracts": {
       "filmDamage": {
         "version": 2,
-        "revision": "2.2"
+        "revision": "2.3"
       },
       "deterministicRenderContext": {
         "version": 1
@@ -23,7 +23,7 @@
     "artifacts": [
       {
         "path": "packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp",
-        "sha256": "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687"
+        "sha256": "4cb78c964cc29270f2fb10bcd2f29d64438f2ab052ee86d3a61366bca032e874"
       },
       {
         "path": "packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp",
@@ -44,11 +44,11 @@
   "generatedOutputs": [
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone-finish-contract-v1.json",
-      "sha256": "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3"
+      "sha256": "cf90a1e838470acd7a7f7272a77561eb254d057742e70a150a6cd28823f8710b"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/forestone_film_damage_recipe.hpp",
-      "sha256": "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687"
+      "sha256": "4cb78c964cc29270f2fb10bcd2f29d64438f2ab052ee86d3a61366bca032e874"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/forestone_deterministic_render_context.hpp",
@@ -72,11 +72,11 @@
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contract_provenance.hpp",
-      "sha256": "c8114abcc2447d3c4b8f7db3cde3b32cd45b171d04225084972eac98e7f2c718"
+      "sha256": "b6e074380d0475bbbe38229e0976ec0ecd7ddddeac7509d88cfcd99acd6435fd"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contracts.hpp",
-      "sha256": "c120152b79bd63e7a276ab712b15f323712b017892397478e4ebf6c49b2b5c23"
+      "sha256": "e32023283df4e67aa9d57ba21d85254ef59bca3103aab55192e0f40dc9d8c8b1"
     }
   ]
 }

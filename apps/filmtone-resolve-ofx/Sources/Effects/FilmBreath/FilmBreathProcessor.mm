@@ -17,8 +17,8 @@ namespace {
 
 constexpr std::size_t kFloatRGBABytesPerPixel = sizeof(float) * 4u;
 constexpr char kFilmBreathPipelineCacheKey[] =
-    "filmtone.finish.film-breath.photometric.v1";
-constexpr char kFilmBreathKernelFunction[] = "filmtoneFilmBreathV1";
+    "filmtone.finish.film-breath.photometric.v2";
+constexpr char kFilmBreathKernelFunction[] = "filmtoneFilmBreathV2";
 
 constexpr char kFilmBreathMetalSource[] = R"METAL(
 #include <metal_stdlib>
@@ -35,7 +35,7 @@ struct FilmBreathUniformsV1 {
     float tint;
 };
 
-kernel void filmtoneFilmBreathV1(
+kernel void filmtoneFilmBreathV2(
     device const float4* source [[buffer(0)]],
     device float4* output [[buffer(1)]],
     constant FilmBreathUniformsV1& uniforms [[buffer(2)]],
@@ -63,7 +63,13 @@ kernel void filmtoneFilmBreathV1(
     float3 color = sourceColor.rgb;
 
     // Canonical Filmtone order: EV exposure, three-piece tonal response,
-    // then the established temperature/tint channel response.
+    // then the temperature/tint colour response. The colour response is a
+    // per-channel gain rather than the canonical additive offset: the host
+    // pixel domain is unknown here, and a gain keeps exact black, sign,
+    // and extended range intact in any encoding, where the additive form
+    // shifts the black floor. Perceived gain magnitude remains
+    // encoding-dependent; coefficients match the canonical baseGradeV2
+    // displacement at unit signal.
     color *= exp2(uniforms.exposure);
 
     const float contrast = 1.0f + uniforms.contrast;
@@ -82,11 +88,11 @@ kernel void filmtoneFilmBreathV1(
     color = mix(linearPart, toePart, toeMask);
     color = mix(color, shoulderPart, shoulderMask);
 
-    color.r += uniforms.temperature * 0.10f;
-    color.b -= uniforms.temperature * 0.10f;
-    color.r += uniforms.tint * 0.05f;
-    color.g -= uniforms.tint * 0.08f;
-    color.b += uniforms.tint * 0.05f;
+    const float3 channelGain = float3(
+        1.0f + uniforms.temperature * 0.10f + uniforms.tint * 0.05f,
+        1.0f - uniforms.tint * 0.08f,
+        1.0f - uniforms.temperature * 0.10f + uniforms.tint * 0.05f);
+    color *= channelGain;
 
     // RGB deliberately remains unclamped. Source alpha is passed through.
     output[outputIndex] = float4(color, sourceColor.a);

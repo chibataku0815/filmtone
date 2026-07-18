@@ -16,7 +16,7 @@ static_assert(forestone::visual_effect::kFilmDamageRecipeContractVersion == 2u);
 static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision.size() == 3u);
 static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[0] == '2');
 static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[1] == '.');
-static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[2] == '2');
+static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[2] == '3');
 static_assert(forestone::visual_render::kDeterministicRenderContextContractVersion == 1u);
 static_assert(forestone::filmtone::kFilmtoneFinishContractVersion == 1u);
 static_assert(filmtone::film_breath::kFilmBreathContractVersion == 1u);

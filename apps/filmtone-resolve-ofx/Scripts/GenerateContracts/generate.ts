@@ -23,18 +23,18 @@ const REGENERATION_COMMAND =
 const FROZEN_EXTERNAL = {
   artifactSchemaVersion: 1,
   filmDamageContractVersion: 2,
-  filmDamageContractRevision: "2.2",
+  filmDamageContractRevision: "2.3",
   deterministicRenderContextContractVersion: 1,
   filmtoneFinishContractVersion: 1,
   manifest: {
     path: "packages/filmtone-pack/artifacts/filmtone-finish-contract-v1.json",
-    sha256: "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3",
+    sha256: "cf90a1e838470acd7a7f7272a77561eb254d057742e70a150a6cd28823f8710b",
   },
   artifacts: {
     filmDamageRecipeHeader: {
       path: "packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp",
       outputName: "forestone_film_damage_recipe.hpp",
-      sha256: "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687",
+      sha256: "4cb78c964cc29270f2fb10bcd2f29d64438f2ab052ee86d3a61366bca032e874",
     },
     deterministicRenderContextHeader: {
       path: "packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp",
@@ -219,7 +219,7 @@ function validateHeaderMarkers(artifacts: readonly LoadedArtifact[]): void {
   const expectedMarkers: Record<LoadedArtifact["key"], readonly string[]> = {
     filmDamageRecipeHeader: [
       "kFilmDamageRecipeContractVersion = 2u;",
-      'kFilmDamageRecipeContractRevision = "2.2";',
+      'kFilmDamageRecipeContractRevision = "2.3";',
     ],
     deterministicRenderContextHeader: [
       "kDeterministicRenderContextContractVersion = 1u;",
@@ -576,9 +576,15 @@ function renderUmbrellaHeader(): string {
     "",
     "static_assert(forestone::visual_effect::kFilmDamageRecipeContractVersion == 2u);",
     "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision.size() == 3u);",
-    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[0] == '2');",
-    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[1] == '.');",
-    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[2] == '2');",
+    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[0] == '" +
+      FROZEN_EXTERNAL.filmDamageContractRevision[0] +
+      "');",
+    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[1] == '" +
+      FROZEN_EXTERNAL.filmDamageContractRevision[1] +
+      "');",
+    "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[2] == '" +
+      FROZEN_EXTERNAL.filmDamageContractRevision[2] +
+      "');",
     "static_assert(forestone::visual_render::kDeterministicRenderContextContractVersion == 1u);",
     "static_assert(forestone::filmtone::kFilmtoneFinishContractVersion == 1u);",
     "static_assert(filmtone::film_breath::kFilmBreathContractVersion == 1u);",
