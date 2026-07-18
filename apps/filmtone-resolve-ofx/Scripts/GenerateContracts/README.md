@@ -1,9 +1,15 @@
-# Filmtone Finish contract generation
+# Filmtone contract generation
 
 This boundary consumes frozen, externally owned C++ handoffs without making
 Filmtone another owner of their TypeScript contracts or defaults. It also
 generates the Film Breath C++ handoff from Filmtone's canonical
 `packages/film-lab-core/src/film-breath.ts` contract.
+
+The same run generates the Resolve spatial facade from
+`packages/film-lab-core/src/resolve-spatial-contract.ts`. That Filmtone-owned
+source freezes Node Role, the five spatial feature parameter surfaces,
+old-project defaults, generic mapping decisions, and render-scale/aspect
+semantics. Generic GlowRecipe and OpticsRecipe ownership remains external.
 
 Run from the Filmtone repository root:
 
@@ -27,6 +33,14 @@ The facade keeps feature use narrow:
   prepares the frozen uniforms used by both Gate Weave and Film Damage.
 - `filmtone::resolve::contracts::makeResolveRenderContextV1` is the only
   Resolve frame-time conversion entry point.
+- `filmtone_resolve_spatial.hpp` exposes generated parameter/feature metadata,
+  role-scheduling helpers, and one normalized view per spatial feature. It
+  preserves stored values when a role masks scheduling.
+
+The spatial header and provenance header both embed SHA-256 values for the
+canonical spatial contract, Filmtone reset defaults, the rgbShift limit, and
+Detail Softness derivation. The umbrella header compares those values at
+compile time so mixed-generation artifacts fail closed.
 
 The Resolve time adapter requires a resolved frame rate. It converts OpenFX
 frame-time to seconds, derives an explicit integral frame index from frame-time,

@@ -41,6 +41,34 @@
     "contractVersion": 1,
     "sha256": "1ad75cd29676f4d6c587ad63bb617edd542223fe66abbcc66637dedd4139fed2"
   },
+  "spatialInput": {
+    "owner": "packages/film-lab-core/src/resolve-spatial-contract.ts",
+    "contractId": "com.forestone.filmtone.resolve.spatial",
+    "contractVersion": 1,
+    "publicDisplayName": "Filmtone",
+    "compatibilityPluginId": "com.chibatakumi.filmtone.finish",
+    "inputs": [
+      {
+        "path": "packages/film-lab-core/src/resolve-spatial-contract.ts",
+        "sha256": "3de4a5d9d53dc04bb49b65cecbdc849ef88b08a971df8ba8e9f8dc7346fdd78b"
+      },
+      {
+        "path": "packages/film-lab-core/src/presets.ts",
+        "sha256": "48bb207ca368dd93dd50f4af3d09142bb2f7b939f8ef1970d99981900fa68b0a"
+      },
+      {
+        "path": "packages/film-lab-core/src/phase0-constants.ts",
+        "sha256": "7a9008029f764667304935d70c8ea4df179359686fcd271739eb27f11593ca83"
+      },
+      {
+        "path": "packages/film-lab-core/src/detail-softness.ts",
+        "sha256": "9698ddd440a9395968b18a74de55d29ecf53c9848511913c1939f436e9488351"
+      }
+    ],
+    "parameterCount": 14,
+    "featureCount": 5,
+    "verificationState": "canonical source and generated facade/provenance hashes frozen; build/test/Resolve verification not authorized"
+  },
   "generatedOutputs": [
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone-finish-contract-v1.json",
@@ -71,12 +99,16 @@
       "sha256": "3211520d5e313197626c3d386591a2bbc177629e54c0b2390090f2bb0f5fb8f4"
     },
     {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_resolve_spatial.hpp",
+      "sha256": "d3a30063e9648e5e6bb6bb96168cc2bfa9148d30bf6d0c5729c73ddba7b41ed0"
+    },
+    {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contract_provenance.hpp",
-      "sha256": "b6e074380d0475bbbe38229e0976ec0ecd7ddddeac7509d88cfcd99acd6435fd"
+      "sha256": "56d86aac0adb36e3276ad7f574f8b29b9eee585868e5b458dcb252d8aaffccf5"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contracts.hpp",
-      "sha256": "e32023283df4e67aa9d57ba21d85254ef59bca3103aab55192e0f40dc9d8c8b1"
+      "sha256": "77816a23046c97df3e27d488309caefe4333e4a9cc2e9e9fb6c9a195cf3a5e40"
     }
   ]
 }

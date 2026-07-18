@@ -4,6 +4,10 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { FILM_BREATH_CONTRACT } from "../../../../packages/film-lab-core/src/film-breath.ts";
+import {
+  FILMTONE_RESOLVE_SPATIAL_CONTRACT,
+  FILMTONE_RESOLVE_SPATIAL_CONTRACT_VERSION,
+} from "../../../../packages/film-lab-core/src/resolve-spatial-contract.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..", "..", "..");
@@ -15,6 +19,34 @@ const FILM_BREATH_SOURCE_PATH = resolve(
   REPO_ROOT,
   "packages/film-lab-core/src/film-breath.ts",
 );
+const SPATIAL_CONTRACT_SOURCE_PATH = resolve(
+  REPO_ROOT,
+  "packages/film-lab-core/src/resolve-spatial-contract.ts",
+);
+const SPATIAL_CONTRACT_INPUTS = {
+  contract: {
+    path: "packages/film-lab-core/src/resolve-spatial-contract.ts",
+    absolutePath: SPATIAL_CONTRACT_SOURCE_PATH,
+  },
+  defaults: {
+    path: "packages/film-lab-core/src/presets.ts",
+    absolutePath: resolve(REPO_ROOT, "packages/film-lab-core/src/presets.ts"),
+  },
+  rgbShiftLimit: {
+    path: "packages/film-lab-core/src/phase0-constants.ts",
+    absolutePath: resolve(
+      REPO_ROOT,
+      "packages/film-lab-core/src/phase0-constants.ts",
+    ),
+  },
+  detailSoftness: {
+    path: "packages/film-lab-core/src/detail-softness.ts",
+    absolutePath: resolve(
+      REPO_ROOT,
+      "packages/film-lab-core/src/detail-softness.ts",
+    ),
+  },
+} as const;
 
 const REGENERATION_COMMAND =
   "bun run apps/filmtone-resolve-ofx/Scripts/GenerateContracts/generate.ts " +
@@ -77,6 +109,14 @@ interface LoadedArtifact {
   sha256: string;
   contents: Buffer;
   text: string;
+}
+
+type SpatialContractInputKey = keyof typeof SPATIAL_CONTRACT_INPUTS;
+
+interface LoadedSpatialContractInput {
+  key: SpatialContractInputKey;
+  path: string;
+  sha256: string;
 }
 
 function fail(message: string): never {
@@ -248,11 +288,114 @@ function validateFilmBreathContract(): void {
   );
 }
 
+function spatialParameter(memberName: string) {
+  const parameter = FILMTONE_RESOLVE_SPATIAL_CONTRACT.parameterDefinitions.find(
+    (candidate) => candidate.memberName === memberName,
+  );
+  if (!parameter) {
+    return fail(`spatial contract is missing parameter member ${memberName}`);
+  }
+  return parameter;
+}
+
+function validateSpatialContract(): void {
+  const contract = FILMTONE_RESOLVE_SPATIAL_CONTRACT;
+  assertEqual(
+    "Resolve spatial contract version",
+    contract.contractVersion,
+    FILMTONE_RESOLVE_SPATIAL_CONTRACT_VERSION,
+  );
+  assertEqual(
+    "Resolve spatial contract version freeze",
+    contract.contractVersion,
+    1,
+  );
+  assertEqual(
+    "Resolve spatial contract owner",
+    contract.owner,
+    "packages/film-lab-core/src/resolve-spatial-contract.ts",
+  );
+  assertEqual(
+    "Resolve public display name",
+    contract.product.publicDisplayName,
+    "Filmtone",
+  );
+  assertEqual(
+    "Resolve compatibility plugin ID",
+    contract.product.compatibilityPluginId,
+    "com.chibatakumi.filmtone.finish",
+  );
+  assertEqual("Resolve spatial parameter count", contract.parameterDefinitions.length, 14);
+  assertEqual("Resolve spatial feature count", contract.features.length, 5);
+  assertEqual("Resolve Node Role count", contract.nodeRoles.length, 3);
+
+  const parameterIds = new Set<string>();
+  const memberNames = new Set<string>();
+  for (const parameter of contract.parameterDefinitions) {
+    if (parameterIds.has(parameter.id)) {
+      fail(`duplicate spatial parameter ID ${parameter.id}`);
+    }
+    if (memberNames.has(parameter.memberName)) {
+      fail(`duplicate spatial parameter member ${parameter.memberName}`);
+    }
+    if (
+      !Number.isFinite(parameter.defaultValue) ||
+      !Number.isFinite(parameter.minValue) ||
+      !Number.isFinite(parameter.maxValue) ||
+      parameter.minValue > parameter.maxValue ||
+      parameter.defaultValue < parameter.minValue ||
+      parameter.defaultValue > parameter.maxValue
+    ) {
+      fail(`invalid spatial parameter range/default for ${parameter.id}`);
+    }
+    parameterIds.add(parameter.id);
+    memberNames.add(parameter.memberName);
+  }
+
+  const role = spatialParameter("nodeRole");
+  assertEqual("Node Role default", role.defaultValue, 0);
+  assertEqual("Node Role minimum", role.minValue, 0);
+  assertEqual("Node Role maximum", role.maxValue, 2);
+  assertEqual("Node Role kind", role.kind, "choice");
+
+  for (const feature of contract.features) {
+    const enabled = spatialParameter(feature.enabledMember);
+    const identity = spatialParameter(feature.identityMember);
+    assertEqual(`${feature.id} Enabled default`, enabled.defaultValue, 0);
+    assertEqual(`${feature.id} identity amount default`, identity.defaultValue, 0);
+  }
+
+  const rgbShift = spatialParameter("rgbShift");
+  assertEqual(
+    "rgbShift generic mapping",
+    rgbShift.genericMapping,
+    "rejected-non-equivalent",
+  );
+  assertEqual(
+    "rgbShift rejected generic path",
+    rgbShift.genericPath,
+    "optics.chromaticFringing",
+  );
+  const detailSoftness = spatialParameter("detailSoftness");
+  assertEqual(
+    "detailSoftness ownership",
+    detailSoftness.genericMapping,
+    "filmtone-only",
+  );
+  if (contract.spatialSemantics.textureSoftness.effectiveMaximum <= 0) {
+    fail("Texture Softness effective maximum must be positive");
+  }
+}
+
 function cppNumber(value: number): string {
   if (!Number.isFinite(value)) {
     return fail(`cannot emit non-finite C++ number ${value}`);
   }
   return Number.isInteger(value) ? `${value}.0` : String(value);
+}
+
+function cppFloat(value: number): string {
+  return `${cppNumber(value)}f`;
 }
 
 function cppUint(value: number): string {
@@ -411,6 +554,320 @@ function renderFilmBreathHeader(): string {
   ].join("\n");
 }
 
+function spatialInputHash(
+  inputs: readonly LoadedSpatialContractInput[],
+  key: SpatialContractInputKey,
+): string {
+  const input = inputs.find((candidate) => candidate.key === key);
+  if (!input) {
+    return fail(`missing loaded spatial contract input ${key}`);
+  }
+  return input.sha256;
+}
+
+function spatialParameterKind(kind: string): string {
+  switch (kind) {
+    case "boolean":
+      return "FilmtoneSpatialParameterKindV1::boolean";
+    case "real":
+      return "FilmtoneSpatialParameterKindV1::real";
+    case "choice":
+      return "FilmtoneSpatialParameterKindV1::choice";
+    default:
+      return fail(`unsupported spatial parameter kind ${kind}`);
+  }
+}
+
+function spatialGenericMapping(mapping: string): string {
+  switch (mapping) {
+    case "filmtone-only":
+      return "FilmtoneSpatialGenericMappingV1::filmtoneOnly";
+    case "direct":
+      return "FilmtoneSpatialGenericMappingV1::direct";
+    case "rejected-non-equivalent":
+      return "FilmtoneSpatialGenericMappingV1::rejectedNonEquivalent";
+    default:
+      return fail(`unsupported spatial generic mapping ${mapping}`);
+  }
+}
+
+function renderSpatialContractHeader(
+  inputs: readonly LoadedSpatialContractInput[],
+): string {
+  const contract = FILMTONE_RESOLVE_SPATIAL_CONTRACT;
+  const parameters = contract.parameterDefinitions;
+  const roles = contract.nodeRoles;
+  const features = contract.features;
+  const parameterRows = parameters.map((parameter) =>
+    `  {${cppString(parameter.id)}, ${cppString(parameter.memberName)}, ${cppString(parameter.feature)}, ` +
+    `${cppString(parameter.sourceField)}, ${cppString(parameter.label)}, ${cppString(parameter.groupId)}, ` +
+    `${spatialParameterKind(parameter.kind)}, ${cppString(parameter.unit)}, ` +
+    `${cppNumber(parameter.defaultValue)}, ${cppNumber(parameter.minValue)}, ` +
+    `${cppNumber(parameter.maxValue)}, ${cppNumber(parameter.identityValue)}, ` +
+    `${cppString(parameter.normalization)}, ${spatialGenericMapping(parameter.genericMapping)}, ` +
+    `${cppString(parameter.genericPath)}},`,
+  );
+  const roleRows = roles.map((role) =>
+    `  {FilmtoneNodeRoleV1::${role.key}, ${cppString(role.key)}, ${cppString(role.label)}, ` +
+    `${role.schedulesSpatial ? "true" : "false"}, ` +
+    `${role.schedulesFilmModules ? "true" : "false"}},`,
+  );
+  const featureRows = features.map((feature) =>
+    `  {${cppString(feature.id)}, ${cppString(feature.label)}, ` +
+    `${cppString(feature.enabledMember)}, ${cppString(feature.identityMember)}, ` +
+    `${cppString(feature.renderScaleRule)}, ${cppString(feature.aspectRule)}, ` +
+    `${cppString(feature.identityCondition)}},`,
+  );
+  const parameterFields = parameters.map((parameter) => {
+    const type = parameter.kind === "real" ? "float" : "std::uint32_t";
+    const value = parameter.kind === "real"
+      ? cppFloat(parameter.defaultValue)
+      : `${Math.trunc(parameter.defaultValue)}u`;
+    return `  ${type} ${parameter.memberName} = ${value};`;
+  });
+
+  const strength = spatialParameter("bloomStrength");
+  const threshold = spatialParameter("bloomThreshold");
+  const radius = spatialParameter("bloomRadius");
+  const softKnee = spatialParameter("bloomSoftKnee");
+  const rgbShift = spatialParameter("rgbShift");
+  const lensSoftness = spatialParameter("lensSoftness");
+  const detailSoftness = spatialParameter("detailSoftness");
+  const vignette = spatialParameter("vignette");
+  const texture = contract.spatialSemantics.textureSoftness;
+
+  return [
+    ...generatedBanner(contract.owner),
+    "#pragma once",
+    "",
+    "#include <algorithm>",
+    "#include <array>",
+    "#include <cmath>",
+    "#include <cstdint>",
+    "#include <string_view>",
+    "",
+    "namespace filmtone::resolve::spatial {",
+    "",
+    `inline constexpr std::uint32_t kFilmtoneResolveSpatialContractVersion = ${contract.contractVersion}u;`,
+    `inline constexpr std::string_view kFilmtoneResolveSpatialContractId = ${cppString(contract.contractId)};`,
+    `inline constexpr std::string_view kFilmtoneResolveSpatialContractOwner = ${cppString(contract.owner)};`,
+    `inline constexpr std::string_view kFilmtonePublicDisplayName = ${cppString(contract.product.publicDisplayName)};`,
+    `inline constexpr std::string_view kFilmtoneCompatibilityPluginId = ${cppString(contract.product.compatibilityPluginId)};`,
+    `inline constexpr std::string_view kSpatialContractSourceSha256 = ${cppString(spatialInputHash(inputs, "contract"))};`,
+    `inline constexpr std::string_view kSpatialDefaultsSourceSha256 = ${cppString(spatialInputHash(inputs, "defaults"))};`,
+    `inline constexpr std::string_view kSpatialRgbShiftLimitSourceSha256 = ${cppString(spatialInputHash(inputs, "rgbShiftLimit"))};`,
+    `inline constexpr std::string_view kSpatialDetailSoftnessSourceSha256 = ${cppString(spatialInputHash(inputs, "detailSoftness"))};`,
+    "inline constexpr bool kRoleMasksPreserveStoredValues = true;",
+    "inline constexpr bool kSpatialPreservesSourceAlpha = true;",
+    "inline constexpr bool kSpatialPreservesExtendedRangeRgb = true;",
+    "inline constexpr float kGenericBloomColorResponseV1 = 0.0f;",
+    "",
+    "enum class FilmtoneNodeRoleV1 : std::uint32_t {",
+    ...roles.map((role) => `  ${role.key} = ${role.value}u,`),
+    "};",
+    "",
+    "enum class FilmtoneSpatialParameterKindV1 : std::uint32_t {",
+    "  boolean = 0u,",
+    "  real = 1u,",
+    "  choice = 2u,",
+    "};",
+    "",
+    "enum class FilmtoneSpatialGenericMappingV1 : std::uint32_t {",
+    "  filmtoneOnly = 0u,",
+    "  direct = 1u,",
+    "  rejectedNonEquivalent = 2u,",
+    "};",
+    "",
+    "struct FilmtoneNodeRoleDefinitionV1 {",
+    "  FilmtoneNodeRoleV1 value;",
+    "  const char* key;",
+    "  const char* label;",
+    "  bool schedulesSpatial;",
+    "  bool schedulesFilmModules;",
+    "};",
+    "",
+    `inline constexpr std::array<FilmtoneNodeRoleDefinitionV1, ${roles.length}> kFilmtoneNodeRoleDefinitionsV1{{`,
+    ...roleRows,
+    "}};",
+    "",
+    "struct FilmtoneSpatialParameterDefinitionV1 {",
+    "  const char* id;",
+    "  const char* memberName;",
+    "  const char* feature;",
+    "  const char* sourceField;",
+    "  const char* label;",
+    "  const char* groupId;",
+    "  FilmtoneSpatialParameterKindV1 kind;",
+    "  const char* unit;",
+    "  double defaultValue;",
+    "  double minValue;",
+    "  double maxValue;",
+    "  double identityValue;",
+    "  const char* normalization;",
+    "  FilmtoneSpatialGenericMappingV1 genericMapping;",
+    "  const char* genericPath;",
+    "};",
+    "",
+    `inline constexpr std::array<FilmtoneSpatialParameterDefinitionV1, ${parameters.length}> kFilmtoneSpatialParameterDefinitionsV1{{`,
+    ...parameterRows,
+    "}};",
+    "",
+    "struct FilmtoneSpatialFeatureDefinitionV1 {",
+    "  const char* id;",
+    "  const char* label;",
+    "  const char* enabledMember;",
+    "  const char* identityMember;",
+    "  const char* renderScaleRule;",
+    "  const char* aspectRule;",
+    "  const char* identityCondition;",
+    "};",
+    "",
+    `inline constexpr std::array<FilmtoneSpatialFeatureDefinitionV1, ${features.length}> kFilmtoneSpatialFeatureDefinitionsV1{{`,
+    ...featureRows,
+    "}};",
+    "",
+    "struct FilmtoneSpatialParametersV1 {",
+    ...parameterFields,
+    "};",
+    "",
+    "struct DeepGlowParameterViewV1 {",
+    "  bool active = false;",
+    `  float strength = ${cppFloat(strength.defaultValue)};`,
+    `  float threshold = ${cppFloat(threshold.defaultValue)};`,
+    `  float radius = ${cppFloat(radius.defaultValue)};`,
+    `  float softKnee = ${cppFloat(softKnee.defaultValue)};`,
+    "};",
+    "",
+    "struct PeripheralChromaticShiftParameterViewV1 {",
+    "  bool active = false;",
+    `  float amount = ${cppFloat(rgbShift.defaultValue)};`,
+    "};",
+    "",
+    "struct LensSoftnessParameterViewV1 {",
+    "  bool active = false;",
+    `  float amount = ${cppFloat(lensSoftness.defaultValue)};`,
+    "};",
+    "",
+    "struct TextureSoftnessParameterViewV1 {",
+    "  bool active = false;",
+    `  float amount = ${cppFloat(detailSoftness.defaultValue)};`,
+    "  float effectiveAmount = 0.0f;",
+    `  float kernelRadiusFullResolutionPixels = ${cppFloat(texture.kernelRadiusMinimumFullResolutionPixels)};`,
+    `  float rangeSigma = ${cppFloat(texture.rangeSigma)};`,
+    `  float detailAmplitudeLow = ${cppFloat(texture.detailAmplitudeLow)};`,
+    `  float detailAmplitudeHigh = ${cppFloat(texture.detailAmplitudeHigh)};`,
+    `  float chromaAttenuationScale = ${cppFloat(texture.chromaAttenuationScale)};`,
+    `  float highlightBias = ${cppFloat(texture.highlightBias)};`,
+    "};",
+    "",
+    "struct VignetteParameterViewV1 {",
+    "  bool active = false;",
+    `  float amount = ${cppFloat(vignette.defaultValue)};`,
+    "};",
+    "",
+    `inline constexpr float kPeripheralChromaticShiftRadialExponentV1 = ${cppFloat(contract.spatialSemantics.peripheralChromaticShift.radialExponent)};`,
+    `inline constexpr float kTextureSoftnessEffectiveMaximumV1 = ${cppFloat(texture.effectiveMaximum)};`,
+    `inline constexpr float kTextureSoftnessKernelRadiusMinimumFullResolutionPixelsV1 = ${cppFloat(texture.kernelRadiusMinimumFullResolutionPixels)};`,
+    `inline constexpr float kTextureSoftnessKernelRadiusMaximumFullResolutionPixelsV1 = ${cppFloat(texture.kernelRadiusMaximumFullResolutionPixels)};`,
+    "",
+    "namespace detail {",
+    "",
+    "inline float clampFinite(float value, float minimum, float maximum, float fallback) noexcept {",
+    "  if (!std::isfinite(value)) return fallback;",
+    "  return std::min(maximum, std::max(minimum, value));",
+    "}",
+    "",
+    "}  // namespace detail",
+    "",
+    "[[nodiscard]] inline FilmtoneNodeRoleV1 normalizeNodeRoleV1(std::uint32_t value) noexcept {",
+    "  switch (value) {",
+    ...roles.map((role) =>
+      `    case ${role.value}u: return FilmtoneNodeRoleV1::${role.key};`,
+    ),
+    "    default: return FilmtoneNodeRoleV1::all;",
+    "  }",
+    "}",
+    "",
+    "[[nodiscard]] inline bool roleSchedulesSpatialV1(std::uint32_t storedRole) noexcept {",
+    "  const auto role = normalizeNodeRoleV1(storedRole);",
+    "  return role == FilmtoneNodeRoleV1::all || role == FilmtoneNodeRoleV1::optics;",
+    "}",
+    "",
+    "[[nodiscard]] inline bool roleSchedulesFilmModulesV1(std::uint32_t storedRole) noexcept {",
+    "  const auto role = normalizeNodeRoleV1(storedRole);",
+    "  return role == FilmtoneNodeRoleV1::all || role == FilmtoneNodeRoleV1::filmModules;",
+    "}",
+    "",
+    "[[nodiscard]] inline DeepGlowParameterViewV1 makeDeepGlowParameterViewV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    `  const float strength = detail::clampFinite(parameters.bloomStrength, ${cppFloat(strength.minValue)}, ${cppFloat(strength.maxValue)}, ${cppFloat(strength.defaultValue)});`,
+    "  return {",
+    "      parameters.deepGlowEnabled != 0u && strength > 0.0f,",
+    "      strength,",
+    `      detail::clampFinite(parameters.bloomThreshold, ${cppFloat(threshold.minValue)}, ${cppFloat(threshold.maxValue)}, ${cppFloat(threshold.defaultValue)}),`,
+    `      detail::clampFinite(parameters.bloomRadius, ${cppFloat(radius.minValue)}, ${cppFloat(radius.maxValue)}, ${cppFloat(radius.defaultValue)}),`,
+    `      detail::clampFinite(parameters.bloomSoftKnee, ${cppFloat(softKnee.minValue)}, ${cppFloat(softKnee.maxValue)}, ${cppFloat(softKnee.defaultValue)}),`,
+    "  };",
+    "}",
+    "",
+    "[[nodiscard]] inline PeripheralChromaticShiftParameterViewV1 makePeripheralChromaticShiftParameterViewV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    `  const float amount = detail::clampFinite(parameters.rgbShift, ${cppFloat(rgbShift.minValue)}, ${cppFloat(rgbShift.maxValue)}, ${cppFloat(rgbShift.defaultValue)});`,
+    "  return {parameters.peripheralChromaticShiftEnabled != 0u && amount > 0.0f, amount};",
+    "}",
+    "",
+    "[[nodiscard]] inline LensSoftnessParameterViewV1 makeLensSoftnessParameterViewV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    `  const float amount = detail::clampFinite(parameters.lensSoftness, ${cppFloat(lensSoftness.minValue)}, ${cppFloat(lensSoftness.maxValue)}, ${cppFloat(lensSoftness.defaultValue)});`,
+    "  return {parameters.lensSoftnessEnabled != 0u && amount > 0.0f, amount};",
+    "}",
+    "",
+    "[[nodiscard]] inline TextureSoftnessParameterViewV1 makeTextureSoftnessParameterViewV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    `  const float amount = detail::clampFinite(parameters.detailSoftness, ${cppFloat(detailSoftness.minValue)}, ${cppFloat(detailSoftness.maxValue)}, ${cppFloat(detailSoftness.defaultValue)});`,
+    "  const float effective = std::min(kTextureSoftnessEffectiveMaximumV1, amount);",
+    "  const float t = effective / kTextureSoftnessEffectiveMaximumV1;",
+    "  const float radius = kTextureSoftnessKernelRadiusMinimumFullResolutionPixelsV1 +",
+    "      t * (kTextureSoftnessKernelRadiusMaximumFullResolutionPixelsV1 -",
+    "           kTextureSoftnessKernelRadiusMinimumFullResolutionPixelsV1);",
+    "  return {",
+    "      parameters.textureSoftnessEnabled != 0u && amount > 0.0f,",
+    "      amount,",
+    "      effective,",
+    "      radius,",
+    `      ${cppFloat(texture.rangeSigma)},`,
+    `      ${cppFloat(texture.detailAmplitudeLow)},`,
+    `      ${cppFloat(texture.detailAmplitudeHigh)},`,
+    `      ${cppFloat(texture.chromaAttenuationScale)},`,
+    `      ${cppFloat(texture.highlightBias)},`,
+    "  };",
+    "}",
+    "",
+    "[[nodiscard]] inline VignetteParameterViewV1 makeVignetteParameterViewV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    `  const float amount = detail::clampFinite(parameters.vignette, ${cppFloat(vignette.minValue)}, ${cppFloat(vignette.maxValue)}, ${cppFloat(vignette.defaultValue)});`,
+    "  return {parameters.vignetteEnabled != 0u && amount > 0.0f, amount};",
+    "}",
+    "",
+    "[[nodiscard]] inline bool isSpatialConfiguredIdentityV1(",
+    "    const FilmtoneSpatialParametersV1& parameters) noexcept {",
+    "  return !makeDeepGlowParameterViewV1(parameters).active &&",
+    "      !makePeripheralChromaticShiftParameterViewV1(parameters).active &&",
+    "      !makeLensSoftnessParameterViewV1(parameters).active &&",
+    "      !makeTextureSoftnessParameterViewV1(parameters).active &&",
+    "      !makeVignetteParameterViewV1(parameters).active;",
+    "}",
+    "",
+    `static_assert(kFilmtoneSpatialParameterDefinitionsV1.size() == ${parameters.length}u);`,
+    `static_assert(kFilmtoneSpatialFeatureDefinitionsV1.size() == ${features.length}u);`,
+    "static_assert(kGenericBloomColorResponseV1 == 0.0f);",
+    "static_assert(kTextureSoftnessEffectiveMaximumV1 > 0.0f);",
+    "",
+    "}  // namespace filmtone::resolve::spatial",
+    "",
+  ].join("\n");
+}
+
 function renderResolveTimeAdapterHeader(): string {
   return [
     ...generatedBanner(
@@ -529,7 +986,10 @@ function renderFinishAdapterHeader(): string {
   ].join("\n");
 }
 
-function renderProvenanceHeader(filmBreathSourceSha256: string): string {
+function renderProvenanceHeader(
+  filmBreathSourceSha256: string,
+  spatialInputs: readonly LoadedSpatialContractInput[],
+): string {
   const artifacts = FROZEN_EXTERNAL.artifacts;
   return [
     ...generatedBanner(
@@ -553,6 +1013,14 @@ function renderProvenanceHeader(filmBreathSourceSha256: string): string {
     `inline constexpr std::string_view kFilmtoneFinishMappingSha256 = ${cppString(artifacts.filmtoneFinishMappingHeader.sha256)};`,
     `inline constexpr std::string_view kFilmBreathSourcePath = "packages/film-lab-core/src/film-breath.ts";`,
     `inline constexpr std::string_view kFilmBreathSourceSha256 = ${cppString(filmBreathSourceSha256)};`,
+    `inline constexpr std::string_view kSpatialContractSourcePath = ${cppString(SPATIAL_CONTRACT_INPUTS.contract.path)};`,
+    `inline constexpr std::string_view kSpatialContractSourceSha256 = ${cppString(spatialInputHash(spatialInputs, "contract"))};`,
+    `inline constexpr std::string_view kSpatialDefaultsSourcePath = ${cppString(SPATIAL_CONTRACT_INPUTS.defaults.path)};`,
+    `inline constexpr std::string_view kSpatialDefaultsSourceSha256 = ${cppString(spatialInputHash(spatialInputs, "defaults"))};`,
+    `inline constexpr std::string_view kSpatialRgbShiftLimitSourcePath = ${cppString(SPATIAL_CONTRACT_INPUTS.rgbShiftLimit.path)};`,
+    `inline constexpr std::string_view kSpatialRgbShiftLimitSourceSha256 = ${cppString(spatialInputHash(spatialInputs, "rgbShiftLimit"))};`,
+    `inline constexpr std::string_view kSpatialDetailSoftnessSourcePath = ${cppString(SPATIAL_CONTRACT_INPUTS.detailSoftness.path)};`,
+    `inline constexpr std::string_view kSpatialDetailSoftnessSourceSha256 = ${cppString(spatialInputHash(spatialInputs, "detailSoftness"))};`,
     "",
     "}  // namespace filmtone::resolve::contracts::provenance",
     "",
@@ -573,6 +1041,7 @@ function renderUmbrellaHeader(): string {
     '#include "filmtone_finish_adapter.hpp"',
     '#include "filmtone_finish_contract_provenance.hpp"',
     '#include "filmtone_finish_resolve_time.hpp"',
+    '#include "filmtone_resolve_spatial.hpp"',
     "",
     "static_assert(forestone::visual_effect::kFilmDamageRecipeContractVersion == 2u);",
     "static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision.size() == 3u);",
@@ -588,6 +1057,13 @@ function renderUmbrellaHeader(): string {
     "static_assert(forestone::visual_render::kDeterministicRenderContextContractVersion == 1u);",
     "static_assert(forestone::filmtone::kFilmtoneFinishContractVersion == 1u);",
     "static_assert(filmtone::film_breath::kFilmBreathContractVersion == 1u);",
+    "static_assert(filmtone::resolve::spatial::kFilmtoneResolveSpatialContractVersion == 1u);",
+    "static_assert(filmtone::resolve::spatial::kFilmtonePublicDisplayName == std::string_view{\"Filmtone\"});",
+    "static_assert(filmtone::resolve::spatial::kFilmtoneCompatibilityPluginId == std::string_view{\"com.chibatakumi.filmtone.finish\"});",
+    "static_assert(filmtone::resolve::spatial::kSpatialContractSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialContractSourceSha256);",
+    "static_assert(filmtone::resolve::spatial::kSpatialDefaultsSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialDefaultsSourceSha256);",
+    "static_assert(filmtone::resolve::spatial::kSpatialRgbShiftLimitSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialRgbShiftLimitSourceSha256);",
+    "static_assert(filmtone::resolve::spatial::kSpatialDetailSoftnessSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialDetailSoftnessSourceSha256);",
     "static_assert(forestone::filmtone::kGateWeaveStreamSalt == forestone::visual_effect::kGateWeaveStreamSalt);",
     "static_assert(forestone::filmtone::kFilmDamageStreamSalt == forestone::visual_effect::kFilmDamageStreamSalt);",
     "",
@@ -605,6 +1081,7 @@ const manifest = parseManifest(manifestContents);
 validateManifest(manifest);
 assertHash("external manifest", manifestContents, FROZEN_EXTERNAL.manifest.sha256);
 validateFilmBreathContract();
+validateSpatialContract();
 
 const externalArtifacts = (
   Object.entries(FROZEN_EXTERNAL.artifacts) as Array<
@@ -633,6 +1110,18 @@ for (const artifact of externalArtifacts) {
 
 const filmBreathSourceContents = readRequired(FILM_BREATH_SOURCE_PATH, "Film Breath source");
 const filmBreathSourceSha256 = sha256(filmBreathSourceContents);
+const spatialContractInputs = (
+  Object.entries(SPATIAL_CONTRACT_INPUTS) as Array<
+    [SpatialContractInputKey, (typeof SPATIAL_CONTRACT_INPUTS)[SpatialContractInputKey]]
+  >
+).map(([key, input]): LoadedSpatialContractInput => {
+  const contents = readRequired(input.absolutePath, `spatial contract input ${key}`);
+  return {
+    key,
+    path: input.path,
+    sha256: sha256(contents),
+  };
+});
 const outputContents = new Map<string, Buffer>();
 outputContents.set("filmtone-finish-contract-v1.json", manifestContents);
 for (const artifact of externalArtifacts) {
@@ -651,8 +1140,15 @@ outputContents.set(
   Buffer.from(renderFinishAdapterHeader(), "utf8"),
 );
 outputContents.set(
+  "filmtone_resolve_spatial.hpp",
+  Buffer.from(renderSpatialContractHeader(spatialContractInputs), "utf8"),
+);
+outputContents.set(
   "filmtone_finish_contract_provenance.hpp",
-  Buffer.from(renderProvenanceHeader(filmBreathSourceSha256), "utf8"),
+  Buffer.from(
+    renderProvenanceHeader(filmBreathSourceSha256, spatialContractInputs),
+    "utf8",
+  ),
 );
 outputContents.set(
   "filmtone_finish_contracts.hpp",
@@ -694,6 +1190,25 @@ const provenance = {
     owner: "packages/film-lab-core/src/film-breath.ts",
     contractVersion: FILM_BREATH_CONTRACT.contractVersion,
     sha256: filmBreathSourceSha256,
+  },
+  spatialInput: {
+    owner: FILMTONE_RESOLVE_SPATIAL_CONTRACT.owner,
+    contractId: FILMTONE_RESOLVE_SPATIAL_CONTRACT.contractId,
+    contractVersion: FILMTONE_RESOLVE_SPATIAL_CONTRACT.contractVersion,
+    publicDisplayName:
+      FILMTONE_RESOLVE_SPATIAL_CONTRACT.product.publicDisplayName,
+    compatibilityPluginId:
+      FILMTONE_RESOLVE_SPATIAL_CONTRACT.product.compatibilityPluginId,
+    inputs: spatialContractInputs.map(({ path, sha256: hash }) => ({
+      path,
+      sha256: hash,
+    })),
+    parameterCount:
+      FILMTONE_RESOLVE_SPATIAL_CONTRACT.parameterDefinitions.length,
+    featureCount: FILMTONE_RESOLVE_SPATIAL_CONTRACT.features.length,
+    verificationState:
+      "canonical source and generated facade/provenance hashes frozen; " +
+      "build/test/Resolve verification not authorized",
   },
   generatedOutputs: generatedOutputProvenance,
 };

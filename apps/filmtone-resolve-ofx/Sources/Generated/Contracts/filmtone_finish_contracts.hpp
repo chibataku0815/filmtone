@@ -11,6 +11,7 @@
 #include "filmtone_finish_adapter.hpp"
 #include "filmtone_finish_contract_provenance.hpp"
 #include "filmtone_finish_resolve_time.hpp"
+#include "filmtone_resolve_spatial.hpp"
 
 static_assert(forestone::visual_effect::kFilmDamageRecipeContractVersion == 2u);
 static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision.size() == 3u);
@@ -20,5 +21,12 @@ static_assert(forestone::visual_effect::kFilmDamageRecipeContractRevision[2] == 
 static_assert(forestone::visual_render::kDeterministicRenderContextContractVersion == 1u);
 static_assert(forestone::filmtone::kFilmtoneFinishContractVersion == 1u);
 static_assert(filmtone::film_breath::kFilmBreathContractVersion == 1u);
+static_assert(filmtone::resolve::spatial::kFilmtoneResolveSpatialContractVersion == 1u);
+static_assert(filmtone::resolve::spatial::kFilmtonePublicDisplayName == std::string_view{"Filmtone"});
+static_assert(filmtone::resolve::spatial::kFilmtoneCompatibilityPluginId == std::string_view{"com.chibatakumi.filmtone.finish"});
+static_assert(filmtone::resolve::spatial::kSpatialContractSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialContractSourceSha256);
+static_assert(filmtone::resolve::spatial::kSpatialDefaultsSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialDefaultsSourceSha256);
+static_assert(filmtone::resolve::spatial::kSpatialRgbShiftLimitSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialRgbShiftLimitSourceSha256);
+static_assert(filmtone::resolve::spatial::kSpatialDetailSoftnessSourceSha256 == filmtone::resolve::contracts::provenance::kSpatialDetailSoftnessSourceSha256);
 static_assert(forestone::filmtone::kGateWeaveStreamSalt == forestone::visual_effect::kGateWeaveStreamSalt);
 static_assert(forestone::filmtone::kFilmDamageStreamSalt == forestone::visual_effect::kFilmDamageStreamSalt);

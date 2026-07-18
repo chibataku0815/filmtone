@@ -20,5 +20,13 @@ inline constexpr std::string_view kFilmtoneFinishMappingPath = "packages/filmton
 inline constexpr std::string_view kFilmtoneFinishMappingSha256 = "a7bca5ef716633ac7fedc25ed6890fb5f6b41599360088475c87cf2182665d44";
 inline constexpr std::string_view kFilmBreathSourcePath = "packages/film-lab-core/src/film-breath.ts";
 inline constexpr std::string_view kFilmBreathSourceSha256 = "1ad75cd29676f4d6c587ad63bb617edd542223fe66abbcc66637dedd4139fed2";
+inline constexpr std::string_view kSpatialContractSourcePath = "packages/film-lab-core/src/resolve-spatial-contract.ts";
+inline constexpr std::string_view kSpatialContractSourceSha256 = "3de4a5d9d53dc04bb49b65cecbdc849ef88b08a971df8ba8e9f8dc7346fdd78b";
+inline constexpr std::string_view kSpatialDefaultsSourcePath = "packages/film-lab-core/src/presets.ts";
+inline constexpr std::string_view kSpatialDefaultsSourceSha256 = "48bb207ca368dd93dd50f4af3d09142bb2f7b939f8ef1970d99981900fa68b0a";
+inline constexpr std::string_view kSpatialRgbShiftLimitSourcePath = "packages/film-lab-core/src/phase0-constants.ts";
+inline constexpr std::string_view kSpatialRgbShiftLimitSourceSha256 = "7a9008029f764667304935d70c8ea4df179359686fcd271739eb27f11593ca83";
+inline constexpr std::string_view kSpatialDetailSoftnessSourcePath = "packages/film-lab-core/src/detail-softness.ts";
+inline constexpr std::string_view kSpatialDetailSoftnessSourceSha256 = "9698ddd440a9395968b18a74de55d29ecf53c9848511913c1939f436e9488351";
 
 }  // namespace filmtone::resolve::contracts::provenance
