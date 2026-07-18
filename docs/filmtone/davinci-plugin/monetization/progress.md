@@ -24,10 +24,11 @@ Coordinator-owned: yes
 - Phase C外部基盤: Polar製品($49 / ¥8,000)と固定額クーポン($10 / ¥1,600)、
   Resend domain検証とdomain限定送信key、Cloudflare KV / Turnstile本番widget /
   initial Worker deploy / secret 4件まで完了。規約・SLA文面も候補を作成済み。
-  hostname/action bindingを含むcurrent sourceも2026-07-19に再deploy済み。
+  product identity同期済みsourceも2026-07-19に本番deploy済み。Version IDは
+  `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`。
 - 残るMON-4発売ゲート: testing authorization後の実trial請求・メール送達・
-  添付license検証・失敗系確認、MON-6でのtrialフォームと購入メール文面配置、
-  法務文面のオーナー最終確認。
+  添付license検証、正しい本番Turnstile tokenのhostname/action成功、MON-6での
+  trialフォームと購入メール文面配置、法務文面のオーナー最終確認。
 - latest mainのQUALITYはResolve 21.0.2.4ホスト実描画までpassしたが、owner verdictは
   Damage pass / Breath・Weave below passでpartial acceptanceのままclosed。
   combined/public acceptanceは未成立。
@@ -54,7 +55,7 @@ Coordinator-owned: yes
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
 | MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質回復 + combined/public受入 | **是** | **Blocked** |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
-| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — hostname/action binding版deploy済み。名称同期版はcommit/push済み・deploy未実施。実送達・公開導線・法務最終確認待ち** |
+| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — product identity同期版deploy・安全な失敗系・外部表示名sync完了。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
 | MON-6 | ローンチ(製品ページ・記事・価格公開) | 対応計画 §7 | MON-2〜5 + release truth | 否 | Queued |
 | MON-7 | 外殻(実売後のみ): 購入側自動発行(Phase L2)、marketplace 展開、edu/bundle 価格、Windows 版検討 | 対応計画 §5 L2 注記 | MON-6 後の実売データ | 一部 | Queued(着手条件未成立) |
@@ -159,6 +160,13 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 - [x] hostname/action bindingとResend 409種別判定を含むsource commit `f8c4611`を
   remoteへ保存して再deploy。Worker Version ID:
   `627b6337-15d3-441c-a695-8accb47f9f9d`
+- [x] product identity同期済みcommit `6104168`のWorkerを本番deploy。Worker
+  Version ID: `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`。同deploy後にtoken欠落
+  `400 invalid_request`、不正token `403 verification_failed`を再確認。どちらも
+  Turnstile/throttle/KV/Resendの処理順からメール送信・KV書き込みへ到達しない。
+- [x] 外部表示名sync: Cloudflare Turnstile widgetはsitekey・domain・managed
+  modeを維持して`Filmtone Trial`、1Password Environment
+  `w4plqx7tjh2zmaojldj6r3jfp4`はID・変数を維持して`Filmtone Production`。
 - [ ] **発売ゲート(未通過)**: Resend 実送達確認(実メール到達・添付検証)/
   正しいTurnstile hostname/action成功と欠落・不正・mismatch拒否 / trial使用済み
   購入者の優先発行例外を購入メールに明記
@@ -243,6 +251,11 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 - 1Password MCPの同名更新が追記動作になったため、旧Environmentを削除せず
   retired名へ変更し、新しい`Filmtone Production`をMCPだけで再作成。
   必要5変数を重複なしで保存し、変数名一覧だけを確認した。
+- 2026-07-19 product identity post-deploy gate: Worker Version
+  `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`を本番へdeploy。許可originからの
+  token欠落は`400 invalid_request`、不正tokenは`403 verification_failed`。
+  Turnstile widgetと1Password Environmentの表示名syncも完了。実trial請求、
+  Resend実送達、添付`Filmtone.license`検証は実行していない。
 
 ## 進行ログ
 
@@ -328,3 +341,16 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   ことを明記。Turnstile widget・1Password Environmentの実ダッシュボード
   表示名は本タスクで未確認(文書上の名称のみ同期)。名称同期版Workerの
   deploy・実trial送達・添付license検証は発売ゲートとして未実施のまま。
+- 2026-07-19 (改訂 15 / product identity post-deploy gate): commit `6104168`の
+  Workerを本番へdeployし、Version ID
+  `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`を記録。deploy後のtoken欠落は
+  `400 invalid_request`、不正tokenは`403 verification_failed`で、sourceの
+  処理順から両方ともthrottle/KV/Resendへ到達しない。Cloudflare Turnstile
+  widgetを`Filmtone Trial`、指定1Password Environmentを
+  `Filmtone Production`へ名称同期し、sitekey/domain/modeとEnvironment IDを
+  維持した。MON-6のTurnstile付きtrialフォームが未設置のため、有効tokenを
+  使う実trial請求、Resend実送達、添付`Filmtone.license`検証は未実施。
+  rename後bundleのResolve内discovery / identity / determinism再検証も未実施。
+  Copy / History Impact: 外部管理画面とWorker deployを確定済みproduct identityへ
+  同期しただけで、公開release claimは追加していない。Article Opportunity:
+  No story。Change-History Opportunity: No。

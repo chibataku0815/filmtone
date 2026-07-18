@@ -68,6 +68,27 @@ All dispatches follow `delegation.md`. Master states are:
   feature-specific work. This is not a packaging, distribution, parity, or
   public-release claim.
 
+## Product Identity Post-Deploy Gate — 2026-07-19
+
+- Product identity同期済みWorker source at commit `6104168` was deployed to
+  production as Version ID `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`.
+- Production failure paths were rechecked from an allowed origin: a missing
+  Turnstile token returns `400 invalid_request`; an invalid token returns
+  `403 verification_failed`. Both stop before throttle, KV, and Resend work.
+- External management labels are synchronized: Cloudflare Turnstile uses
+  `Filmtone Trial`; 1Password Environment
+  `w4plqx7tjh2zmaojldj6r3jfp4` uses `Filmtone Production`. Functional sitekey,
+  allowed domains, widget mode, Environment ID, and stored variables were not
+  changed.
+- Actual trial E2E remains structurally open because MON-6 has no production
+  Turnstile form on `chibatakumi.studio`. No valid token was automated, no
+  email was requested, and attachment delivery was not verified.
+- The renamed `Filmtone.ofx.bundle` has not been re-verified inside Resolve.
+  Discovery, identity, and deterministic repeat remain open owner-authorized
+  host gates; the dated pre-rename host evidence below is unchanged.
+- MON-2 remains Blocked on Film Breath / Gate Weave owner pass and combined
+  public-quality acceptance. MON-5 and MON-6 remain downstream.
+
 ## Workstream Status
 
 | ID | Plan | Progress | Repository | Depends on | State |
