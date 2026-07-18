@@ -12,11 +12,73 @@ export const FILM_BREATH_ZERO_OFFSETS: FilmBreathOffsets = {
   tint: 0,
 };
 
-const FILM_BREATH_LIMITS = {
-  exposure: 0.5,
-  contrast: 0.15,
-  temperature: 0.22,
-  tint: 0.12,
+export const FILM_BREATH_CONTRACT_VERSION = 1 as const;
+
+/**
+ * Versioned numeric and algorithm contract for Film Breath implementations.
+ *
+ * This object is the Filmtone-owned source used by both this TypeScript
+ * implementation and generated native handoffs. Keep implementation-specific
+ * ports out of this package and bump the version when these semantics change.
+ */
+export const FILM_BREATH_CONTRACT = {
+  contractVersion: FILM_BREATH_CONTRACT_VERSION,
+  algorithm: "filmtone-value-noise-v1",
+  seedNormalization: "absolute-truncate-uint32-wrap",
+  amount: {
+    min: 0,
+    max: 1,
+    exponent: 1.35,
+    envelopeSeconds: 1.25,
+  },
+  limits: {
+    exposure: 0.5,
+    contrast: 0.15,
+    temperature: 0.22,
+    tint: 0.12,
+  },
+  outputSalts: {
+    exposure: 0x4f1bbcdc,
+    contrast: 0x9e2c6b6f,
+    temperature: 0x27d4eb2f,
+    tint: 0x165667b1,
+  },
+  hash: {
+    latticeMultiplier: 0x9e3779b1,
+    saltMultiplier: 0x85ebca6b,
+    avalancheMultiplierA: 0x7feb352d,
+    avalancheMultiplierB: 0x846ca68b,
+    divisor: 0xffffffff,
+  },
+  noise: {
+    phaseSaltXor: 0xa511e9b3,
+    phaseScale: 8,
+    calibration: 2.5,
+    min: -1,
+    max: 1,
+    bands: {
+      fast: {
+        periodSeconds: 1.8,
+        weight: 0.15,
+        saltXor: 0x52a7b9c4,
+      },
+      medium: {
+        periodSeconds: 4.8,
+        weight: 0.55,
+        saltXor: 0,
+      },
+      slow: {
+        periodSeconds: 8.6,
+        weight: 0.2,
+        saltXor: 0x6d2b79f5,
+      },
+      long: {
+        periodSeconds: 15.5,
+        weight: 0.1,
+        saltXor: 0x1b873593,
+      },
+    },
+  },
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
@@ -40,19 +102,21 @@ function normalizeSeed(sourceSeed: number): number {
 }
 
 function hashUnit(seed: number, lattice: number, salt: number): number {
+  const hash = FILM_BREATH_CONTRACT.hash;
   let x = seed >>> 0;
-  x ^= Math.imul((lattice | 0) >>> 0, 0x9e3779b1) >>> 0;
-  x ^= Math.imul(salt >>> 0, 0x85ebca6b) >>> 0;
+  x ^= Math.imul((lattice | 0) >>> 0, hash.latticeMultiplier) >>> 0;
+  x ^= Math.imul(salt >>> 0, hash.saltMultiplier) >>> 0;
   x ^= x >>> 16;
-  x = Math.imul(x, 0x7feb352d) >>> 0;
+  x = Math.imul(x, hash.avalancheMultiplierA) >>> 0;
   x ^= x >>> 15;
-  x = Math.imul(x, 0x846ca68b) >>> 0;
+  x = Math.imul(x, hash.avalancheMultiplierB) >>> 0;
   x ^= x >>> 16;
-  return (x >>> 0) / 0xffffffff;
+  return (x >>> 0) / hash.divisor;
 }
 
 function valueNoise(timeSeconds: number, seed: number, salt: number, periodSeconds: number): number {
-  const phase = hashUnit(seed, 0, salt ^ 0xa511e9b3) * 8;
+  const noise = FILM_BREATH_CONTRACT.noise;
+  const phase = hashUnit(seed, 0, salt ^ noise.phaseSaltXor) * noise.phaseScale;
   const position = timeSeconds / periodSeconds + phase;
   const lattice = Math.floor(position);
   const fraction = position - lattice;
@@ -67,12 +131,21 @@ function breathNoise(timeSeconds: number, seed: number, salt: number): number {
   // Independent-phase sums collapse toward zero (E|Σw·U| ≈ 0.27 for these
   // weights), so the 2.5× calibration lifts typical magnitude into the
   // visible band and the clamp truncates rare in-phase peaks at ±1.
-  const fast = valueNoise(timeSeconds, seed, salt ^ 0x52a7b9c4, 1.8);
-  const medium = valueNoise(timeSeconds, seed, salt, 4.8);
-  const slow = valueNoise(timeSeconds, seed, salt ^ 0x6d2b79f5, 8.6);
-  const long = valueNoise(timeSeconds, seed, salt ^ 0x1b873593, 15.5);
-  const weighted = fast * 0.15 + medium * 0.55 + slow * 0.2 + long * 0.1;
-  return clamp(weighted * 2.5, -1, 1);
+  const noise = FILM_BREATH_CONTRACT.noise;
+  const fastBand = noise.bands.fast;
+  const mediumBand = noise.bands.medium;
+  const slowBand = noise.bands.slow;
+  const longBand = noise.bands.long;
+  const fast = valueNoise(timeSeconds, seed, salt ^ fastBand.saltXor, fastBand.periodSeconds);
+  const medium = valueNoise(timeSeconds, seed, salt ^ mediumBand.saltXor, mediumBand.periodSeconds);
+  const slow = valueNoise(timeSeconds, seed, salt ^ slowBand.saltXor, slowBand.periodSeconds);
+  const long = valueNoise(timeSeconds, seed, salt ^ longBand.saltXor, longBand.periodSeconds);
+  const weighted =
+    fast * fastBand.weight +
+    medium * mediumBand.weight +
+    slow * slowBand.weight +
+    long * longBand.weight;
+  return clamp(weighted * noise.calibration, noise.min, noise.max);
 }
 
 export function deriveFilmBreathOffsets(
@@ -80,13 +153,14 @@ export function deriveFilmBreathOffsets(
   timeSeconds: number,
   sourceSeed: number,
 ): FilmBreathOffsets {
-  const clampedAmount = clamp01(amount);
+  const contract = FILM_BREATH_CONTRACT;
+  const clampedAmount = clamp(amount, contract.amount.min, contract.amount.max);
   if (clampedAmount <= 0 || !Number.isFinite(timeSeconds) || timeSeconds <= 0) {
     return FILM_BREATH_ZERO_OFFSETS;
   }
 
-  const drive = Math.pow(clampedAmount, 1.35);
-  const envelope = smoothstep(timeSeconds / 1.25);
+  const drive = Math.pow(clampedAmount, contract.amount.exponent);
+  const envelope = smoothstep(timeSeconds / contract.amount.envelopeSeconds);
   const scale = drive * envelope;
   if (scale <= 0) {
     return FILM_BREATH_ZERO_OFFSETS;
@@ -94,9 +168,14 @@ export function deriveFilmBreathOffsets(
 
   const seed = normalizeSeed(sourceSeed);
   return {
-    exposure: breathNoise(timeSeconds, seed, 0x4f1bbcdc) * FILM_BREATH_LIMITS.exposure * scale,
-    contrast: breathNoise(timeSeconds, seed, 0x9e2c6b6f) * FILM_BREATH_LIMITS.contrast * scale,
-    temperature: breathNoise(timeSeconds, seed, 0x27d4eb2f) * FILM_BREATH_LIMITS.temperature * scale,
-    tint: breathNoise(timeSeconds, seed, 0x165667b1) * FILM_BREATH_LIMITS.tint * scale,
+    exposure:
+      breathNoise(timeSeconds, seed, contract.outputSalts.exposure) * contract.limits.exposure * scale,
+    contrast:
+      breathNoise(timeSeconds, seed, contract.outputSalts.contrast) * contract.limits.contrast * scale,
+    temperature:
+      breathNoise(timeSeconds, seed, contract.outputSalts.temperature) *
+      contract.limits.temperature *
+      scale,
+    tint: breathNoise(timeSeconds, seed, contract.outputSalts.tint) * contract.limits.tint * scale,
   };
 }

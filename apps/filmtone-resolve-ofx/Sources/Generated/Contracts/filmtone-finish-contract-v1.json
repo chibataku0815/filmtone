@@ -1,0 +1,449 @@
+{
+  "artifactSchemaVersion": 1,
+  "generatedBy": "tools/filmtone-finish-contract/generate-cpp-handoff.ts",
+  "owners": {
+    "filmDamageRecipe": "@forestone/visual-effect-core",
+    "deterministicRenderContext": "@forestone/visual-render-core",
+    "filmtoneFinishMapping": "@forestone/filmtone-pack"
+  },
+  "deterministicRenderContext": {
+    "contractVersion": 1,
+    "defaultFrameRate": 24,
+    "fieldContract": {
+      "hostTimeSeconds": {
+        "defaultValue": 0,
+        "unit": "seconds",
+        "semantic": "Immutable host timeline time for the requested frame."
+      },
+      "frameIndex": {
+        "defaultValue": 0,
+        "unit": "integral-host-frame",
+        "semantic": "Explicit frame index wins; otherwise floor(hostTimeSeconds * frameRate + 0.5)."
+      },
+      "frameRate": {
+        "defaultValue": 24,
+        "minExclusive": 0,
+        "unit": "frames-per-second",
+        "semantic": "Source or timeline frame rate; never a module-local material clock."
+      },
+      "renderScale": {
+        "x": {
+          "defaultValue": 1,
+          "minExclusive": 0,
+          "semantic": "Horizontal render scale relative to canonical full resolution."
+        },
+        "y": {
+          "defaultValue": 1,
+          "minExclusive": 0,
+          "semantic": "Vertical render scale relative to canonical full resolution."
+        }
+      },
+      "bounds": {
+        "x": {
+          "defaultValue": 0,
+          "unit": "canonical-pixels",
+          "semantic": "Full-frame bounds origin X in host canonical pixel space."
+        },
+        "y": {
+          "defaultValue": 0,
+          "unit": "canonical-pixels",
+          "semantic": "Full-frame bounds origin Y in host canonical pixel space."
+        },
+        "width": {
+          "defaultValue": 1,
+          "minExclusive": 0,
+          "unit": "canonical-pixels",
+          "semantic": "Full-frame bounds width, not a render-tile width."
+        },
+        "height": {
+          "defaultValue": 1,
+          "minExclusive": 0,
+          "unit": "canonical-pixels",
+          "semantic": "Full-frame bounds height, not a render-tile height."
+        }
+      },
+      "seed": {
+        "defaultValue": 0,
+        "min": 0,
+        "max": 4294967295,
+        "unit": "uint32",
+        "semantic": "Unsigned master seed before named module-stream derivation."
+      }
+    },
+    "streamSeedMixConstants": {
+      "saltMultiplier": 2654435761,
+      "avalancheMultiplierA": 2146121005,
+      "avalancheMultiplierB": 2221713035
+    }
+  },
+  "filmDamage": {
+    "contractVersion": 2,
+    "contractRevision": "2.2",
+    "gateWeaveFieldContract": {
+      "amount": {
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      },
+      "horizontalAmplitude": {
+        "defaultValue": 0.012,
+        "min": 0,
+        "max": 0.05,
+        "unit": "short-axis-fraction"
+      },
+      "verticalAmplitude": {
+        "defaultValue": 0.0066,
+        "min": 0,
+        "max": 0.05,
+        "unit": "short-axis-fraction"
+      },
+      "rotationAmplitudeDegrees": {
+        "defaultValue": 0,
+        "min": 0,
+        "max": 5,
+        "unit": "degrees-clockwise-screen-space"
+      },
+      "frequency": {
+        "defaultValue": 1.6,
+        "min": 0,
+        "max": 12,
+        "unit": "cycles-per-second"
+      },
+      "jitter": {
+        "defaultValue": 0.25,
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      }
+    },
+    "randomStreamSalts": {
+      "filmDamage": 1178881351,
+      "gateWeave": 1196901718
+    },
+    "neutralRecipe": {
+      "enabled": false,
+      "seed": 0,
+      "formatProfile": "35mm",
+      "global": {
+        "amount": 0,
+        "opacity": 1,
+        "period": 24,
+        "chromaticity": 0,
+        "artifactScale": 0.45,
+        "edgeBias": 0.2
+      },
+      "dust": {
+        "density": 0,
+        "size": {
+          "min": 0.08,
+          "max": 0.35
+        },
+        "opacity": {
+          "min": 0.25,
+          "max": 0.7
+        },
+        "softness": 0.45,
+        "polarity": "mixed",
+        "lifetimeFrames": {
+          "min": 3,
+          "max": 18
+        },
+        "fadeFrames": {
+          "inFrames": 1,
+          "outFrames": 3
+        },
+        "frameEntryVariation": 0.5,
+        "edgeBias": 0.25
+      },
+      "scratches": {
+        "density": 0,
+        "width": {
+          "min": 0.05,
+          "max": 0.22
+        },
+        "length": {
+          "min": 0.3,
+          "max": 0.95
+        },
+        "opacity": {
+          "min": 0.25,
+          "max": 0.75
+        },
+        "polarity": "light",
+        "direction": "vertical",
+        "roughness": 0.4,
+        "taper": 0.35,
+        "breakup": 0.45,
+        "gaps": {
+          "density": 0.42,
+          "size": {
+            "min": 0.06,
+            "max": 0.32
+          },
+          "softness": 0.45
+        },
+        "waviness": 0.35,
+        "jitter": 0.25,
+        "lifetimeFrames": {
+          "min": 12,
+          "max": 90
+        },
+        "fadeFrames": {
+          "inFrames": 4,
+          "outFrames": 14
+        },
+        "areaCenter": 0.5,
+        "areaWidth": 1,
+        "gateBias": 0.35
+      },
+      "fibers": {
+        "density": 0,
+        "length": {
+          "min": 0.25,
+          "max": 0.9
+        },
+        "width": {
+          "min": 0.04,
+          "max": 0.12
+        },
+        "opacity": {
+          "min": 0.2,
+          "max": 0.65
+        },
+        "curl": 0.3,
+        "wiggle": 0.25,
+        "persistence": 0.75,
+        "polarity": "dark",
+        "lifetimeFrames": {
+          "min": 48,
+          "max": 180
+        },
+        "fadeFrames": {
+          "inFrames": 10,
+          "outFrames": 24
+        },
+        "gateBias": 0.45
+      },
+      "stains": {
+        "density": 0,
+        "size": {
+          "min": 0.2,
+          "max": 0.75
+        },
+        "opacity": {
+          "min": 0.08,
+          "max": 0.35
+        },
+        "softness": 0.7,
+        "chromaticity": 0.25,
+        "polarity": "mixed",
+        "lifetimeFrames": {
+          "min": 24,
+          "max": 180
+        },
+        "fadeFrames": {
+          "inFrames": 12,
+          "outFrames": 36
+        },
+        "edgeBias": 0.35
+      },
+      "flicker": {
+        "amount": 0,
+        "speed": 6,
+        "exposureBias": 0,
+        "randomAmplitude": 0.35,
+        "waveAmplitude": 0.35,
+        "waveFrequency": 1.5
+      },
+      "gateWeave": {
+        "amount": 0,
+        "horizontalAmplitude": 0.012,
+        "verticalAmplitude": 0.0066,
+        "rotationAmplitudeDegrees": 0,
+        "frequency": 1.6,
+        "jitter": 0.25,
+        "travelAxis": "mixed"
+      },
+      "gateWear": {
+        "amount": 0,
+        "width": 0.14,
+        "opacity": 0.45,
+        "softness": 0.55,
+        "jitter": 0.35,
+        "polarity": "dark"
+      },
+      "defocus": {
+        "amount": 0,
+        "radius": 0.35
+      }
+    }
+  },
+  "filmtoneFinish": {
+    "contractVersion": 1,
+    "parameterDefinitions": [
+      {
+        "key": "variation",
+        "id": "com.forestone.filmtone.finish.variation",
+        "kind": "integer",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 999999999,
+        "semantic": "Unsigned master seed stored by the host."
+      },
+      {
+        "key": "filmBreathEnabled",
+        "id": "com.forestone.filmtone.finish.filmBreath.enabled",
+        "kind": "boolean",
+        "defaultValue": false,
+        "semantic": "Module bypass. False is exact identity."
+      },
+      {
+        "key": "filmBreathAmount",
+        "id": "com.forestone.filmtone.finish.filmBreath.amount",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Existing Filmtone Film Breath amount."
+      },
+      {
+        "key": "gateWeaveEnabled",
+        "id": "com.forestone.filmtone.finish.gateWeave.enabled",
+        "kind": "boolean",
+        "defaultValue": false,
+        "semantic": "Module bypass. False is exact identity."
+      },
+      {
+        "key": "gateWeaveAmount",
+        "id": "com.forestone.filmtone.finish.gateWeave.amount",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Master Gate Weave strength."
+      },
+      {
+        "key": "gateWeaveHorizontalAmplitude",
+        "id": "com.forestone.filmtone.finish.gateWeave.horizontalAmplitude",
+        "kind": "double",
+        "defaultValue": 0.012,
+        "min": 0,
+        "max": 0.05,
+        "semantic": "Horizontal amplitude as a source short-axis fraction."
+      },
+      {
+        "key": "gateWeaveVerticalAmplitude",
+        "id": "com.forestone.filmtone.finish.gateWeave.verticalAmplitude",
+        "kind": "double",
+        "defaultValue": 0.0066,
+        "min": 0,
+        "max": 0.05,
+        "semantic": "Vertical amplitude as a source short-axis fraction."
+      },
+      {
+        "key": "gateWeaveRotationAmplitudeDegrees",
+        "id": "com.forestone.filmtone.finish.gateWeave.rotationAmplitudeDegrees",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 5,
+        "semantic": "Peak clockwise screen-space rotation in degrees."
+      },
+      {
+        "key": "gateWeaveFrequency",
+        "id": "com.forestone.filmtone.finish.gateWeave.frequency",
+        "kind": "double",
+        "defaultValue": 1.6,
+        "min": 0,
+        "max": 12,
+        "semantic": "Mechanical cadence in cycles per second."
+      },
+      {
+        "key": "gateWeaveJitter",
+        "id": "com.forestone.filmtone.finish.gateWeave.jitter",
+        "kind": "double",
+        "defaultValue": 0.25,
+        "min": 0,
+        "max": 1,
+        "semantic": "Deterministic frame-to-frame instability."
+      },
+      {
+        "key": "filmDamageEnabled",
+        "id": "com.forestone.filmtone.finish.filmDamage.enabled",
+        "kind": "boolean",
+        "defaultValue": false,
+        "semantic": "Module bypass. False is exact identity."
+      },
+      {
+        "key": "filmDamageAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.amount",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Master multiplier for enabled damage families."
+      },
+      {
+        "key": "dustAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.dust",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Existing Filmtone dust amount mapped to generic dust density."
+      },
+      {
+        "key": "scratchAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.scratches",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Existing Filmtone scratch amount mapped to generic scratch density."
+      },
+      {
+        "key": "fiberAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.fibers",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Generic fiber/hair density. Neutral for existing flat params."
+      },
+      {
+        "key": "stainAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.stains",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Generic stain density. Neutral for existing flat params."
+      },
+      {
+        "key": "gateWearAmount",
+        "id": "com.forestone.filmtone.finish.filmDamage.gateWear",
+        "kind": "double",
+        "defaultValue": 0,
+        "min": 0,
+        "max": 1,
+        "semantic": "Generic gate-wear amount. Neutral for existing flat params."
+      }
+    ],
+    "compatibilityKeys": [
+      "filmBreathAmount",
+      "dustAmount",
+      "scratchAmount"
+    ],
+    "randomStreamSalts": {
+      "filmBreath": 1178751572,
+      "gateWeave": 1196901718,
+      "filmDamage": 1178881351
+    }
+  },
+  "generatedArtifacts": {
+    "filmDamageRecipeHeader": "packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp",
+    "deterministicRenderContextHeader": "packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp",
+    "filmtoneFinishMappingHeader": "packages/filmtone-pack/artifacts/cpp/forestone_filmtone_finish_mapping.hpp"
+  }
+}

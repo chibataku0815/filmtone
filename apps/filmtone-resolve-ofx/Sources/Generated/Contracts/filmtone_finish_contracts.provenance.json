@@ -1,0 +1,82 @@
+{
+  "artifactSchemaVersion": 1,
+  "generatedBy": "apps/filmtone-resolve-ofx/Scripts/GenerateContracts/generate.ts",
+  "regenerationCommand": "bun run apps/filmtone-resolve-ofx/Scripts/GenerateContracts/generate.ts --external-root <visual-effect-core-root>",
+  "externalInput": {
+    "repository": "visual-effect-core",
+    "manifest": {
+      "path": "packages/filmtone-pack/artifacts/filmtone-finish-contract-v1.json",
+      "sha256": "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3"
+    },
+    "contracts": {
+      "filmDamage": {
+        "version": 2,
+        "revision": "2.2"
+      },
+      "deterministicRenderContext": {
+        "version": 1
+      },
+      "filmtoneFinishMapping": {
+        "version": 1
+      }
+    },
+    "artifacts": [
+      {
+        "path": "packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp",
+        "sha256": "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687"
+      },
+      {
+        "path": "packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp",
+        "sha256": "cf8c442a6ba7fbfe0331b7cfa71b36855cc39bca5ec99051e134d704c4379916"
+      },
+      {
+        "path": "packages/filmtone-pack/artifacts/cpp/forestone_filmtone_finish_mapping.hpp",
+        "sha256": "a7bca5ef716633ac7fedc25ed6890fb5f6b41599360088475c87cf2182665d44"
+      }
+    ],
+    "verificationState": "interface frozen and adapter input hashes enforced; CONTRACT build/test/generated-artifact hash verification debt retained"
+  },
+  "filmBreathInput": {
+    "owner": "packages/film-lab-core/src/film-breath.ts",
+    "contractVersion": 1,
+    "sha256": "1ad75cd29676f4d6c587ad63bb617edd542223fe66abbcc66637dedd4139fed2"
+  },
+  "generatedOutputs": [
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone-finish-contract-v1.json",
+      "sha256": "c1ff2cb2cd43c2d39ce4bd204e3f4bcdbd43546745955102d31daccbf9746bb3"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/forestone_film_damage_recipe.hpp",
+      "sha256": "b91ed35fa4751365cf14972adfaa0bca5f8419492bfa5248e23eff599a6c6687"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/forestone_deterministic_render_context.hpp",
+      "sha256": "cf8c442a6ba7fbfe0331b7cfa71b36855cc39bca5ec99051e134d704c4379916"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/forestone_filmtone_finish_mapping.hpp",
+      "sha256": "a7bca5ef716633ac7fedc25ed6890fb5f6b41599360088475c87cf2182665d44"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_film_breath.hpp",
+      "sha256": "6210c728cbcd32b4e118b1705d23ab0ae48796c986af342d99015f2b8f720edf"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_resolve_time.hpp",
+      "sha256": "158e481e77d5fe128213791380e43b9a6f1938b16ee8c73576f27af4ff6f93f2"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_adapter.hpp",
+      "sha256": "3211520d5e313197626c3d386591a2bbc177629e54c0b2390090f2bb0f5fb8f4"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contract_provenance.hpp",
+      "sha256": "c8114abcc2447d3c4b8f7db3cde3b32cd45b171d04225084972eac98e7f2c718"
+    },
+    {
+      "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contracts.hpp",
+      "sha256": "c120152b79bd63e7a276ab712b15f323712b017892397478e4ebf6c49b2b5c23"
+    }
+  ]
+}
