@@ -20,11 +20,13 @@ inline constexpr char kFilmBreathTonalResponseParameterId[] =
     "com.forestone.filmtone.finish.filmBreath.tonalResponse";
 inline constexpr char kFilmBreathColorResponseParameterId[] =
     "com.forestone.filmtone.finish.filmBreath.colorResponse";
+inline constexpr char kFilmBreathPeriodFramesParameterId[] =
+    "com.forestone.filmtone.finish.filmBreath.periodFrames";
 
 // Variation, Film Breath Enabled, and Film Breath Amount IDs/defaults/ranges
-// remain owned by kFilmtoneFinishParameterDefinitions. Only response controls
-// that are genuinely local to this module are described here.
-inline constexpr std::array<FilmBreathParameterDescriptor, 3>
+// remain owned by kFilmtoneFinishParameterDefinitions. Only response and
+// cadence controls that are genuinely local to this module are described here.
+inline constexpr std::array<FilmBreathParameterDescriptor, 4>
     kFilmBreathParameterDescriptors{{
         {kFilmBreathExposureResponseParameterId,
          forestone::filmtone::FilmtoneFinishParameterKind::real,
@@ -41,6 +43,11 @@ inline constexpr std::array<FilmBreathParameterDescriptor, 3>
          1.0,
          0.0,
          1.0},
+        {kFilmBreathPeriodFramesParameterId,
+         forestone::filmtone::FilmtoneFinishParameterKind::real,
+         24.0,
+         1.0,
+         120.0},
     }};
 
 struct FilmBreathParameters final {
@@ -48,6 +55,7 @@ struct FilmBreathParameters final {
     double exposureResponse = 1.0;
     double tonalResponse = 1.0;
     double colorResponse = 1.0;
+    double periodFrames = 24.0;
 };
 
 }  // namespace filmtone::resolve::effects::film_breath

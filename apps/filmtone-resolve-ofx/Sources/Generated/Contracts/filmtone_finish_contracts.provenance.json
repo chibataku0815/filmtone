@@ -50,7 +50,7 @@
     "inputs": [
       {
         "path": "packages/film-lab-core/src/resolve-spatial-contract.ts",
-        "sha256": "3de4a5d9d53dc04bb49b65cecbdc849ef88b08a971df8ba8e9f8dc7346fdd78b"
+        "sha256": "1b5f08c7a898e484fe8321ad033bd12efd8bc6f2cd968c2d566f8c89246b4e1b"
       },
       {
         "path": "packages/film-lab-core/src/presets.ts",
@@ -100,11 +100,11 @@
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_resolve_spatial.hpp",
-      "sha256": "d3a30063e9648e5e6bb6bb96168cc2bfa9148d30bf6d0c5729c73ddba7b41ed0"
+      "sha256": "407dcf8be2c64f7b3ecf2b383471c84a13fe34d562d90ae0e22afb32143816b7"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contract_provenance.hpp",
-      "sha256": "56d86aac0adb36e3276ad7f574f8b29b9eee585868e5b458dcb252d8aaffccf5"
+      "sha256": "6dd6387cabb0dc56fb99ea321f116c2f93be18c955927b3c1268dcfc4283e9d8"
     },
     {
       "path": "apps/filmtone-resolve-ofx/Sources/Generated/Contracts/filmtone_finish_contracts.hpp",

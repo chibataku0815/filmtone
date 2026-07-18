@@ -17,7 +17,7 @@ inline constexpr std::string_view kFilmtoneResolveSpatialContractId = "com.fores
 inline constexpr std::string_view kFilmtoneResolveSpatialContractOwner = "packages/film-lab-core/src/resolve-spatial-contract.ts";
 inline constexpr std::string_view kFilmtonePublicDisplayName = "Filmtone";
 inline constexpr std::string_view kFilmtoneCompatibilityPluginId = "com.chibatakumi.filmtone.finish";
-inline constexpr std::string_view kSpatialContractSourceSha256 = "3de4a5d9d53dc04bb49b65cecbdc849ef88b08a971df8ba8e9f8dc7346fdd78b";
+inline constexpr std::string_view kSpatialContractSourceSha256 = "1b5f08c7a898e484fe8321ad033bd12efd8bc6f2cd968c2d566f8c89246b4e1b";
 inline constexpr std::string_view kSpatialDefaultsSourceSha256 = "48bb207ca368dd93dd50f4af3d09142bb2f7b939f8ef1970d99981900fa68b0a";
 inline constexpr std::string_view kSpatialRgbShiftLimitSourceSha256 = "7a9008029f764667304935d70c8ea4df179359686fcd271739eb27f11593ca83";
 inline constexpr std::string_view kSpatialDetailSoftnessSourceSha256 = "9698ddd440a9395968b18a74de55d29ecf53c9848511913c1939f436e9488351";
@@ -80,15 +80,15 @@ inline constexpr std::array<FilmtoneSpatialParameterDefinitionV1, 14> kFilmtoneS
   {"com.forestone.filmtone.finish.nodeRole", "nodeRole", "nodeRole", "nodeRole", "Node Role", "", FilmtoneSpatialParameterKindV1::choice, "stored-choice-index", 0.0, 0.0, 2.0, 0.0, "invalid-choice-to-default", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.deepGlow.enabled", "deepGlowEnabled", "deepGlow", "enabled", "Enabled", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::boolean, "boolean", 0.0, 0.0, 1.0, 0.0, "zero-or-one", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.deepGlow.amount", "bloomStrength", "deepGlow", "bloomStrength", "Strength", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "normalized-glow-energy", 0.0, 0.0, 1.0, 0.0, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.strength"},
-  {"com.forestone.filmtone.finish.deepGlow.threshold", "bloomThreshold", "deepGlow", "bloomThreshold", "Threshold", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "normalized-input-luminance", 0.8, 0.0, 1.0, 0.8, "finite-clamp-parameter-only-no-rgb-clamp", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.threshold"},
-  {"com.forestone.filmtone.finish.deepGlow.radius", "bloomRadius", "deepGlow", "bloomRadius", "Radius", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "normalized-mip-distribution", 0.4, 0.0, 1.0, 0.4, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.radius"},
-  {"com.forestone.filmtone.finish.deepGlow.softKnee", "bloomSoftKnee", "deepGlow", "bloomSoftKnee", "Soft Knee", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "threshold-relative-soft-knee", 0.5, 0.0, 1.0, 0.5, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.softKnee"},
+  {"com.forestone.filmtone.finish.deepGlow.threshold", "bloomThreshold", "deepGlow", "bloomThreshold", "Threshold", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "working-domain-input-luminance", 0.8, 0.0, 4.0, 0.8, "finite-clamp-parameter-only-no-rgb-clamp", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.threshold"},
+  {"com.forestone.filmtone.finish.deepGlow.radius", "bloomRadius", "deepGlow", "bloomRadius", "Radius", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "normalized-log-psf-radius", 0.4, 0.0, 1.0, 0.4, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.radius"},
+  {"com.forestone.filmtone.finish.deepGlow.softKnee", "bloomSoftKnee", "deepGlow", "bloomSoftKnee", "Threshold Smooth", "com.chibatakumi.filmtone.finish.group.deepGlow", FilmtoneSpatialParameterKindV1::real, "threshold-relative-soft-knee", 0.5, 0.0, 1.0, 0.5, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "glow.bloom.softKnee"},
   {"com.forestone.filmtone.finish.peripheralChromaticShift.enabled", "peripheralChromaticShiftEnabled", "peripheralChromaticShift", "enabled", "Enabled", "com.chibatakumi.filmtone.finish.group.peripheralChromaticShift", FilmtoneSpatialParameterKindV1::boolean, "boolean", 0.0, 0.0, 1.0, 0.0, "zero-or-one", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.peripheralChromaticShift.amount", "rgbShift", "peripheralChromaticShift", "rgbShift", "Amount", "com.chibatakumi.filmtone.finish.group.peripheralChromaticShift", FilmtoneSpatialParameterKindV1::real, "per-axis-frame-fraction", 0.0, 0.0, 0.005, 0.0, "finite-clamp-to-range-no-rescale", FilmtoneSpatialGenericMappingV1::rejectedNonEquivalent, "optics.chromaticFringing"},
   {"com.forestone.filmtone.finish.lensSoftness.enabled", "lensSoftnessEnabled", "lensSoftness", "enabled", "Enabled", "com.chibatakumi.filmtone.finish.group.lensSoftness", FilmtoneSpatialParameterKindV1::boolean, "boolean", 0.0, 0.0, 1.0, 0.0, "zero-or-one", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.lensSoftness.amount", "lensSoftness", "lensSoftness", "lensSoftness", "Amount", "com.chibatakumi.filmtone.finish.group.lensSoftness", FilmtoneSpatialParameterKindV1::real, "normalized-optical-softness", 0.0, 0.0, 1.0, 0.0, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "optics.lensSoftness"},
   {"com.forestone.filmtone.finish.textureSoftness.enabled", "textureSoftnessEnabled", "textureSoftness", "enabled", "Enabled", "com.chibatakumi.filmtone.finish.group.textureSoftness", FilmtoneSpatialParameterKindV1::boolean, "boolean", 0.0, 0.0, 1.0, 0.0, "zero-or-one", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
-  {"com.forestone.filmtone.finish.textureSoftness.amount", "detailSoftness", "textureSoftness", "detailSoftness", "Amount", "com.chibatakumi.filmtone.finish.group.textureSoftness", FilmtoneSpatialParameterKindV1::real, "normalized-texture-softness", 0.0, 0.0, 1.0, 0.0, "finite-clamp-then-effective-clamp", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
+  {"com.forestone.filmtone.finish.textureSoftness.amount", "detailSoftness", "textureSoftness", "detailSoftness", "Amount", "com.chibatakumi.filmtone.finish.group.textureSoftness", FilmtoneSpatialParameterKindV1::real, "normalized-texture-softness", 0.0, 0.0, 1.0, 0.0, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.vignette.enabled", "vignetteEnabled", "vignette", "enabled", "Enabled", "com.chibatakumi.filmtone.finish.group.vignette", FilmtoneSpatialParameterKindV1::boolean, "boolean", 0.0, 0.0, 1.0, 0.0, "zero-or-one", FilmtoneSpatialGenericMappingV1::filmtoneOnly, ""},
   {"com.forestone.filmtone.finish.vignette.amount", "vignette", "vignette", "vignette", "Amount", "com.chibatakumi.filmtone.finish.group.vignette", FilmtoneSpatialParameterKindV1::real, "normalized-multiplicative-attenuation", 0.0, 0.0, 1.0, 0.0, "finite-clamp-to-range", FilmtoneSpatialGenericMappingV1::direct, "optics.vignette"},
 }};
@@ -104,7 +104,7 @@ struct FilmtoneSpatialFeatureDefinitionV1 {
 };
 
 inline constexpr std::array<FilmtoneSpatialFeatureDefinitionV1, 5> kFilmtoneSpatialFeatureDefinitionsV1{{
-  {"deepGlow", "Deep Glow", "deepGlowEnabled", "bloomStrength", "normalized-pyramid-rebuilt-for-render-scale", "isotropic-pixel-filtering-no-axis-stretch", "disabled-or-bloomStrength-zero"},
+  {"deepGlow", "Deep Glow", "deepGlowEnabled", "bloomStrength", "log-psf-radius-fraction-of-render-short-axis-rebuilt-per-render-scale", "isotropic-pixel-filtering-no-axis-stretch", "disabled-or-bloomStrength-zero"},
   {"peripheralChromaticShift", "Peripheral Chromatic Shift", "peripheralChromaticShiftEnabled", "rgbShift", "frame-fraction-recomputed-from-render-bounds", "native-radial-v1-full-resolution-pixel-direction", "disabled-or-rgbShift-zero"},
   {"lensSoftness", "Lens Softness", "lensSoftnessEnabled", "lensSoftness", "full-resolution-pixel-radius-times-render-scale", "half-diagonal-peripheral-distance", "disabled-or-lensSoftness-zero"},
   {"textureSoftness", "Texture Softness", "textureSoftnessEnabled", "detailSoftness", "full-resolution-pixel-radius-times-render-scale", "center-inclusive-isotropic-pixel-neighborhood", "disabled-or-detailSoftness-zero"},
@@ -164,9 +164,9 @@ struct VignetteParameterViewV1 {
 };
 
 inline constexpr float kPeripheralChromaticShiftRadialExponentV1 = 1.65f;
-inline constexpr float kTextureSoftnessEffectiveMaximumV1 = 0.65f;
+inline constexpr float kTextureSoftnessEffectiveMaximumV1 = 1.0f;
 inline constexpr float kTextureSoftnessKernelRadiusMinimumFullResolutionPixelsV1 = 1.0f;
-inline constexpr float kTextureSoftnessKernelRadiusMaximumFullResolutionPixelsV1 = 2.5f;
+inline constexpr float kTextureSoftnessKernelRadiusMaximumFullResolutionPixelsV1 = 5.0f;
 
 namespace detail {
 
@@ -202,7 +202,7 @@ inline float clampFinite(float value, float minimum, float maximum, float fallba
   return {
       parameters.deepGlowEnabled != 0u && strength > 0.0f,
       strength,
-      detail::clampFinite(parameters.bloomThreshold, 0.0f, 1.0f, 0.8f),
+      detail::clampFinite(parameters.bloomThreshold, 0.0f, 4.0f, 0.8f),
       detail::clampFinite(parameters.bloomRadius, 0.0f, 1.0f, 0.4f),
       detail::clampFinite(parameters.bloomSoftKnee, 0.0f, 1.0f, 0.5f),
   };

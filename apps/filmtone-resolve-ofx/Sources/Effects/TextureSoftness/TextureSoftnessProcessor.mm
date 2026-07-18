@@ -1,6 +1,5 @@
 #include "TextureSoftnessProcessor.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -10,8 +9,8 @@ namespace filmtone::resolve::texture_softness {
 namespace {
 
 constexpr char kPipelineCacheKey[] =
-    "filmtone.resolve.spatial.texture-softness.bilateral-detail.v1";
-constexpr char kMetalFunctionName[] = "filmtoneTextureSoftnessV1";
+    "filmtone.resolve.spatial.texture-softness.acutance-relaxation.v2";
+constexpr char kMetalFunctionName[] = "filmtoneTextureSoftnessV2";
 
 // Texture Softness deliberately evaluates its compact bilateral neighborhood
 // directly. Spatial ABI v1 exposes RGBA32Float textures without a filterability
@@ -20,7 +19,7 @@ constexpr char kMetalSource[] = R"METAL(
 #include <metal_stdlib>
 using namespace metal;
 
-struct FilmtoneTextureSoftnessUniformsV1 {
+struct FilmtoneTextureSoftnessUniformsV2 {
     uint width;
     uint height;
     uint reserved0;
@@ -31,10 +30,21 @@ struct FilmtoneTextureSoftnessUniformsV1 {
     float effectiveAmount;
     float rangeSigma;
 
-    float detailAmplitudeLow;
-    float detailAmplitudeHigh;
+    float reserved2;
+    float reserved3;
     float chromaAttenuationScale;
     float highlightBias;
+};
+
+constant float2 kFilmtoneTextureSoftnessDirectionsV2[8] = {
+    float2(1.0f, 0.0f),
+    float2(-1.0f, 0.0f),
+    float2(0.0f, 1.0f),
+    float2(0.0f, -1.0f),
+    float2(0.7071067811865475f, 0.7071067811865475f),
+    float2(-0.7071067811865475f, 0.7071067811865475f),
+    float2(0.7071067811865475f, -0.7071067811865475f),
+    float2(-0.7071067811865475f, -0.7071067811865475f),
 };
 
 float filmtoneTextureSoftnessLuma709(float3 rgb) {
@@ -86,10 +96,28 @@ float filmtoneTextureSoftnessRangeWeight(
     return exp(-(difference * difference) * inverseSigmaSquared);
 }
 
-kernel void filmtoneTextureSoftnessV1(
+float4 filmtoneTextureSoftnessContributionV2(
+    texture2d<float, access::read> source,
+    float2 position,
+    uint2 dimensions,
+    float centerLuma,
+    float inverseSigmaSquared,
+    float spatialWeight) {
+    const float3 sampleRgb = filmtoneTextureSoftnessSampleLinearClamped(
+        source,
+        position,
+        dimensions).rgb;
+    const float weight = spatialWeight * filmtoneTextureSoftnessRangeWeight(
+        sampleRgb,
+        centerLuma,
+        inverseSigmaSquared);
+    return float4(sampleRgb * weight, weight);
+}
+
+kernel void filmtoneTextureSoftnessV2(
     texture2d<float, access::read> source [[texture(0)]],
     texture2d<float, access::write> output [[texture(1)]],
-    constant FilmtoneTextureSoftnessUniformsV1& uniforms [[buffer(0)]],
+    constant FilmtoneTextureSoftnessUniformsV2& uniforms [[buffer(0)]],
     uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= uniforms.width || gid.y >= uniforms.height) {
         return;
@@ -98,81 +126,59 @@ kernel void filmtoneTextureSoftnessV1(
     const uint2 dimensions = uint2(uniforms.width, uniforms.height);
     const float4 center = source.read(gid);
     const float2 position = float2(gid);
-    const float diagonalScale = 0.7071067811865475f;
     const float2 radius = float2(uniforms.radiusX, uniforms.radiusY);
-    const float2 diagonalRadius = radius * diagonalScale;
-
-    const float3 east = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position + float2(radius.x, 0.0f), dimensions).rgb;
-    const float3 west = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position - float2(radius.x, 0.0f), dimensions).rgb;
-    const float3 north = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position + float2(0.0f, radius.y), dimensions).rgb;
-    const float3 south = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position - float2(0.0f, radius.y), dimensions).rgb;
-    const float3 northEast = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position + diagonalRadius, dimensions).rgb;
-    const float3 northWest = filmtoneTextureSoftnessSampleLinearClamped(
-        source,
-        position + float2(-diagonalRadius.x, diagonalRadius.y),
-        dimensions).rgb;
-    const float3 southEast = filmtoneTextureSoftnessSampleLinearClamped(
-        source,
-        position + float2(diagonalRadius.x, -diagonalRadius.y),
-        dimensions).rgb;
-    const float3 southWest = filmtoneTextureSoftnessSampleLinearClamped(
-        source, position - diagonalRadius, dimensions).rgb;
 
     const float centerLuma = filmtoneTextureSoftnessLuma709(center.rgb);
     const float sigmaSquared = max(
         uniforms.rangeSigma * uniforms.rangeSigma,
         1.0e-6f);
     const float inverseSigmaSquared = 1.0f / sigmaSquared;
-    const float eastWeight = filmtoneTextureSoftnessRangeWeight(
-        east, centerLuma, inverseSigmaSquared);
-    const float westWeight = filmtoneTextureSoftnessRangeWeight(
-        west, centerLuma, inverseSigmaSquared);
-    const float northWeight = filmtoneTextureSoftnessRangeWeight(
-        north, centerLuma, inverseSigmaSquared);
-    const float southWeight = filmtoneTextureSoftnessRangeWeight(
-        south, centerLuma, inverseSigmaSquared);
-    const float northEastWeight = filmtoneTextureSoftnessRangeWeight(
-        northEast, centerLuma, inverseSigmaSquared);
-    const float northWestWeight = filmtoneTextureSoftnessRangeWeight(
-        northWest, centerLuma, inverseSigmaSquared);
-    const float southEastWeight = filmtoneTextureSoftnessRangeWeight(
-        southEast, centerLuma, inverseSigmaSquared);
-    const float southWestWeight = filmtoneTextureSoftnessRangeWeight(
-        southWest, centerLuma, inverseSigmaSquared);
-
-    const float3 referenceSum = center.rgb +
-        east * eastWeight + west * westWeight +
-        north * northWeight + south * southWeight +
-        northEast * northEastWeight + northWest * northWestWeight +
-        southEast * southEastWeight + southWest * southWestWeight;
-    const float referenceWeight = 1.0f +
-        eastWeight + westWeight + northWeight + southWeight +
-        northEastWeight + northWestWeight +
-        southEastWeight + southWestWeight;
-    const float3 referenceRgb = referenceSum / referenceWeight;
+    // A center-weighted inner ring relaxes fine digital acutance while the
+    // wider ring reaches the visible texture scale at high Amount. Range
+    // weights, rather than a residual-detail kill switch, protect major edges.
+    float4 reference = float4(center.rgb * 1.5f, 1.5f);
+    for (uint directionIndex = 0u; directionIndex < 8u; ++directionIndex) {
+        const float2 direction =
+            kFilmtoneTextureSoftnessDirectionsV2[directionIndex];
+        reference += filmtoneTextureSoftnessContributionV2(
+            source,
+            position + direction * radius * 0.45f,
+            dimensions,
+            centerLuma,
+            inverseSigmaSquared,
+            1.0f);
+        reference += filmtoneTextureSoftnessContributionV2(
+            source,
+            position + direction * radius,
+            dimensions,
+            centerLuma,
+            inverseSigmaSquared,
+            0.65f);
+    }
+    const float3 referenceRgb = reference.rgb / max(reference.a, 1.0e-6f);
     const float3 detail = center.rgb - referenceRgb;
 
     const float3 lumaWeights = float3(0.2126f, 0.7152f, 0.0722f);
     const float detailLuma = dot(detail, lumaWeights);
-    const float3 detailLumaVector = detailLuma * lumaWeights;
+    // Rec.709 weights measure luminance; a neutral RGB vector reconstructs
+    // that luminance. Multiplying by the weights here would retain most
+    // grayscale acutance and manufacture a false chroma residual.
+    const float3 detailLumaVector = float3(detailLuma);
     const float3 detailChroma = detail - detailLumaVector;
-    const float detailGate = 1.0f - smoothstep(
-        uniforms.detailAmplitudeLow,
-        uniforms.detailAmplitudeHigh,
-        abs(detailLuma));
     const float highlightWeight = mix(
         1.0f,
         uniforms.highlightBias,
         smoothstep(0.6f, 0.9f, centerLuma));
-    const float lumaAttenuation =
-        uniforms.effectiveAmount * detailGate * highlightWeight;
-    const float chromaAttenuation =
-        lumaAttenuation * uniforms.chromaAttenuationScale;
+    const float amount = clamp(uniforms.effectiveAmount, 0.0f, 1.0f);
+    const float relaxation = amount * (0.58f + 0.42f * amount);
+    const float lumaAttenuation = clamp(
+        relaxation * max(highlightWeight, 0.0f),
+        0.0f,
+        1.0f);
+    const float chromaAttenuation = clamp(
+        lumaAttenuation * uniforms.chromaAttenuationScale,
+        0.0f,
+        1.0f);
     const float3 softened = center.rgb -
         detailLumaVector * lumaAttenuation -
         detailChroma * chromaAttenuation;
@@ -181,7 +187,7 @@ kernel void filmtoneTextureSoftnessV1(
 }
 )METAL";
 
-struct alignas(16) TextureSoftnessUniformsV1 final {
+struct alignas(16) TextureSoftnessUniformsV2 final {
     std::uint32_t width;
     std::uint32_t height;
     std::uint32_t reserved0;
@@ -192,14 +198,14 @@ struct alignas(16) TextureSoftnessUniformsV1 final {
     float effectiveAmount;
     float rangeSigma;
 
-    float detailAmplitudeLow;
-    float detailAmplitudeHigh;
+    float reserved2;
+    float reserved3;
     float chromaAttenuationScale;
     float highlightBias;
 };
 
-static_assert(sizeof(TextureSoftnessUniformsV1) == 48u);
-static_assert(alignof(TextureSoftnessUniformsV1) == 16u);
+static_assert(sizeof(TextureSoftnessUniformsV2) == 48u);
+static_assert(alignof(TextureSoftnessUniformsV2) == 16u);
 
 bool validateParameters(
     const spatial::TextureSoftnessParameterViewV1& parameters,
@@ -209,8 +215,6 @@ bool validateParameters(
         std::isfinite(parameters.effectiveAmount) &&
         std::isfinite(parameters.kernelRadiusFullResolutionPixels) &&
         std::isfinite(parameters.rangeSigma) &&
-        std::isfinite(parameters.detailAmplitudeLow) &&
-        std::isfinite(parameters.detailAmplitudeHigh) &&
         std::isfinite(parameters.chromaAttenuationScale) &&
         std::isfinite(parameters.highlightBias);
     if (!parameters.active || !finite || parameters.amount <= 0.0f ||
@@ -222,14 +226,9 @@ bool validateParameters(
         parameters.kernelRadiusFullResolutionPixels >
             spatial::kTextureSoftnessKernelRadiusMaximumFullResolutionPixelsV1 ||
         parameters.rangeSigma <= 0.0f ||
-        parameters.detailAmplitudeLow < 0.0f ||
-        parameters.detailAmplitudeHigh <= parameters.detailAmplitudeLow ||
         parameters.chromaAttenuationScale < 0.0f ||
         parameters.chromaAttenuationScale > 1.0f ||
-        parameters.highlightBias < 0.0f ||
-        parameters.effectiveAmount *
-                std::max(1.0f, parameters.highlightBias) >
-            1.0f) {
+        parameters.highlightBias < 0.0f) {
         error = "Texture Softness received values outside its frozen parameter view.";
         return false;
     }
@@ -253,7 +252,7 @@ bool scaledRadius(
 bool makeUniforms(
     const spatial::TextureSoftnessParameterViewV1& parameters,
     const host::spatial::SpatialFrameDescriptor& frame,
-    TextureSoftnessUniformsV1& uniforms,
+    TextureSoftnessUniformsV2& uniforms,
     std::string& error) {
     float radiusX = 0.0f;
     float radiusY = 0.0f;
@@ -269,7 +268,7 @@ bool makeUniforms(
         error = "Texture Softness could not resolve its render-scale radius.";
         return false;
     }
-    uniforms = TextureSoftnessUniformsV1{
+    uniforms = TextureSoftnessUniformsV2{
         frame.width,
         frame.height,
         0u,
@@ -278,8 +277,8 @@ bool makeUniforms(
         radiusY,
         parameters.effectiveAmount,
         parameters.rangeSigma,
-        parameters.detailAmplitudeLow,
-        parameters.detailAmplitudeHigh,
+        0.0f,
+        0.0f,
         parameters.chromaAttenuationScale,
         parameters.highlightBias,
     };
@@ -315,7 +314,7 @@ bool TextureSoftnessProcessor::makeResourcePlan(
         return false;
     }
 
-    TextureSoftnessUniformsV1 uniforms{};
+    TextureSoftnessUniformsV2 uniforms{};
     if (!makeUniforms(parameters_, frame, uniforms, error)) {
         return false;
     }
@@ -353,7 +352,7 @@ bool TextureSoftnessProcessor::encodeSpatialMetal(
         return false;
     }
 
-    TextureSoftnessUniformsV1 uniforms{};
+    TextureSoftnessUniformsV2 uniforms{};
     if (!makeUniforms(parameters_, invocation.frame, uniforms, error)) {
         return false;
     }
@@ -380,7 +379,7 @@ bool TextureSoftnessProcessor::encodeSpatialMetal(
         {0u, &uniforms, sizeof(uniforms)},
     };
     const host::spatial::SpatialComputePass pass{
-        "Filmtone Texture Softness Bilateral Detail",
+        "Filmtone Texture Softness Acutance Relaxation",
         &pipeline,
         textures,
         2u,

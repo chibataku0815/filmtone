@@ -20,9 +20,18 @@ struct EvaluatedFilmtoneFinishParameters final {
 };
 
 // Registers the generated 17-entry accepted film surface, the generated
-// 14-entry spatial surface, and the three accepted local Film Breath response
-// controls. Generated definitions remain the only owner of persistent IDs,
-// kinds, defaults, and ranges.
+// 14-entry spatial surface, and the four accepted local Film Breath response
+// and cadence controls. Generated metadata retains ownership of generated
+// controls; the local Film Breath descriptor array owns these four controls.
+//
+// Layout: Node Role, then the always-open Quick Enable group that reuses the
+// eight persistent Enabled parameters under their feature names, then
+// Variation, then one closed detail group per feature holding only stored
+// adjustment controls. Real-valued descriptor defaults and the non-finite
+// evaluate fallbacks both resolve through the Resolve-only factory table in
+// FilmtoneResolveFactoryDefaults.h; Enabled, Node Role, and Variation keep
+// generated identity defaults so the effect stays exact identity at add time
+// and after reset.
 void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor);
 
 class FilmtoneFinishParameterSet final {
@@ -60,6 +69,7 @@ private:
     OFX::DoubleParam* filmBreathExposureResponse_;
     OFX::DoubleParam* filmBreathTonalResponse_;
     OFX::DoubleParam* filmBreathColorResponse_;
+    OFX::DoubleParam* filmBreathPeriodFrames_;
 
     OFX::BooleanParam* gateWeaveEnabled_;
     OFX::DoubleParam* gateWeaveAmount_;

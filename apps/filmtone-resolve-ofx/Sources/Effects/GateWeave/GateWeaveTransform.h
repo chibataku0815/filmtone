@@ -10,9 +10,9 @@ namespace filmtone::resolve::gate_weave {
 using GateWeaveTransform =
     forestone::visual_render::FilmDamageGateWeaveTransformV1;
 
-// Exact absolute motion limits for every time, seed, and jitter value admitted
-// by one normalized revision-2.3 recipe. These limits let the Metal pass use a
-// constant safety crop rather than a frame-varying zoom.
+// Exact absolute motion limits for every frame, seed, and jitter value admitted
+// by one normalized recipe. These limits let the Metal pass use a constant
+// safety crop rather than a frame-varying zoom.
 struct GateWeaveMotionEnvelope final {
     double maxOffsetX = 0.0;
     double maxOffsetY = 0.0;

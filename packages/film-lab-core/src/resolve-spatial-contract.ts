@@ -1,7 +1,4 @@
-import {
-  DETAIL_SOFTNESS_EFFECTIVE_MAX,
-  deriveDetailSoftnessUniforms,
-} from "./detail-softness";
+import { deriveDetailSoftnessUniforms } from "./detail-softness";
 import { PHASE0_RGB_SHIFT_MAX } from "./phase0-constants";
 import { PRESETS } from "./presets";
 
@@ -17,6 +14,15 @@ const UNIT_INTERVAL_MIN = 0;
 const UNIT_INTERVAL_MAX = 1;
 const DETAIL_SOFTNESS_NEUTRAL = deriveDetailSoftnessUniforms(0);
 const DETAIL_SOFTNESS_MAXIMUM = deriveDetailSoftnessUniforms(1);
+// Resolve's float full-frame pass has enough sampling headroom to expose the
+// full control range. Shared app renderers keep their own host-specific
+// calibration in detail-softness.ts.
+const RESOLVE_DETAIL_SOFTNESS_EFFECTIVE_MAX = 1;
+const RESOLVE_DETAIL_SOFTNESS_RADIUS_MAX = 5;
+// Deep Glow selects emitters from scene-referred float values, so the
+// threshold range extends above 1.0 to isolate HDR-only sources. The stored
+// default and every old-project value stay inside the previous 0...1 range.
+const RESOLVE_DEEP_GLOW_THRESHOLD_MAX = 4;
 
 export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
   contractId: "com.forestone.filmtone.resolve.spatial",
@@ -139,10 +145,10 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
       kind: "real",
       label: "Threshold",
       groupId: "com.chibatakumi.filmtone.finish.group.deepGlow",
-      unit: "normalized-input-luminance",
+      unit: "working-domain-input-luminance",
       defaultValue: PRESETS.reset.bloomThreshold,
       minValue: UNIT_INTERVAL_MIN,
-      maxValue: UNIT_INTERVAL_MAX,
+      maxValue: RESOLVE_DEEP_GLOW_THRESHOLD_MAX,
       identityValue: PRESETS.reset.bloomThreshold,
       normalization: "finite-clamp-parameter-only-no-rgb-clamp",
       genericMapping: "direct",
@@ -156,7 +162,7 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
       kind: "real",
       label: "Radius",
       groupId: "com.chibatakumi.filmtone.finish.group.deepGlow",
-      unit: "normalized-mip-distribution",
+      unit: "normalized-log-psf-radius",
       defaultValue: PRESETS.reset.bloomRadius,
       minValue: UNIT_INTERVAL_MIN,
       maxValue: UNIT_INTERVAL_MAX,
@@ -171,7 +177,9 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
       feature: "deepGlow",
       sourceField: "bloomSoftKnee",
       kind: "real",
-      label: "Soft Knee",
+      // Display label only: the persistent softKnee ID and stored values are
+      // unchanged, so existing Resolve projects load identically.
+      label: "Threshold Smooth",
       groupId: "com.chibatakumi.filmtone.finish.group.deepGlow",
       unit: "threshold-relative-soft-knee",
       defaultValue: PRESETS.reset.bloomSoftKnee,
@@ -282,7 +290,7 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
       minValue: UNIT_INTERVAL_MIN,
       maxValue: UNIT_INTERVAL_MAX,
       identityValue: 0,
-      normalization: "finite-clamp-then-effective-clamp",
+      normalization: "finite-clamp-to-range",
       genericMapping: "filmtone-only",
       genericPath: "",
     },
@@ -327,7 +335,8 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
       label: "Deep Glow",
       enabledMember: "deepGlowEnabled",
       identityMember: "bloomStrength",
-      renderScaleRule: "normalized-pyramid-rebuilt-for-render-scale",
+      renderScaleRule:
+        "log-psf-radius-fraction-of-render-short-axis-rebuilt-per-render-scale",
       aspectRule: "isotropic-pixel-filtering-no-axis-stretch",
       identityCondition: "disabled-or-bloomStrength-zero",
     },
@@ -386,11 +395,11 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
         "At the perimeter, rgbShift is the source-coordinate displacement as a fraction of the corresponding full-resolution frame axis. No generic conversion is applied.",
     },
     textureSoftness: {
-      effectiveMaximum: DETAIL_SOFTNESS_EFFECTIVE_MAX,
+      effectiveMaximum: RESOLVE_DETAIL_SOFTNESS_EFFECTIVE_MAX,
       kernelRadiusMinimumFullResolutionPixels:
         DETAIL_SOFTNESS_NEUTRAL.kernelRadiusPx,
       kernelRadiusMaximumFullResolutionPixels:
-        DETAIL_SOFTNESS_MAXIMUM.kernelRadiusPx,
+        RESOLVE_DETAIL_SOFTNESS_RADIUS_MAX,
       rangeSigma: DETAIL_SOFTNESS_MAXIMUM.rangeSigma,
       detailAmplitudeLow: DETAIL_SOFTNESS_MAXIMUM.detailAmplitudeLo,
       detailAmplitudeHigh: DETAIL_SOFTNESS_MAXIMUM.detailAmplitudeHi,
@@ -400,7 +409,8 @@ export const FILMTONE_RESOLVE_SPATIAL_CONTRACT = {
     },
     vignette: {
       radius: "full-resolution-pixel-distance-divided-by-half-diagonal",
-      attenuation: "rgb-times-clamp(1-vignette*radiusSquared,0,1)",
+      attenuation:
+        "rgb-times-(1-edgeLoss(vignette)*smoothstep(0,1,clamp(radius,0,1)))",
     },
   },
   genericContract: {

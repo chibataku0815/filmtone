@@ -17,28 +17,32 @@ namespace {
 
 constexpr std::size_t kFloatRGBABytesPerPixel = sizeof(float) * 4u;
 constexpr char kFilmBreathPipelineCacheKey[] =
-    "filmtone.finish.film-breath.photometric.v2";
-constexpr char kFilmBreathKernelFunction[] = "filmtoneFilmBreathV2";
+    "filmtone.finish.film-breath.photometric.v4";
+constexpr char kFilmBreathKernelFunction[] = "filmtoneFilmBreathV4";
 
 constexpr char kFilmBreathMetalSource[] = R"METAL(
 #include <metal_stdlib>
 using namespace metal;
 
-struct FilmBreathUniformsV1 {
+struct FilmBreathUniformsV2 {
     uint sourceRowStridePixels;
     uint outputRowStridePixels;
     uint width;
     uint height;
     float exposure;
     float contrast;
-    float temperature;
-    float tint;
+    float cyanDensity;
+    float magentaDensity;
+    float yellowDensity;
+    float padding0;
+    float padding1;
+    float padding2;
 };
 
-kernel void filmtoneFilmBreathV2(
+kernel void filmtoneFilmBreathV4(
     device const float4* source [[buffer(0)]],
     device float4* output [[buffer(1)]],
-    constant FilmBreathUniformsV1& uniforms [[buffer(2)]],
+    constant FilmBreathUniformsV2& uniforms [[buffer(2)]],
     uint2 position [[thread_position_in_grid]]) {
     if (position.x >= uniforms.width || position.y >= uniforms.height) {
         return;
@@ -54,64 +58,76 @@ kernel void filmtoneFilmBreathV2(
 
     if (uniforms.exposure == 0.0f &&
         uniforms.contrast == 0.0f &&
-        uniforms.temperature == 0.0f &&
-        uniforms.tint == 0.0f) {
+        uniforms.cyanDensity == 0.0f &&
+        uniforms.magentaDensity == 0.0f &&
+        uniforms.yellowDensity == 0.0f) {
         output[outputIndex] = sourceColor;
         return;
     }
 
     float3 color = sourceColor.rgb;
 
-    // Canonical Filmtone order: EV exposure, three-piece tonal response,
-    // then the temperature/tint colour response. The colour response is a
-    // per-channel gain rather than the canonical additive offset: the host
-    // pixel domain is unknown here, and a gain keeps exact black, sign,
-    // and extended range intact in any encoding, where the additive form
-    // shifts the black floor. Perceived gain magnitude remains
-    // encoding-dependent; coefficients match the canonical baseGradeV2
-    // displacement at unit signal.
-    color *= exp2(uniforms.exposure);
+    // Resolve does not expose a reliable working-encoding contract here, so
+    // this is an encoding-agnostic signal operation rather than a claim of
+    // scene- or display-referred equivalence. Exposure stays neutral. Tonal
+    // variation uses one bounded log-luminance slope and therefore remains
+    // distinct from exposure while preserving channel ratios.
+    const float positiveLuminance = dot(
+        max(color, float3(0.0f)),
+        float3(0.2126f, 0.7152f, 0.0722f));
+    float tonalGain = 1.0f;
+    if (positiveLuminance > 1.0e-6f) {
+        const float logLuminance = clamp(
+            log2(positiveLuminance),
+            -8.0f,
+            8.0f);
+        const float contrastSlope = clamp(
+            uniforms.contrast,
+            -0.45f,
+            0.45f);
+        tonalGain = exp2(contrastSlope * logLuminance);
+    }
+    color *= exp2(uniforms.exposure) * tonalGain;
 
-    const float contrast = 1.0f + uniforms.contrast;
-    const float3 toeMask =
-        float3(1.0f) - smoothstep(float3(0.0f), float3(0.18f), color);
-    const float3 shoulderMask =
-        smoothstep(float3(0.85f), float3(1.0f), color);
-    const float3 linearPart =
-        (color - float3(0.5f)) * contrast + float3(0.5f);
-    const float3 toePart =
-        color * (1.0f - 0.35f * uniforms.contrast);
-    const float3 shoulderPart =
-        float3(1.0f) -
-        (float3(1.0f) - color) *
-            (1.0f - 0.35f * uniforms.contrast);
-    color = mix(linearPart, toePart, toeMask);
-    color = mix(color, shoulderPart, shoulderMask);
+    // The offset model supplies signed CMY optical densities in stops.
+    // Positive C, M, and Y primarily absorb R, G, and B respectively. The
+    // small non-negative off-diagonal terms model broad, imperfect dye
+    // absorption without turning these into ideal digital-primary gains.
+    // Negative density follows the complementary direction. Transmission is
+    // intentionally not luminance-normalized: subtractive filtration can
+    // change both colour and density.
+    const float3 cmyDensity = float3(
+        uniforms.cyanDensity,
+        uniforms.magentaDensity,
+        uniforms.yellowDensity);
+    const float3 channelDensityStops = float3(
+        dot(cmyDensity, float3(1.00f, 0.06f, 0.04f)),
+        dot(cmyDensity, float3(0.05f, 1.00f, 0.07f)),
+        dot(cmyDensity, float3(0.03f, 0.08f, 1.00f)));
+    color *= exp2(-channelDensityStops);
 
-    const float3 channelGain = float3(
-        1.0f + uniforms.temperature * 0.10f + uniforms.tint * 0.05f,
-        1.0f - uniforms.tint * 0.08f,
-        1.0f - uniforms.temperature * 0.10f + uniforms.tint * 0.05f);
-    color *= channelGain;
-
-    // RGB deliberately remains unclamped. Source alpha is passed through.
+    // Every RGB operation is a positive finite multiplier: exact black and
+    // channel sign survive, negative/HDR RGB remains unclamped, and source
+    // alpha passes through unchanged.
     output[outputIndex] = float4(color, sourceColor.a);
 }
 )METAL";
 
-struct alignas(16) FilmBreathMetalUniformsV1 final {
+struct alignas(16) FilmBreathMetalUniformsV2 final {
     std::uint32_t sourceRowStridePixels;
     std::uint32_t outputRowStridePixels;
     std::uint32_t width;
     std::uint32_t height;
     float exposure;
     float contrast;
-    float temperature;
-    float tint;
+    float cyanDensity;
+    float magentaDensity;
+    float yellowDensity;
+    float padding[3];
 };
 
-static_assert(sizeof(FilmBreathMetalUniformsV1) == 32u);
-static_assert(alignof(FilmBreathMetalUniformsV1) == 16u);
+static_assert(sizeof(FilmBreathMetalUniformsV2) == 48u);
+static_assert(alignof(FilmBreathMetalUniformsV2) == 16u);
 
 struct PreparedBuffer final {
     std::size_t offset;
@@ -220,7 +236,7 @@ bool makeUniforms(
     id<MTLBuffer> output,
     PreparedBuffer& preparedSource,
     PreparedBuffer& preparedOutput,
-    FilmBreathMetalUniformsV1& uniforms,
+    FilmBreathMetalUniformsV2& uniforms,
     std::string& error) {
     if (invocation.source.format != host::PixelFormat::floatRGBA ||
         invocation.output.format != host::PixelFormat::floatRGBA) {
@@ -275,15 +291,17 @@ bool makeUniforms(
         return false;
     }
 
-    uniforms = FilmBreathMetalUniformsV1{
+    uniforms = FilmBreathMetalUniformsV2{
         preparedSource.rowStridePixels,
         preparedOutput.rowStridePixels,
         static_cast<std::uint32_t>(width),
         static_cast<std::uint32_t>(height),
         static_cast<float>(offsets.exposure),
         static_cast<float>(offsets.contrast),
-        static_cast<float>(offsets.temperature),
-        static_cast<float>(offsets.tint),
+        static_cast<float>(offsets.cyanDensity),
+        static_cast<float>(offsets.magentaDensity),
+        static_cast<float>(offsets.yellowDensity),
+        {0.0f, 0.0f, 0.0f},
     };
     return true;
 }
@@ -341,7 +359,7 @@ bool FilmBreathProcessor::encodeMetal(
 
     PreparedBuffer preparedSource{};
     PreparedBuffer preparedOutput{};
-    FilmBreathMetalUniformsV1 uniforms{};
+    FilmBreathMetalUniformsV2 uniforms{};
     if (!makeUniforms(
             *offsets,
             context,

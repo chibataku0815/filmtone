@@ -1,59 +1,27 @@
 #include "GateWeaveTransform.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
 
 namespace filmtone::resolve::gate_weave {
 namespace {
 
-constexpr double kTwoPi = 6.283185307179586476925286766559;
-
-// Film Damage 2.3 Gate Weave reference: each axis is a convex blend of
-// correlated multi-band drift and deterministic per-frame registration
-// scatter. The blend stays inside one unit of resolved amplitude, allowing an
-// exact constant edge-safety envelope without playback-history state.
-constexpr std::size_t kDriftBandCount = 5u;
-constexpr std::array<double, kDriftBandCount> kDriftBandFrequencyRatios{
-    0.2317, 0.4671, 1.0, 2.0893, 4.3117};
-
-constexpr std::array<double, kDriftBandCount> normalizedDriftWeights(
-    double spectralCenterRatio) noexcept {
-    std::array<double, kDriftBandCount> weights{};
-    double sum = 0.0;
-    for (std::size_t band = 0u; band < kDriftBandCount; ++band) {
-        const double relative =
-            kDriftBandFrequencyRatios[band] / spectralCenterRatio;
-        weights[band] = 1.0 / (1.0 + relative * relative);
-        sum += weights[band];
-    }
-    for (std::size_t band = 0u; band < kDriftBandCount; ++band) {
-        weights[band] /= sum;
-    }
-    return weights;
-}
-
-constexpr std::array<double, kDriftBandCount> kHorizontalDriftWeights =
-    normalizedDriftWeights(0.6);
-constexpr std::array<double, kDriftBandCount> kVerticalDriftWeights =
-    normalizedDriftWeights(1.0);
-constexpr std::array<double, kDriftBandCount> kRotationDriftWeights =
-    normalizedDriftWeights(0.4);
-
-constexpr double kHorizontalPhaseLane = 211.0;
-constexpr double kVerticalPhaseLane = 223.0;
-constexpr double kRotationPhaseLane = 227.0;
-constexpr double kVerticalModulationPhaseLane = 229.0;
-constexpr double kHorizontalScatterLane = 101.0;
-constexpr double kVerticalScatterLane = 103.0;
-constexpr double kRotationScatterLane = 107.0;
-constexpr double kHorizontalScatterShare = 0.22;
-constexpr double kVerticalScatterShare = 0.40;
-constexpr double kRotationScatterShare = 0.12;
-constexpr double kVerticalModulationFrequencyRatio = 0.1117;
-constexpr double kVerticalModulationDepth = 0.35;
+// Gate movement is stochastic, not cyclic. Frequency is interpreted as the
+// inverse correlation time; frameRate / frequency gives the primary
+// correlation span in frames. Each output is a bounded convex combination, so
+// the existing constant automatic-crop envelope remains exact.
+constexpr std::uint32_t kSharedSmoothLane = 0x8f6c2a31u;
+constexpr std::uint32_t kHorizontalSmoothLane = 0x4f1bbcdcu;
+constexpr std::uint32_t kVerticalSmoothLane = 0x9e2c6b6fu;
+constexpr std::uint32_t kRotationSmoothLane = 0x27d4eb2fu;
+constexpr std::uint32_t kSharedRoughLane = 0xa511e9b3u;
+constexpr std::uint32_t kHorizontalRoughLane = 0x52a7b9c4u;
+constexpr std::uint32_t kVerticalRoughLane = 0x6d2b79f5u;
+constexpr std::uint32_t kRotationRoughLane = 0x1b873593u;
+constexpr std::uint32_t kHorizontalScatterLane = 0x85ebca6bu;
+constexpr std::uint32_t kVerticalScatterLane = 0x7feb352du;
+constexpr std::uint32_t kRotationScatterLane = 0x846ca68bu;
 
 struct GateWeaveAmplitudes final {
     double offsetX = 0.0;
@@ -104,31 +72,99 @@ double gateInstabilityFor(
     return 0.0;
 }
 
-double fract(double value) noexcept {
-    return value - std::floor(value);
+double smootherstep(double value) noexcept {
+    const double x = std::clamp(value, 0.0, 1.0);
+    return x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
 }
 
-double hash3(double a, double b, double c) noexcept {
-    return fract(std::sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453123);
-}
-
-double driftValue(
-    const std::array<double, kDriftBandCount>& weights,
-    double baseAngle,
-    double seed,
-    double phaseLane) noexcept {
-    double value = 0.0;
-    for (std::size_t band = 0u; band < kDriftBandCount; ++band) {
-        const double phase =
-            hash3(static_cast<double>(band), seed, phaseLane) * kTwoPi;
-        value += weights[band] *
-                 std::sin(baseAngle * kDriftBandFrequencyRatios[band] + phase);
+std::uint32_t normalizeLattice(double value) noexcept {
+    if (!isFinite(value)) {
+        return 0u;
     }
+    double wrapped = std::fmod(value, 4294967296.0);
+    if (wrapped < 0.0) {
+        wrapped += 4294967296.0;
+    }
+    return static_cast<std::uint32_t>(wrapped);
+}
+
+std::uint32_t mixHash(
+    std::uint32_t seed,
+    std::uint32_t lattice,
+    std::uint32_t lane) noexcept {
+    std::uint32_t value = seed ^ lane;
+    value ^= lattice * 0x9e3779b1u;
+    value ^= value >> 16u;
+    value *= 0x7feb352du;
+    value ^= value >> 15u;
+    value *= 0x846ca68bu;
+    value ^= value >> 16u;
     return value;
 }
 
-double scatterValue(double frameIndex, double seed, double lane) noexcept {
-    return 2.0 * (hash3(frameIndex, seed, lane) - 0.5);
+double signedHash(
+    std::uint32_t seed,
+    double lattice,
+    std::uint32_t lane) noexcept {
+    constexpr double kInverseUint32 = 1.0 / 4294967295.0;
+    return static_cast<double>(
+               mixHash(seed, normalizeLattice(lattice), lane)) *
+               kInverseUint32 * 2.0 -
+           1.0;
+}
+
+double valueNoise(
+    double frameIndex,
+    double correlationFrames,
+    std::uint32_t seed,
+    std::uint32_t lane) noexcept {
+    const double position = frameIndex / correlationFrames;
+    const double lattice = std::floor(position);
+    const double fraction = position - lattice;
+    const double first = signedHash(seed, lattice, lane);
+    const double second = signedHash(seed, lattice + 1.0, lane);
+    return first + (second - first) * smootherstep(fraction);
+}
+
+double trajectoryValue(
+    double frameIndex,
+    double correlationFrames,
+    double jitter,
+    std::uint32_t seed,
+    std::uint32_t smoothLane,
+    std::uint32_t roughLane,
+    std::uint32_t scatterLane) noexcept {
+    const double smooth =
+        valueNoise(
+            frameIndex,
+            correlationFrames,
+            seed,
+            kSharedSmoothLane) * 0.42 +
+        valueNoise(
+            frameIndex,
+            correlationFrames,
+            seed,
+            smoothLane) * 0.58;
+    const double roughCorrelation = std::max(
+        1.0,
+        correlationFrames * (0.38 - 0.23 * jitter));
+    const double rough =
+        valueNoise(
+            frameIndex,
+            roughCorrelation,
+            seed,
+            kSharedRoughLane) * 0.30 +
+        valueNoise(
+            frameIndex,
+            roughCorrelation,
+            seed,
+            roughLane) * 0.70;
+    const double scatter = signedHash(
+        seed,
+        std::floor(frameIndex),
+        scatterLane);
+    const double jerky = rough * 0.78 + scatter * 0.22;
+    return (1.0 - jitter) * smooth + jitter * jerky;
 }
 
 GateWeaveAmplitudes resolveAmplitudes(
@@ -228,49 +264,43 @@ GateWeaveTransform resolveGateWeaveTransform(
     GateWeaveTransform transform{};
     const GateWeaveAmplitudes amplitudes = resolveAmplitudes(recipe, context);
     if ((amplitudes.offsetX == 0.0 && amplitudes.offsetY == 0.0 &&
-         amplitudes.rotationDegrees == 0.0) ||
-        !isFinite(context.hostTimeSeconds)) {
+         amplitudes.rotationDegrees == 0.0)) {
         return transform;
     }
 
     const auto& weave = recipe.gateWeave;
-    const double baseAngle =
-        context.hostTimeSeconds * static_cast<double>(weave.frequency) * kTwoPi;
-    if (!isFinite(baseAngle)) {
+    if (!isFinite(context.frameRate) || context.frameRate <= 0.0) {
         return transform;
     }
-    const double seed = static_cast<double>(streamSeed);
     const double frameIndex = static_cast<double>(context.frameIndex);
     const double jitter = std::clamp(amplitudes.jitter, 0.0, 1.0);
-    const double horizontalShare = kHorizontalScatterShare * jitter;
-    const double verticalShare = kVerticalScatterShare * jitter;
-    const double rotationShare = kRotationScatterShare * jitter;
-
-    const double modulationPhase =
-        hash3(0.0, seed, kVerticalModulationPhaseLane) * kTwoPi;
-    const double verticalModulation =
-        1.0 -
-        kVerticalModulationDepth *
-            (0.5 +
-             0.5 * std::sin(baseAngle * kVerticalModulationFrequencyRatio +
-                            modulationPhase));
-
-    const double horizontal =
-        (1.0 - horizontalShare) *
-            driftValue(
-                kHorizontalDriftWeights, baseAngle, seed, kHorizontalPhaseLane) +
-        horizontalShare *
-            scatterValue(frameIndex, seed, kHorizontalScatterLane);
-    const double vertical =
-        (1.0 - verticalShare) * verticalModulation *
-            driftValue(
-                kVerticalDriftWeights, baseAngle, seed, kVerticalPhaseLane) +
-        verticalShare * scatterValue(frameIndex, seed, kVerticalScatterLane);
-    const double rotation =
-        (1.0 - rotationShare) *
-            driftValue(
-                kRotationDriftWeights, baseAngle, seed, kRotationPhaseLane) +
-        rotationShare * scatterValue(frameIndex, seed, kRotationScatterLane);
+    const double correlationFrames = std::max(
+        1.0,
+        context.frameRate / static_cast<double>(weave.frequency));
+    const double horizontal = trajectoryValue(
+        frameIndex,
+        correlationFrames,
+        jitter,
+        streamSeed,
+        kHorizontalSmoothLane,
+        kHorizontalRoughLane,
+        kHorizontalScatterLane);
+    const double vertical = trajectoryValue(
+        frameIndex,
+        correlationFrames,
+        jitter,
+        streamSeed,
+        kVerticalSmoothLane,
+        kVerticalRoughLane,
+        kVerticalScatterLane);
+    const double rotation = trajectoryValue(
+        frameIndex,
+        correlationFrames,
+        jitter,
+        streamSeed,
+        kRotationSmoothLane,
+        kRotationRoughLane,
+        kRotationScatterLane);
 
     transform.offsetX = static_cast<float>(amplitudes.offsetX * horizontal);
     transform.offsetY = static_cast<float>(amplitudes.offsetY * vertical);
@@ -283,8 +313,8 @@ GateWeaveMotionEnvelope resolveGateWeaveMotionEnvelope(
     const forestone::visual_effect::FilmDamageRecipeV2& recipe,
     const forestone::visual_render::DeterministicRenderContextV1& context) noexcept {
     const GateWeaveAmplitudes amplitudes = resolveAmplitudes(recipe, context);
-    // Revision 2.3 guarantees that the convex drift/scatter blend stays inside
-    // one unit of the resolved amplitude on every axis.
+    // Every stochastic stage and blend is bounded to one unit, so this remains
+    // an exact envelope for automatic crop and cubic reconstruction safety.
     return GateWeaveMotionEnvelope{
         std::abs(amplitudes.offsetX),
         std::abs(amplitudes.offsetY),

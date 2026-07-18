@@ -8,15 +8,15 @@ namespace filmtone::resolve::effects::vignette {
 namespace {
 
 constexpr char kVignettePipelineCacheKey[] =
-    "filmtone.resolve.spatial.vignette.v1";
+    "filmtone.resolve.spatial.vignette.filmic-falloff.v2";
 constexpr char kVignetteKernelFunction[] =
-    "filmtoneResolveSpatialVignetteV1";
+    "filmtoneResolveSpatialVignetteV2";
 
 constexpr char kVignetteMetalSource[] = R"METAL(
 #include <metal_stdlib>
 using namespace metal;
 
-struct FilmtoneResolveVignetteUniformsV1 {
+struct FilmtoneResolveVignetteUniformsV2 {
     uint width;
     uint height;
     float normalizedRadiusPerRenderedPixelX;
@@ -27,10 +27,10 @@ struct FilmtoneResolveVignetteUniformsV1 {
     float reserved;
 };
 
-kernel void filmtoneResolveSpatialVignetteV1(
+kernel void filmtoneResolveSpatialVignetteV2(
     texture2d<float, access::read> source [[texture(0)]],
     texture2d<float, access::write> output [[texture(1)]],
-    constant FilmtoneResolveVignetteUniformsV1& uniforms [[buffer(0)]],
+    constant FilmtoneResolveVignetteUniformsV2& uniforms [[buffer(0)]],
     uint2 gid [[thread_position_in_grid]]) {
     if (gid.x >= uniforms.width || gid.y >= uniforms.height) {
         return;
@@ -45,10 +45,18 @@ kernel void filmtoneResolveSpatialVignetteV1(
             uniforms.normalizedRadiusPerRenderedPixelY);
     const float normalizedDistanceSquared =
         dot(normalizedDistance, normalizedDistance);
-    const float attenuation = clamp(
-        1.0f - uniforms.amount * normalizedDistanceSquared,
+    const float radius = clamp(
+        sqrt(max(normalizedDistanceSquared, 0.0f)),
         0.0f,
         1.0f);
+    // Smoothstep has a zero slope at the optical center and perimeter while
+    // lifting the middle field above the old quadratic response. Edge loss is
+    // capped at 72%, so maximum Amount cannot create a black corner hole.
+    const float filmicRadius = radius * radius * (3.0f - 2.0f * radius);
+    const float amount = clamp(uniforms.amount, 0.0f, 1.0f);
+    const float edgeLoss =
+        amount * mix(0.82f, 0.72f, amount);
+    const float attenuation = 1.0f - edgeLoss * filmicRadius;
 
     // The scalar multiplication preserves RGB sign, hue ratios, and values
     // above one. Alpha is copied from the unsplit source sample.
@@ -58,7 +66,7 @@ kernel void filmtoneResolveSpatialVignetteV1(
 }
 )METAL";
 
-struct alignas(16) VignetteMetalUniformsV1 final {
+struct alignas(16) VignetteMetalUniformsV2 final {
     std::uint32_t width;
     std::uint32_t height;
     float normalizedRadiusPerRenderedPixelX;
@@ -69,13 +77,13 @@ struct alignas(16) VignetteMetalUniformsV1 final {
     float reserved;
 };
 
-static_assert(sizeof(VignetteMetalUniformsV1) == 32u);
-static_assert(alignof(VignetteMetalUniformsV1) == 16u);
+static_assert(sizeof(VignetteMetalUniformsV2) == 32u);
+static_assert(alignof(VignetteMetalUniformsV2) == 16u);
 
 bool makeUniforms(
     const host::spatial::SpatialFrameDescriptor& frame,
     const spatial::VignetteParameterViewV1& parameters,
-    VignetteMetalUniformsV1& uniforms,
+    VignetteMetalUniformsV2& uniforms,
     std::string& error) {
     if (frame.width == 0u || frame.height == 0u ||
         !std::isfinite(frame.renderScaleX) || frame.renderScaleX <= 0.0 ||
@@ -86,7 +94,8 @@ bool makeUniforms(
         frame.logicalDisplayWidth <= 0.0 ||
         !std::isfinite(frame.logicalDisplayHeight) ||
         frame.logicalDisplayHeight <= 0.0 ||
-        !std::isfinite(parameters.amount) || parameters.amount <= 0.0f) {
+        !std::isfinite(parameters.amount) || parameters.amount <= 0.0f ||
+        parameters.amount > 1.0f) {
         error = "Vignette requires an active finite amount and finite positive display geometry.";
         return false;
     }
@@ -123,7 +132,7 @@ bool makeUniforms(
         return false;
     }
 
-    uniforms = VignetteMetalUniformsV1{
+    uniforms = VignetteMetalUniformsV2{
         frame.width,
         frame.height,
         normalizedScaleX,
@@ -163,7 +172,7 @@ bool VignetteProcessor::makeResourcePlan(
     host::spatial::SpatialResourcePlan& plan,
     std::string& error) const {
     (void)context;
-    VignetteMetalUniformsV1 uniforms{};
+    VignetteMetalUniformsV2 uniforms{};
     if (!makeUniforms(frame, parameters_, uniforms, error)) {
         return false;
     }
@@ -185,7 +194,7 @@ bool VignetteProcessor::encodeSpatialMetal(
     const host::spatial::SpatialEncodeInvocation& invocation,
     std::string& error) const {
     (void)context;
-    VignetteMetalUniformsV1 uniforms{};
+    VignetteMetalUniformsV2 uniforms{};
     if (!makeUniforms(invocation.frame, parameters_, uniforms, error)) {
         return false;
     }

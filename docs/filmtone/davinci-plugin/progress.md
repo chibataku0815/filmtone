@@ -1,6 +1,6 @@
 # Filmtone DaVinci Resolve Plugin Progress
 
-Date: 2026-07-18 JST
+Date: 2026-07-19 JST
 Coordinator-owned: yes
 
 This is the only master progress record for the OpenFX lane. Worker chats must
@@ -78,6 +78,10 @@ All dispatches follow `delegation.md`. Master states are:
 | `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Accepted — source integrated and actual Resolve host path proved |
 | `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Closed with partial acceptance — Damage pass; Breath/Weave below pass and deferred |
+| `RESOLVE-PARAMETER-UX` | Owner-directed Quick Enable + factory-default scope | [Progress](workstreams/progress/resolve-parameter-ux.md) | Filmtone | current integrated parameter surface + owner UX decision | Review — source-static review passed; authorized combined rebuild, Resolve UI proof, and owner acceptance pending |
+| `FILM-BREATH-CMY-MODEL` | [Plan](workstreams/film-breath-cmy-model.md) | [Progress](workstreams/progress/film-breath-cmy-model.md) | Filmtone | Film Breath correction decision | Accepted — source interface and implementation integrated; runtime proof deferred |
+| `FILM-BREATH-CMY-METAL` | [Plan](workstreams/film-breath-cmy-metal.md) | [Progress](workstreams/progress/film-breath-cmy-metal.md) | Filmtone | FILM-BREATH-CMY-MODEL interface | Accepted — subtractive CMY Metal response integrated; runtime proof deferred |
+| `FILM-BREATH-PERIOD-UI` | [Plan](workstreams/film-breath-period-ui.md) | [Progress](workstreams/progress/film-breath-period-ui.md) | Filmtone | current integrated parameter surface | Accepted — persistent Period registration and UI wiring integrated; runtime proof deferred |
 
 ## Parallel Launch Order
 
@@ -183,6 +187,48 @@ path, plugin interface, and clean integration base.
 - Untracked evidence remains under
   `apps/filmtone-resolve-ofx/build/quality-evidence/resolve-host/`; it is not
   release packaging or tracked test infrastructure.
+
+## Resolve Parameter UX Review — 2026-07-19 JST
+
+- Coordinator review found no source-static acceptance blocker. The worker
+  edit boundary is limited to the new Resolve factory-default table,
+  `FilmtoneFinishParameters.cpp/.h`, and its worker-owned progress record. It
+  did not edit the canonical contract, Generated files, any Effects folder,
+  another worker record, or this master record.
+- `Quick Enable` is defined open immediately after Node Role and reuses each
+  of the eight existing persistent Enabled IDs exactly once. Variation follows
+  it; all five spatial and three film detail groups are closed by default, as
+  are the film Advanced groups. No Enabled parameter remains duplicated in a
+  detail group.
+- The single real-value factory-default table feeds both descriptor defaults
+  and non-finite runtime fallbacks. Compile-time checks constrain every row to
+  an existing real parameter and its accepted range. Enabled remains false,
+  Node Role remains All, Variation remains zero, and active rendering still
+  requires Enabled plus a positive Amount, preserving add/reset identity.
+- Existing persistent parameter IDs, animation/persistence flags, stored
+  values, and keyframes are unchanged. The new Quick Enable group ID is
+  additive. Runtime project-reopen proof remains part of the authorized
+  Resolve pass rather than a source-only claim.
+- Handoff metadata discrepancy: the worker record contains the two start MD5s
+  but not the stated end MD5 list. The coordinator independently captured the
+  reviewed tips as factory defaults `24f25c8084fcff754ebc591ec8893165`,
+  parameter cpp `ea24fb145feb2dfe4c886c3edfb81e0f`, parameter header
+  `1c4cffefed11249cb06b47257acecd74`, and worker record
+  `a521f17c5fca5c811fc70980b4606eb4`. This documentation omission does not
+  change the product-source verdict.
+- State remains `Review`, not `Accepted`. After explicit authorization, run
+  one combined rebuild, recoverable install, and Resolve session to prove the
+  actual UI order, default-open/default-closed state, each enable-time visual
+  starting value, reset identity, and old-project stored-value/keyframe load.
+- Integration order was executed through the source boundary: the Deep Glow
+  canonical contract/facade was regenerated first from the clean accepted
+  external artifact worktree at `fc9311e9989e91297c5bd7cddf05355bd58d6c55`.
+  The generator reported 11 artifacts; the resulting facade carries
+  `Threshold Smooth`, threshold range `0...4`, and the log-PSF radius unit.
+  The UX factory defaults remain inside those generated ranges. The remaining
+  step is the single authorized combined rebuild/install/Resolve pass.
+- Tests, build, contract generation, Resolve launch, installation, staging,
+  commit, merge, rebase, and push were not performed during this review.
 
 ## Proposed File Ownership
 

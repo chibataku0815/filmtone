@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "FilmtoneResolveFactoryDefaults.h"
+
 namespace filmtone::resolve::integration {
 namespace {
 
@@ -80,20 +82,9 @@ static_assert(std::string_view(
     kFilmtoneSpatialParameterDefinitionsV1[kVignette].memberName) ==
     "vignette");
 
-enum class ParameterGroup {
-    root,
-    filmBreath,
-    filmBreathAdvanced,
-    gateWeave,
-    gateWeaveAdvanced,
-    filmDamage,
-    filmDamageAdvanced,
-};
-
 struct ParameterPresentation final {
     const char* label;
     const char* hint;
-    ParameterGroup group;
     double increment;
     int digits;
 };
@@ -101,111 +92,101 @@ struct ParameterPresentation final {
 inline constexpr std::array<ParameterPresentation, 17> kBasePresentations{{
     {"Variation",
      "Changes the deterministic movement and material pattern while keeping the same settings.",
-     ParameterGroup::root,
      1.0,
      0},
-    {"Enabled",
-     "Enables Film Breath exposure, tonal, and color movement.",
-     ParameterGroup::filmBreath,
+    {"Film Breath",
+     "Turns Film Breath on or off without changing its stored controls.",
      1.0,
      0},
     {"Amount",
      "Sets the overall Film Breath strength.",
-     ParameterGroup::filmBreath,
      0.01,
      2},
-    {"Enabled",
-     "Enables mechanical frame movement. If CinePrint35 Gate Wv is active, leave one Gate Weave treatment off.",
-     ParameterGroup::gateWeave,
+    {"Gate Weave",
+     "Turns Gate Weave on or off without changing its stored controls.",
      1.0,
      0},
     {"Amount",
      "Sets the overall Gate Weave strength.",
-     ParameterGroup::gateWeave,
      0.01,
      2},
     {"Horizontal Movement",
      "Sets horizontal travel as a fraction of the frame's short axis.",
-     ParameterGroup::gateWeaveAdvanced,
      0.001,
      4},
     {"Vertical Movement",
      "Sets vertical travel as a fraction of the frame's short axis.",
-     ParameterGroup::gateWeaveAdvanced,
      0.001,
      4},
     {"Rotation",
      "Sets the maximum clockwise rotation in degrees.",
-     ParameterGroup::gateWeaveAdvanced,
      0.05,
      2},
     {"Cadence",
-     "Sets Gate Weave movement cycles per second.",
-     ParameterGroup::gateWeaveAdvanced,
+     "Sets the inverse correlation period: higher values make registration changes faster.",
      0.1,
      2},
     {"Instability",
-     "Adds deterministic frame-to-frame variation to the smooth movement.",
-     ParameterGroup::gateWeaveAdvanced,
+     "Moves from smoothly correlated travel toward abrupt frame-to-frame registration changes.",
      0.01,
      2},
-    {"Enabled",
-     "Enables the Film Damage material families below.",
-     ParameterGroup::filmDamage,
+    {"Film Damage",
+     "Turns Film Damage on or off without changing its stored controls.",
      1.0,
      0},
     {"Amount",
      "Sets the shared strength of enabled Film Damage families.",
-     ParameterGroup::filmDamage,
      0.01,
      2},
     {"Dust",
      "Adds dark-weighted dust. If CinePrint35 uses Resolve Film Damage dust, leave one Dust treatment off.",
-     ParameterGroup::filmDamageAdvanced,
      0.01,
      2},
     {"Scratches",
      "Adds broken, persistent film scratches.",
-     ParameterGroup::filmDamageAdvanced,
      0.01,
      2},
     {"Fibers",
      "Adds persistent fibers and hair-like marks.",
-     ParameterGroup::filmDamageAdvanced,
      0.01,
      2},
     {"Stains",
      "Adds broad, slowly changing film-surface stains.",
-     ParameterGroup::filmDamageAdvanced,
      0.01,
      2},
     {"Gate Wear",
      "Adds broken wear along the left and right gate edges.",
-     ParameterGroup::filmDamageAdvanced,
      0.01,
      2},
 }};
 
-inline constexpr std::array<ParameterPresentation, 3>
-    kFilmBreathResponsePresentations{{
-        {"Exposure Response",
-         "Controls how strongly Film Breath changes exposure.",
-         ParameterGroup::filmBreathAdvanced,
+inline constexpr std::array<ParameterPresentation, 4>
+    kFilmBreathPresentations{{
+    {"Exposure Variation",
+     "Sets the amplitude of frame-correlated Film Breath exposure changes.",
          0.01,
          2},
-        {"Tonal Response",
-         "Controls how strongly Film Breath changes tonal contrast.",
-         ParameterGroup::filmBreathAdvanced,
+    {"Tonal Variation",
+     "Sets the amplitude of frame-correlated Film Breath tonal changes.",
          0.01,
          2},
-        {"Color Response",
-         "Controls how strongly Film Breath changes temperature and tint.",
-         ParameterGroup::filmBreathAdvanced,
+    {"Subtractive Color",
+     "Sets the amplitude of frame-correlated subtractive CMY density variation.",
          0.01,
          2},
+    {"Period (Frames)",
+     "Sets the shared Film Breath period. Lower values change more quickly; higher values breathe over more frames.",
+         1.0,
+         0},
     }};
 
+// labelOverride replaces the generated metadata label when non-null. The
+// Quick Enable rows reuse the generated feature labels so the checkbox names
+// stay identical to the detail-group names; Threshold Smooth renames the
+// continuous quadratic threshold rolloff while its persistent softKnee ID is
+// unchanged.
 struct SpatialParameterPresentation final {
+    const char* labelOverride;
     const char* hint;
     double increment;
     int digits;
@@ -213,34 +194,55 @@ struct SpatialParameterPresentation final {
 
 inline constexpr std::array<SpatialParameterPresentation, 14>
     kSpatialPresentations{{
-        {"Chooses whether this node runs the complete graph, spatial optics only, or the three film modules only.",
+        {nullptr,
+         "Chooses whether this node runs the complete graph, spatial optics only, or the three film modules only.",
          1.0,
          0},
-        {"Enables Deep Glow without changing its stored settings.", 1.0, 0},
-        {"Sets highlight glow energy.", 0.01, 2},
-        {"Sets the highlight level where glow begins.", 0.01, 2},
-        {"Distributes glow from a tighter core toward broader scales.", 0.01, 2},
-        {"Softens the transition around the glow threshold.", 0.01, 2},
-        {"Enables Peripheral Chromatic Shift without changing its stored setting.",
+        {kFilmtoneSpatialFeatureDefinitionsV1[0].label,
+         "Turns Deep Glow on or off without changing its stored controls.",
          1.0,
          0},
-        {"Sets restrained radial red and blue separation toward the image perimeter.",
+        {nullptr,
+         "Sets diffusion energy from a restrained highlight bloom to a pronounced glow.", 0.01, 2},
+        {nullptr, "Sets the highlight level where glow begins.", 0.01, 2},
+        {nullptr,
+         "Moves glow from a tighter halo toward a broader light spread.", 0.01, 2},
+        {"Threshold Smooth",
+         "Softens the transition around the glow threshold.", 0.01, 2},
+        {kFilmtoneSpatialFeatureDefinitionsV1[1].label,
+         "Turns Peripheral Chromatic Shift on or off without changing its stored controls.",
+         1.0,
+         0},
+        {nullptr,
+         "Sets restrained radial red and blue separation toward the image perimeter.",
          0.0001,
          4},
-        {"Enables Lens Softness without changing its stored setting.", 1.0, 0},
-        {"Sets peripheral optical softness while keeping the image center coherent.",
+        {kFilmtoneSpatialFeatureDefinitionsV1[2].label,
+         "Turns Lens Softness on or off without changing its stored controls.",
+         1.0,
+         0},
+        {nullptr,
+         "Sets peripheral optical softness while keeping the image center coherent.",
          0.01,
          2},
-        {"Enables Texture Softness without changing its stored setting.", 1.0, 0},
-        {"Relaxes fine digital acutance without applying a lens blur.", 0.01, 2},
-        {"Enables Vignette without changing its stored setting.", 1.0, 0},
-        {"Sets smooth off-axis RGB attenuation while preserving source alpha.",
+        {kFilmtoneSpatialFeatureDefinitionsV1[3].label,
+         "Turns Texture Softness on or off without changing its stored controls.",
+         1.0,
+         0},
+        {nullptr,
+         "Relaxes fine digital acutance, with stronger smoothing toward the top of the range.", 0.01, 2},
+        {kFilmtoneSpatialFeatureDefinitionsV1[4].label,
+         "Turns Vignette on or off without changing its stored controls.",
+         1.0,
+         0},
+        {nullptr,
+         "Sets a progressive off-axis light falloff while preserving source alpha.",
          0.01,
          2},
     }};
 
 static_assert(
-    kFilmBreathResponsePresentations.size() ==
+    kFilmBreathPresentations.size() ==
     effects::film_breath::kFilmBreathParameterDescriptors.size());
 static_assert(
     effects::film_breath::kFilmBreathParameterDescriptors[0].kind ==
@@ -251,76 +253,91 @@ static_assert(
 static_assert(
     effects::film_breath::kFilmBreathParameterDescriptors[2].kind ==
     FilmtoneFinishParameterKind::real);
+static_assert(
+    effects::film_breath::kFilmBreathParameterDescriptors[3].kind ==
+    FilmtoneFinishParameterKind::real);
 
-struct ParameterGroups final {
-    OFX::GroupParamDescriptor* filmBreath;
-    OFX::GroupParamDescriptor* filmBreathAdvanced;
-    OFX::GroupParamDescriptor* gateWeave;
-    OFX::GroupParamDescriptor* gateWeaveAdvanced;
-    OFX::GroupParamDescriptor* filmDamage;
-    OFX::GroupParamDescriptor* filmDamageAdvanced;
-};
-
-struct SpatialParameterGroups final {
-    OFX::GroupParamDescriptor* deepGlow;
-    OFX::GroupParamDescriptor* peripheralChromaticShift;
-    OFX::GroupParamDescriptor* lensSoftness;
-    OFX::GroupParamDescriptor* textureSoftness;
-    OFX::GroupParamDescriptor* vignette;
-};
-
-const FilmtoneFinishParameterDefinitionV1& definition(
+constexpr const FilmtoneFinishParameterDefinitionV1& definition(
     std::size_t index) noexcept {
     return kFilmtoneFinishParameterDefinitions[index];
 }
 
-const FilmtoneSpatialParameterDefinitionV1& spatialDefinition(
+constexpr const FilmtoneSpatialParameterDefinitionV1& spatialDefinition(
     std::size_t index) noexcept {
     return kFilmtoneSpatialParameterDefinitionsV1[index];
 }
 
-OFX::GroupParamDescriptor* spatialGroupFor(
-    std::size_t index,
-    const SpatialParameterGroups& groups) noexcept {
-    if (index >= kDeepGlowEnabled && index <= kBloomSoftKnee) {
-        return groups.deepGlow;
+// Every Resolve factory-default entry must target one existing real-kind
+// persistent parameter and stay inside its accepted range. Enabled, Node
+// Role, and Variation therefore cannot receive a Resolve override, which
+// keeps the add-time and reset-time output exact identity.
+constexpr bool resolveFactoryDefaultsMatchDefinitions() noexcept {
+    for (const auto& entry : kFilmtoneResolveFactoryDefaults) {
+        const std::string_view id{entry.id};
+        bool matched = false;
+        for (const auto& metadata : kFilmtoneSpatialParameterDefinitionsV1) {
+            if (std::string_view(metadata.id) != id) {
+                continue;
+            }
+            if (metadata.kind != FilmtoneSpatialParameterKindV1::real ||
+                entry.value < metadata.minValue ||
+                entry.value > metadata.maxValue) {
+                return false;
+            }
+            matched = true;
+            break;
+        }
+        for (const auto& metadata : kFilmtoneFinishParameterDefinitions) {
+            if (matched || std::string_view(metadata.id) != id) {
+                continue;
+            }
+            if (metadata.kind != FilmtoneFinishParameterKind::real ||
+                entry.value < metadata.minValue ||
+                entry.value > metadata.maxValue) {
+                return false;
+            }
+            matched = true;
+            break;
+        }
+        if (!matched) {
+            return false;
+        }
     }
-    if (index >= kPeripheralChromaticShiftEnabled && index <= kRgbShift) {
-        return groups.peripheralChromaticShift;
-    }
-    if (index >= kLensSoftnessEnabled && index <= kLensSoftness) {
-        return groups.lensSoftness;
-    }
-    if (index >= kTextureSoftnessEnabled && index <= kDetailSoftness) {
-        return groups.textureSoftness;
-    }
-    if (index >= kVignetteEnabled && index <= kVignette) {
-        return groups.vignette;
-    }
-    return nullptr;
+    return true;
 }
 
-OFX::GroupParamDescriptor* groupFor(
-    ParameterGroup group,
-    const ParameterGroups& groups) noexcept {
-    switch (group) {
-        case ParameterGroup::root:
-            return nullptr;
-        case ParameterGroup::filmBreath:
-            return groups.filmBreath;
-        case ParameterGroup::filmBreathAdvanced:
-            return groups.filmBreathAdvanced;
-        case ParameterGroup::gateWeave:
-            return groups.gateWeave;
-        case ParameterGroup::gateWeaveAdvanced:
-            return groups.gateWeaveAdvanced;
-        case ParameterGroup::filmDamage:
-            return groups.filmDamage;
-        case ParameterGroup::filmDamageAdvanced:
-            return groups.filmDamageAdvanced;
-    }
-    return nullptr;
-}
+static_assert(resolveFactoryDefaultsMatchDefinitions());
+
+// The Film Breath response and cadence descriptors are already Resolve-local
+// and store the Resolve factory values directly; assert them instead of
+// duplicating a second default source.
+static_assert(
+    effects::film_breath::kFilmBreathParameterDescriptors[0].defaultValue ==
+    1.0);
+static_assert(
+    effects::film_breath::kFilmBreathParameterDescriptors[1].defaultValue ==
+    1.0);
+static_assert(
+    effects::film_breath::kFilmBreathParameterDescriptors[2].defaultValue ==
+    1.0);
+static_assert(
+    effects::film_breath::kFilmBreathParameterDescriptors[3].defaultValue ==
+    24.0);
+
+// Gate Weave keeps its accepted mechanical-trajectory defaults; the stored
+// translation amplitudes and cadence must remain non-zero so enabling Gate
+// Weave from Quick Enable moves the frame immediately.
+static_assert(
+    kFilmtoneFinishParameterDefinitions[kGateWeaveHorizontalAmplitude]
+        .defaultValue > 0.0);
+static_assert(
+    kFilmtoneFinishParameterDefinitions[kGateWeaveVerticalAmplitude]
+        .defaultValue > 0.0);
+static_assert(
+    kFilmtoneFinishParameterDefinitions[kGateWeaveFrequency].defaultValue >
+    0.0);
+static_assert(
+    kFilmtoneFinishParameterDefinitions[kGateWeaveJitter].defaultValue > 0.0);
 
 void configureValueDescriptor(
     OFX::ValueParamDescriptor& descriptor,
@@ -344,10 +361,9 @@ void configureValueDescriptor(
 OFX::ParamDescriptor* defineBaseParameter(
     OFX::ImageEffectDescriptor& descriptor,
     std::size_t index,
-    const ParameterGroups& groups) {
+    OFX::GroupParamDescriptor* parent) {
     const auto& value = definition(index);
     const auto& presentation = kBasePresentations[index];
-    OFX::GroupParamDescriptor* parent = groupFor(presentation.group, groups);
 
     switch (value.kind) {
         case FilmtoneFinishParameterKind::boolean: {
@@ -360,7 +376,8 @@ OFX::ParamDescriptor* defineBaseParameter(
         case FilmtoneFinishParameterKind::real: {
             OFX::DoubleParamDescriptor* parameter =
                 descriptor.defineDoubleParam(value.id);
-            parameter->setDefault(value.defaultValue);
+            parameter->setDefault(
+                resolveFactoryDefault(value.id, value.defaultValue));
             parameter->setRange(value.minValue, value.maxValue);
             parameter->setDisplayRange(value.minValue, value.maxValue);
             parameter->setIncrement(presentation.increment);
@@ -391,7 +408,10 @@ void configureSpatialValueDescriptor(
     const FilmtoneSpatialParameterDefinitionV1& metadata,
     const SpatialParameterPresentation& presentation,
     OFX::GroupParamDescriptor* parent) {
-    descriptor.setLabels(metadata.label, metadata.label, metadata.label);
+    const char* label = presentation.labelOverride != nullptr
+        ? presentation.labelOverride
+        : metadata.label;
+    descriptor.setLabels(label, label, label);
     descriptor.setScriptName(metadata.id);
     descriptor.setHint(presentation.hint);
     descriptor.setAnimates(true);
@@ -405,10 +425,9 @@ void configureSpatialValueDescriptor(
 OFX::ParamDescriptor* defineSpatialParameter(
     OFX::ImageEffectDescriptor& descriptor,
     std::size_t index,
-    const SpatialParameterGroups& groups) {
+    OFX::GroupParamDescriptor* parent) {
     const auto& metadata = spatialDefinition(index);
     const auto& presentation = kSpatialPresentations[index];
-    OFX::GroupParamDescriptor* parent = spatialGroupFor(index, groups);
 
     switch (metadata.kind) {
         case FilmtoneSpatialParameterKindV1::boolean: {
@@ -425,7 +444,8 @@ OFX::ParamDescriptor* defineSpatialParameter(
         case FilmtoneSpatialParameterKindV1::real: {
             OFX::DoubleParamDescriptor* parameter =
                 descriptor.defineDoubleParam(metadata.id);
-            parameter->setDefault(metadata.defaultValue);
+            parameter->setDefault(
+                resolveFactoryDefault(metadata.id, metadata.defaultValue));
             parameter->setRange(metadata.minValue, metadata.maxValue);
             parameter->setDisplayRange(metadata.minValue, metadata.maxValue);
             parameter->setIncrement(presentation.increment);
@@ -456,7 +476,7 @@ OFX::ParamDescriptor* defineSpatialParameter(
     return nullptr;
 }
 
-OFX::DoubleParamDescriptor* defineFilmBreathResponseParameter(
+OFX::DoubleParamDescriptor* defineFilmBreathParameter(
     OFX::ImageEffectDescriptor& descriptor,
     std::size_t index,
     const ParameterPresentation& presentation,
@@ -481,12 +501,12 @@ double readFiniteReal(
     double time) {
     const double value = parameter.getValueAtTime(time);
     if (!std::isfinite(value)) {
-        return metadata.defaultValue;
+        return resolveFactoryDefault(metadata.id, metadata.defaultValue);
     }
     return std::clamp(value, metadata.minValue, metadata.maxValue);
 }
 
-double readFiniteFilmBreathResponse(
+double readFiniteFilmBreathReal(
     OFX::DoubleParam& parameter,
     std::size_t index,
     double time) {
@@ -527,7 +547,7 @@ float readSpatialReal(
     const double value = parameter.getValueAtTime(time);
     const double normalized = std::isfinite(value)
         ? std::clamp(value, metadata.minValue, metadata.maxValue)
-        : metadata.defaultValue;
+        : resolveFactoryDefault(metadata.id, metadata.defaultValue);
     return static_cast<float>(normalized);
 }
 
@@ -542,13 +562,58 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
         "com.chibatakumi.filmtone.finish.page.controls");
     page->setLabels("Controls", "Controls", "Controls");
 
+    const auto addSpatialParameter = [&](
+        std::size_t index,
+        OFX::GroupParamDescriptor* parent) {
+        OFX::ParamDescriptor* parameter =
+            defineSpatialParameter(descriptor, index, parent);
+        if (parameter != nullptr) {
+            page->addChild(*parameter);
+        }
+    };
+
+    const auto addBaseParameter = [&](
+        std::size_t index,
+        OFX::GroupParamDescriptor* parent) {
+        OFX::ParamDescriptor* parameter =
+            defineBaseParameter(descriptor, index, parent);
+        if (parameter != nullptr) {
+            page->addChild(*parameter);
+        }
+    };
+
+    // Resolve lays the inspector out in parameter-definition order, so the
+    // definition sequence below is the authoritative page order: Node Role,
+    // the always-open Quick Enable group holding every persistent Enabled
+    // toggle, Variation, then one closed detail group per feature holding
+    // only its stored adjustment controls.
+    addSpatialParameter(kNodeRole, nullptr);
+
+    OFX::GroupParamDescriptor* quickEnable = descriptor.defineGroupParam(
+        "com.chibatakumi.filmtone.finish.group.quickEnable");
+    quickEnable->setLabels("Quick Enable", "Quick Enable", "Quick Enable");
+    quickEnable->setHint(
+        "Turns individual Filmtone modules on or off without changing their stored controls.");
+    quickEnable->setOpen(true);
+
+    addSpatialParameter(kDeepGlowEnabled, quickEnable);
+    addSpatialParameter(kPeripheralChromaticShiftEnabled, quickEnable);
+    addSpatialParameter(kLensSoftnessEnabled, quickEnable);
+    addSpatialParameter(kTextureSoftnessEnabled, quickEnable);
+    addSpatialParameter(kVignetteEnabled, quickEnable);
+    addBaseParameter(kFilmBreathEnabled, quickEnable);
+    addBaseParameter(kGateWeaveEnabled, quickEnable);
+    addBaseParameter(kFilmDamageEnabled, quickEnable);
+
+    addBaseParameter(kVariation, nullptr);
+
     const auto defineSpatialGroup = [&descriptor](
         std::size_t featureIndex,
-        std::size_t firstParameterIndex,
+        std::size_t groupIdParameterIndex,
         const char* hint) {
         const auto& feature = kFilmtoneSpatialFeatureDefinitionsV1[featureIndex];
         OFX::GroupParamDescriptor* group = descriptor.defineGroupParam(
-            spatialDefinition(firstParameterIndex).groupId);
+            spatialDefinition(groupIdParameterIndex).groupId);
         group->setLabels(feature.label, feature.label, feature.label);
         group->setHint(hint);
         group->setOpen(false);
@@ -557,71 +622,92 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* deepGlow = defineSpatialGroup(
         0u,
-        kDeepGlowEnabled,
-        "Highlight-selective, multi-scale glow with controlled energy.");
+        kBloomStrength,
+        "Highlight-selective diffusion with independent strength and spread.");
+    addSpatialParameter(kBloomStrength, deepGlow);
+    addSpatialParameter(kBloomThreshold, deepGlow);
+    addSpatialParameter(kBloomRadius, deepGlow);
+    addSpatialParameter(kBloomSoftKnee, deepGlow);
+
     OFX::GroupParamDescriptor* peripheralChromaticShift = defineSpatialGroup(
         1u,
-        kPeripheralChromaticShiftEnabled,
+        kRgbShift,
         "Restrained radial red and blue separation toward the image perimeter.");
+    addSpatialParameter(kRgbShift, peripheralChromaticShift);
+
     OFX::GroupParamDescriptor* lensSoftness = defineSpatialGroup(
         2u,
-        kLensSoftnessEnabled,
+        kLensSoftness,
         "Field-weighted optical softness that keeps the image center coherent.");
+    addSpatialParameter(kLensSoftness, lensSoftness);
+
     OFX::GroupParamDescriptor* textureSoftness = defineSpatialGroup(
         3u,
-        kTextureSoftnessEnabled,
-        "Edge-aware attenuation of fine digital acutance across the frame.");
+        kDetailSoftness,
+        "Edge-aware relief of fine digital acutance across the frame.");
+    addSpatialParameter(kDetailSoftness, textureSoftness);
+
     OFX::GroupParamDescriptor* vignette = defineSpatialGroup(
         4u,
-        kVignetteEnabled,
-        "Smooth aspect-aware attenuation from the image center toward the perimeter.");
-
-    const SpatialParameterGroups spatialGroups{
-        deepGlow,
-        peripheralChromaticShift,
-        lensSoftness,
-        textureSoftness,
-        vignette,
-    };
+        kVignette,
+        "Progressive aspect-aware light falloff from the image center toward the perimeter.");
+    addSpatialParameter(kVignette, vignette);
 
     OFX::GroupParamDescriptor* filmBreath = descriptor.defineGroupParam(
         "com.chibatakumi.filmtone.finish.group.filmBreath");
     filmBreath->setLabels("Film Breath", "Film Breath", "Film Breath");
     filmBreath->setHint(
-        "Deterministic exposure, tonal, and color movement using the established Filmtone cadence.");
-    filmBreath->setOpen(true);
+        "Frame-correlated exposure, tonal contrast, and subtractive color variation with deterministic playback.");
+    filmBreath->setOpen(false);
+    addBaseParameter(kFilmBreathAmount, filmBreath);
 
     OFX::GroupParamDescriptor* filmBreathAdvanced =
         descriptor.defineGroupParam(
             "com.chibatakumi.filmtone.finish.group.filmBreath.advanced");
     filmBreathAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     filmBreathAdvanced->setHint(
-        "Attenuates Film Breath response components without changing cadence.");
+        "Sets Film Breath exposure, tonal contrast, subtractive color variation, and period.");
     filmBreathAdvanced->setParent(*filmBreath);
     filmBreathAdvanced->setOpen(false);
+    for (std::size_t index = 0u;
+         index < kFilmBreathPresentations.size();
+         ++index) {
+        page->addChild(*defineFilmBreathParameter(
+            descriptor,
+            index,
+            kFilmBreathPresentations[index],
+            *filmBreathAdvanced));
+    }
 
     OFX::GroupParamDescriptor* gateWeave = descriptor.defineGroupParam(
         "com.chibatakumi.filmtone.finish.group.gateWeave");
     gateWeave->setLabels("Gate Weave", "Gate Weave", "Gate Weave");
     gateWeave->setHint(
-        "Mechanical image movement with constant automatic edge safety.");
-    gateWeave->setOpen(true);
+        "Frame-correlated mechanical registration movement with automatic edge safety. If CinePrint35 Gate Wv is active, leave one Gate Weave treatment off.");
+    gateWeave->setOpen(false);
+    addBaseParameter(kGateWeaveAmount, gateWeave);
 
     OFX::GroupParamDescriptor* gateWeaveAdvanced =
         descriptor.defineGroupParam(
             "com.chibatakumi.filmtone.finish.group.gateWeave.advanced");
     gateWeaveAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     gateWeaveAdvanced->setHint(
-        "Movement range, rotation, cadence, and deterministic instability.");
+        "Movement range, rotation, correlation cadence, and frame-to-frame instability.");
     gateWeaveAdvanced->setParent(*gateWeave);
     gateWeaveAdvanced->setOpen(false);
+    for (std::size_t index = kGateWeaveHorizontalAmplitude;
+         index <= kGateWeaveJitter;
+         ++index) {
+        addBaseParameter(index, gateWeaveAdvanced);
+    }
 
     OFX::GroupParamDescriptor* filmDamage = descriptor.defineGroupParam(
         "com.chibatakumi.filmtone.finish.group.filmDamage");
     filmDamage->setLabels("Film Damage", "Film Damage", "Film Damage");
     filmDamage->setHint(
         "Dark-weighted dust, scratches, fibers, stains, and gate wear.");
-    filmDamage->setOpen(true);
+    filmDamage->setOpen(false);
+    addBaseParameter(kFilmDamageAmount, filmDamage);
 
     OFX::GroupParamDescriptor* filmDamageAdvanced =
         descriptor.defineGroupParam(
@@ -631,59 +717,10 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
         "Independent Film Damage material-family strengths.");
     filmDamageAdvanced->setParent(*filmDamage);
     filmDamageAdvanced->setOpen(false);
-
-    const ParameterGroups groups{
-        filmBreath,
-        filmBreathAdvanced,
-        gateWeave,
-        gateWeaveAdvanced,
-        filmDamage,
-        filmDamageAdvanced,
-    };
-
-    const auto addSpatialParameter = [&](std::size_t index) {
-        OFX::ParamDescriptor* parameter =
-            defineSpatialParameter(descriptor, index, spatialGroups);
-        if (parameter != nullptr) {
-            page->addChild(*parameter);
-        }
-    };
-
-    for (std::size_t index = kNodeRole;
-         index < kFilmtoneSpatialParameterDefinitionsV1.size();
-         ++index) {
-        addSpatialParameter(index);
-    }
-
-    const auto addBaseParameter = [&](std::size_t index) {
-        OFX::ParamDescriptor* parameter =
-            defineBaseParameter(descriptor, index, groups);
-        if (parameter != nullptr) {
-            page->addChild(*parameter);
-        }
-    };
-
-    addBaseParameter(kVariation);
-    addBaseParameter(kFilmBreathEnabled);
-    addBaseParameter(kFilmBreathAmount);
-    for (std::size_t index = 0u;
-         index < kFilmBreathResponsePresentations.size();
-         ++index) {
-        page->addChild(*defineFilmBreathResponseParameter(
-            descriptor,
-            index,
-            kFilmBreathResponsePresentations[index],
-            *filmBreathAdvanced));
-    }
-    for (std::size_t index = kGateWeaveEnabled;
-         index <= kGateWeaveJitter;
-         ++index) {
-        addBaseParameter(index);
-    }
-    for (std::size_t index = kFilmDamageEnabled;
+    for (std::size_t index = kDustAmount;
          index <= kGateWearAmount;
          ++index) {
-        addBaseParameter(index);
+        addBaseParameter(index, filmDamageAdvanced);
     }
 }
 
@@ -725,6 +762,8 @@ FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
           effects::film_breath::kFilmBreathTonalResponseParameterId)),
       filmBreathColorResponse_(effect.fetchDoubleParam(
           effects::film_breath::kFilmBreathColorResponseParameterId)),
+      filmBreathPeriodFrames_(effect.fetchDoubleParam(
+          effects::film_breath::kFilmBreathPeriodFramesParameterId)),
       gateWeaveEnabled_(
           effect.fetchBooleanParam(definition(kGateWeaveEnabled).id)),
       gateWeaveAmount_(
@@ -825,12 +864,14 @@ EvaluatedFilmtoneFinishParameters FilmtoneFinishParameterSet::evaluate(
     finish.gateWearAmount = static_cast<float>(readFiniteReal(
         *gateWearAmount_, definition(kGateWearAmount), time));
 
-    result.filmBreath.exposureResponse = readFiniteFilmBreathResponse(
+    result.filmBreath.exposureResponse = readFiniteFilmBreathReal(
         *filmBreathExposureResponse_, 0u, time);
-    result.filmBreath.tonalResponse = readFiniteFilmBreathResponse(
+    result.filmBreath.tonalResponse = readFiniteFilmBreathReal(
         *filmBreathTonalResponse_, 1u, time);
-    result.filmBreath.colorResponse = readFiniteFilmBreathResponse(
+    result.filmBreath.colorResponse = readFiniteFilmBreathReal(
         *filmBreathColorResponse_, 2u, time);
+    result.filmBreath.periodFrames = readFiniteFilmBreathReal(
+        *filmBreathPeriodFrames_, 3u, time);
     return result;
 }
 
