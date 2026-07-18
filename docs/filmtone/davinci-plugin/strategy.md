@@ -1,7 +1,7 @@
 # Filmtone DaVinci Resolve Plugin Strategy
 
 Date opened: 2026-07-18 JST
-Status: Foundation frozen; feature wave dispatched
+Status: feature source integrated; INTEGRATION ready for dispatch
 
 This file is the long-term source of truth for the Filmtone DaVinci Resolve
 OpenFX lane. Current coordination state lives in `progress.md`. Each bounded

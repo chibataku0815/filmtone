@@ -25,8 +25,10 @@ All dispatches follow `delegation.md`. Master states are:
   in `visual-effect-core`; Filmtone mapping in `filmtone-pack`.
 - Foundation implementation: CONTRACT, HOST, and ADAPTER source handoffs are
   accepted into one clean integration branch; verification debt is retained.
-- Feature wave: BREATH, WEAVE, and DAMAGE were dispatched from the same frozen
-  base.
+- Feature wave: BREATH, WEAVE, and DAMAGE source handoffs are accepted and
+  integrated; verification debt is retained.
+- Integration wave: ready for a single shared-file worker from the combined
+  feature source base.
 - Tests, installation, and release: not started.
 
 ## Workstream Status
@@ -36,10 +38,10 @@ All dispatches follow `delegation.md`. Master states are:
 | `CONTRACT` | [Plan](workstreams/contract-and-product-mapping.md) | [Progress](workstreams/progress/contract-and-product-mapping.md) | visual-effect-core | planning | Accepted — source integrated; verification debt retained |
 | `HOST` | [Plan](workstreams/ofx-host-foundation.md) | [Progress](workstreams/progress/ofx-host-foundation.md) | Filmtone | planning | Accepted — source integrated; verification debt retained |
 | `ADAPTER` | [Plan](workstreams/filmtone-contract-adapter.md) | [Progress](workstreams/progress/filmtone-contract-adapter.md) | Filmtone | CONTRACT interface freeze | Accepted — source integrated; verification debt retained |
-| `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Dispatched — clean base confirmed |
-| `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Dispatched — clean base confirmed |
-| `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Dispatched — clean base confirmed |
-| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Blocked |
+| `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
+| `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
+| `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
+| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Ready |
 | `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Blocked |
 
 ## Parallel Launch Order
@@ -64,9 +66,9 @@ path, plugin interface, and clean integration base.
 | CONTRACT | `019f7416-8ed4-7023-947d-8f5d0570f38c` | `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core` | `84efd1a8a5dae0edd3afb777a0428739f7c1e72b` | Accepted as `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f` |
 | HOST | `019f7416-9bd1-7e12-a95e-cfee8eda1797` | `/Users/chibatakumi/.codex/worktrees/a45d/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Accepted as `325488e2ab86e5c25459949702ea880a888ac12d` |
 | ADAPTER | `019f7438-f67e-7c11-80fc-81839b706589` | `/Users/chibatakumi/.codex/worktrees/66f1/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Accepted as `7e33462357a2532d16713c813fdd65ea04d70ebd` |
-| BREATH | `019f746f-c80c-7b90-963d-f6cd3b05ef95` | `/Users/chibatakumi/.codex/worktrees/e9c57c76-3e12-4d11-b2d7-7dbb1c661cbc/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Dispatched; clean/base confirmed |
-| WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Dispatched; clean/base confirmed |
-| DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Dispatched; clean/base confirmed |
+| BREATH | `019f746f-c80c-7b90-963d-f6cd3b05ef95` | `/Users/chibatakumi/.codex/worktrees/e9c57c76-3e12-4d11-b2d7-7dbb1c661cbc/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `a678b9153a5505e62b084ad337a461553da107f3` |
+| WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc` |
+| DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `3ddc56cb95aeb093712a56d301358ff796f3d1f7` |
 
 ## Foundation Integration Record
 
@@ -85,6 +87,21 @@ path, plugin interface, and clean integration base.
   `/Users/chibatakumi/.codex/worktrees/79175aaf-cffc-4749-a9f2-7623c1d0f640/filmtone`.
   It remained clean when detected and received an immediate superseded/stop
   instruction; it is not part of the feature wave.
+
+## Feature Integration Record
+
+- BREATH source commit: `a678b9153a5505e62b084ad337a461553da107f3`;
+  coordinator integration commit: `11411fb`.
+- WEAVE source commit: `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc`;
+  coordinator integration commit: `c89d722`.
+- DAMAGE source commit: `3ddc56cb95aeb093712a56d301358ff796f3d1f7`;
+  coordinator integration commit: `b214b76`.
+- Combined feature source commit:
+  `b214b765b333848131b52578325096bb7a4566f4`.
+- Feature progress records were reviewed and incorporated individually; the
+  coordinator master record remained coordinator-owned.
+- INTEGRATION dispatch base: the readiness commit containing this record; its
+  exact SHA and task/worktree are recorded after task creation.
 
 ## Proposed File Ownership
 
@@ -170,8 +187,8 @@ Foundation Freeze is complete. Feature dispatch base:
 - Planning documents: integrated into the clean Foundation branch.
 - Source implementation: CONTRACT, HOST, and ADAPTER handoffs reviewed and
   integrated; explicit build/test/Resolve verification debt remains.
-- Feature source implementation: BREATH, WEAVE, and DAMAGE dispatched in
-  separate clean worktrees from the exact same Foundation Freeze SHA.
+- Feature source implementation: BREATH, WEAVE, and DAMAGE accepted and
+  integrated from isolated commits; INTEGRATION is source-unblocked.
 - Builds/tests/Resolve launch: not run.
 - Test files: not created or modified.
 - `/Library/OFX/Plugins`: not modified.

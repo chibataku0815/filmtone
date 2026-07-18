@@ -6,23 +6,25 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Blocked on BREATH + WEAVE + DAMAGE acceptance`
+`Ready — feature source handoffs accepted`
 
 ## Assignment
 
 - Task: not created
 - Repository: Filmtone
-- Worktree/base: feature integration base, not yet available
+- Worktree/base: assigned at dispatch from the integration readiness commit
 - Runs alone
 - Blocks: `QUALITY`
 
 ## Current Loop
 
-Not started.
+BREATH, WEAVE, and DAMAGE source handoffs are accepted and integrated. Shared
+factory, parameters, pass graph, Makefile, and bundle wiring remain untouched
+and are ready for the single INTEGRATION worker.
 
 ## Checklist
 
-- [ ] Accept all Foundation and feature handoffs.
+- [x] Accept all Foundation and feature handoffs.
 - [ ] Freeze integration base and shared-file ownership.
 - [ ] Register one Filmtone Finish effect and stable parameter IDs.
 - [ ] Connect Film Breath -> Gate Weave -> Film Damage pass order.
@@ -43,13 +45,13 @@ None.
 
 ## Blockers
 
-Feature module handoffs do not exist.
+No source dependency blocker. Build/test/Resolve proof remains outside this
+source-only worker authorization.
 
 ## Next Action
 
-Create this task only after BREATH, WEAVE, and DAMAGE are accepted.
+Dispatch one dedicated INTEGRATION task from the recorded readiness commit.
 
 ## Handoff
 
 Not started.
-
