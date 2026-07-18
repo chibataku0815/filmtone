@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "../License/LicenseStore.h"
+
 namespace filmtone::resolve::integration {
 namespace {
 
@@ -422,11 +424,34 @@ void describeFilmtoneParameters(OFX::ImageEffectDescriptor& descriptor) {
          ++index) {
         addBaseParameter(index);
     }
+
+    // Read-only License status, derived from the license file (not persisted).
+    OFX::GroupParamDescriptor* license = descriptor.defineGroupParam(
+        "com.chibatakumi.filmtone.resolve.group.license");
+    license->setLabels("License", "License", "License");
+    license->setHint(
+        "Current license state. Place Filmtone.license in "
+        "~/Library/Application Support/Filmtone/ to remove the trial watermark.");
+    license->setOpen(true);
+
+    OFX::StringParamDescriptor* licenseStatus =
+        descriptor.defineStringParam(kLicenseStatusParamId);
+    licenseStatus->setLabels("Status", "Status", "Status");
+    licenseStatus->setStringType(OFX::eStringTypeLabel);
+    licenseStatus->setDefault("Trial mode (watermarked)");
+    licenseStatus->setHint("Current Filmtone license state.");
+    licenseStatus->setEnabled(false);
+    licenseStatus->setIsPersistant(false);
+    licenseStatus->setAnimates(false);
+    licenseStatus->setEvaluateOnChange(false);
+    licenseStatus->setParent(*license);
+    page->addChild(*licenseStatus);
 }
 
 FilmtoneParameterSet::FilmtoneParameterSet(
     OFX::ImageEffect& effect)
-    : variation_(effect.fetchIntParam(definition(kVariation).id)),
+    : licenseStatus_(effect.fetchStringParam(kLicenseStatusParamId)),
+      variation_(effect.fetchIntParam(definition(kVariation).id)),
       filmBreathEnabled_(
           effect.fetchBooleanParam(definition(kFilmBreathEnabled).id)),
       filmBreathAmount_(
@@ -513,6 +538,11 @@ EvaluatedFilmtoneParameters FilmtoneParameterSet::evaluate(
     result.filmBreath.colorResponse = readFiniteFilmBreathResponse(
         *filmBreathColorResponse_, 2u, time);
     return result;
+}
+
+void FilmtoneParameterSet::updateLicenseStatus() const {
+    const license::LicenseState state = license::LicenseStore::shared().evaluate();
+    licenseStatus_->setValue(state.statusLine());
 }
 
 std::optional<host::FrameRates> resolveFrameRates(

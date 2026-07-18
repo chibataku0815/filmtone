@@ -39,7 +39,9 @@ public:
         : OFX::ImageEffect(handle),
           outputClip_(fetchClip(kOfxImageEffectOutputClipName)),
           sourceClip_(fetchClip(kOfxImageEffectSimpleSourceClipName)),
-          parameters_(*this) {}
+          parameters_(*this) {
+        parameters_.updateLicenseStatus();
+    }
 
     void render(const OFX::RenderArguments& args) override {
         if (!args.isEnabledMetalRender || args.pMetalCmdQ == nullptr) {
@@ -147,6 +149,16 @@ public:
         identityClip = sourceClip_;
         identityTime = args.time;
         return true;
+    }
+
+    void changedParam(
+        const OFX::InstanceChangedArgs&,
+        const std::string& paramName) override {
+        // Refresh the read-only license label on user interaction. Skip the
+        // label itself to avoid re-entrancy.
+        if (paramName != integration::kLicenseStatusParamId) {
+            parameters_.updateLicenseStatus();
+        }
     }
 
 private:

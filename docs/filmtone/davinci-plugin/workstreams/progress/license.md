@@ -87,6 +87,43 @@ Verification not performed: no Resolve run; watermark not visually inspected;
   no TS<->C cross-verify (owner testing authorization pending).
 ```
 
+## Handoff — 2026-07-19 (License status param; MON-2 code complete)
+
+```text
+Terminal state: Review — verification blocked. MON-2 code scope is complete;
+  proof (cross-verification, Resolve) requires owner testing authorization.
+Changed files (added to the prior increments):
+  apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneParameters.h/.cpp
+    (read-only "License" group + eStringTypeLabel status param; updateLicenseStatus())
+  apps/filmtone-resolve-ofx/Sources/Host/FilmtonePlugin.cpp
+    (set status at instance creation; refresh on changedParam, guarded)
+Status label states (statusLine()):
+  "Licensed to <name>" / "Trial — expires YYYY-MM-DD" / "Trial mode (watermarked)"
+Limitation (documented, implementation-plan §3): the label reflects the license
+  file at instance creation and on any param change; it is not push-updated when
+  the file changes with the panel already open (panel-refresh dependent). Not
+  persisted; default shows "Trial mode (watermarked)".
+Verification performed: make -C apps/filmtone-resolve-ofx => exit 0. updateLicenseStatus
+  symbol + status param ids/labels embedded; identity strings intact.
+Verification not performed: no Resolve run; label not visually confirmed; no
+  TS<->C cross-verify (owner testing authorization pending).
+
+MON-2 code checklist (implementation-plan §3):
+  [x] LicenseStore: envelope + strict canonical decode + kind-bound Ed25519 +
+      trial skew/expiry, matching core.ts. Immutable snapshot + stat cache.
+  [x] WatermarkPass: deterministic, in-place, alpha-safe, extended-range-safe,
+      global output-bounds coords, embedded font.
+  [x] Render-graph final-stage integration; identity invariant preserved for
+      licensed users; isIdentity reports non-identity when watermarked.
+  [x] Read-only License status string.
+  [x] PublicKeys.h (rotation-ready) + vendored ed25519 (pin b1f19fab).
+  [x] Builds arm64 (make PASS).
+  [ ] watermark visual accepted by owner (default is a placeholder).
+  [ ] TS<->C cross-verification + adversarial vectors (owner testing authorization).
+  [ ] runtime proof in Resolve (unlicensed->watermark, full->clean, trial->clean
+      then expired->watermark, tamper->watermark) (owner authorization).
+```
+
 ## Cross-verification plan (when owner authorizes testing)
 
 `LicenseStore::evaluateBytes(bytes, len, nowUnix)` is the pure entry point. Feed

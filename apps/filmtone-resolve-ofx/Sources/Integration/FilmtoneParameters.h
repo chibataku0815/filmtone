@@ -8,6 +8,10 @@
 
 namespace filmtone::resolve::integration {
 
+// Read-only License status label (derived from the license file; not persisted).
+inline constexpr char kLicenseStatusParamId[] =
+    "com.chibatakumi.filmtone.resolve.license.status";
+
 struct EvaluatedFilmtoneParameters final {
     effects::film_breath::FilmBreathParameters filmBreath{};
 
@@ -29,7 +33,12 @@ public:
     [[nodiscard]] EvaluatedFilmtoneParameters evaluate(
         double time) const;
 
+    // Re-evaluates the license file and writes the read-only status label.
+    // Panel-refresh dependent: call at instance creation and on param changes.
+    void updateLicenseStatus() const;
+
 private:
+    OFX::StringParam* licenseStatus_;
     OFX::IntParam* variation_;
 
     OFX::BooleanParam* filmBreathEnabled_;

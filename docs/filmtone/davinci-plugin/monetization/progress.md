@@ -84,7 +84,7 @@ Worker deploy / 公開 module scope(MON-6 前に確定)/ 価格公開。
 | ID | 内容 | 仕様 | 依存 | プラグイン本体に触るか | State |
 |---|---|---|---|---|---|
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
-| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質ゲート waived(2026-07-19 owner・改訂 17) | **是** | **Running — crypto core(ed25519 + LicenseStore)build 検証済み。watermark + 統合が残([progress](workstreams/progress/license.md))** |
+| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質ゲート waived(2026-07-19 owner・改訂 17) | **是** | **Review — verification blocked(2026-07-19)**: コード完了・build PASS。残は owner の watermark 視覚確定 / testing authorization(TS↔C)/ Resolve 実機([progress](workstreams/progress/license.md)) |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
 | MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — product identity同期版deploy・安全な失敗系・外部表示名sync完了。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
@@ -431,3 +431,15 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   owner ゲート: ウォーターマーク視覚確定(既定は placeholder・2-3 候補提示予定)、
   TS↔C クロス検証の testing authorization、Resolve 実機確認。詳細は
   [workstreams/progress/license.md](workstreams/progress/license.md)。Git: owner 承認で commit/push。
+- 2026-07-19 (改訂 20 / MON-2 status param・コード完了): 読み取り専用 License
+  グループ status ラベル(eStringTypeLabel、非永続)を `FilmtoneParameters.h/.cpp`
+  に追加し、`statusLine()`(Licensed to … / Trial — expires … / Trial mode
+  (watermarked))を instance 生成時と changedParam 時に更新(パネル再表示依存の
+  制約を明記)。**これで MON-2 の実装スコープは code-complete**、状態は
+  delegation.md の **Review — verification blocked**(build PASS だが証明に owner
+  authorization 必要)。残る owner ゲート: watermark 視覚確定、testing
+  authorization(TS↔C クロス検証 + adversarial vectors)、Resolve 実機
+  (unlicensed→watermark / full→clean / trial→clean→expired→watermark / tamper→
+  watermark)。Copy / History Impact: プラグイン内部 UI ラベルのみで公開 claim
+  なし。Article Opportunity: No story。Change-History Opportunity: No。Git: owner
+  承認で commit/push。
