@@ -1,4 +1,4 @@
-# Filmtone Finish License Delivery And Support / ライセンス送付とサポート
+# Filmtone License Delivery And Support / ライセンス送付とサポート
 
 Status: Publication candidate — purchase and trial routes are not live yet  
 Contact: chiba@fores-tone.co.jp
@@ -22,10 +22,10 @@ fullライセンスを待つ間は、14日trialを請求してclean出力を利�
 
 ### ライセンスファイルの配置
 
-メールに添付された `FilmtoneFinish.license` を次の場所へ保存します。
+メールに添付された `Filmtone.license` を次の場所へ保存します。
 
 ```text
-~/Library/Application Support/Filmtone/FilmtoneFinish.license
+~/Library/Application Support/Filmtone/Filmtone.license
 ```
 
 DaVinci Resolveでフレームを再レンダーすると、ライセンス状態が反映されます。
@@ -61,10 +61,10 @@ the full-license issue.
 
 ### Install the license file
 
-Save the attached `FilmtoneFinish.license` at:
+Save the attached `Filmtone.license` at:
 
 ```text
-~/Library/Application Support/Filmtone/FilmtoneFinish.license
+~/Library/Application Support/Filmtone/Filmtone.license
 ```
 
 Re-render a frame in DaVinci Resolve for the license state to update.

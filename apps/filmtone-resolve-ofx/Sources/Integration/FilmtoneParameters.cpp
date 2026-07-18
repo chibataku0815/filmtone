@@ -1,4 +1,4 @@
-#include "FilmtoneFinishParameters.h"
+#include "FilmtoneParameters.h"
 
 #include <algorithm>
 #include <array>
@@ -330,13 +330,13 @@ bool isPositiveFinite(double value) noexcept {
 
 }  // namespace
 
-void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
+void describeFilmtoneParameters(OFX::ImageEffectDescriptor& descriptor) {
     OFX::PageParamDescriptor* page = descriptor.definePageParam(
-        "com.chibatakumi.filmtone.finish.page.controls");
+        "com.chibatakumi.filmtone.resolve.page.controls");
     page->setLabels("Controls", "Controls", "Controls");
 
     OFX::GroupParamDescriptor* filmBreath = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.filmBreath");
+        "com.chibatakumi.filmtone.resolve.group.filmBreath");
     filmBreath->setLabels("Film Breath", "Film Breath", "Film Breath");
     filmBreath->setHint(
         "Deterministic exposure, tonal, and color movement using the established Filmtone cadence.");
@@ -344,7 +344,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* filmBreathAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.filmBreath.advanced");
+            "com.chibatakumi.filmtone.resolve.group.filmBreath.advanced");
     filmBreathAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     filmBreathAdvanced->setHint(
         "Attenuates Film Breath response components without changing cadence.");
@@ -352,7 +352,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     filmBreathAdvanced->setOpen(false);
 
     OFX::GroupParamDescriptor* gateWeave = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.gateWeave");
+        "com.chibatakumi.filmtone.resolve.group.gateWeave");
     gateWeave->setLabels("Gate Weave", "Gate Weave", "Gate Weave");
     gateWeave->setHint(
         "Mechanical image movement with constant automatic edge safety.");
@@ -360,7 +360,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* gateWeaveAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.gateWeave.advanced");
+            "com.chibatakumi.filmtone.resolve.group.gateWeave.advanced");
     gateWeaveAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     gateWeaveAdvanced->setHint(
         "Movement range, rotation, cadence, and deterministic instability.");
@@ -368,7 +368,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     gateWeaveAdvanced->setOpen(false);
 
     OFX::GroupParamDescriptor* filmDamage = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.filmDamage");
+        "com.chibatakumi.filmtone.resolve.group.filmDamage");
     filmDamage->setLabels("Film Damage", "Film Damage", "Film Damage");
     filmDamage->setHint(
         "Dark-weighted dust, scratches, fibers, stains, and gate wear.");
@@ -376,7 +376,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* filmDamageAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.filmDamage.advanced");
+            "com.chibatakumi.filmtone.resolve.group.filmDamage.advanced");
     filmDamageAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     filmDamageAdvanced->setHint(
         "Independent Film Damage material-family strengths.");
@@ -424,7 +424,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     }
 }
 
-FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
+FilmtoneParameterSet::FilmtoneParameterSet(
     OFX::ImageEffect& effect)
     : variation_(effect.fetchIntParam(definition(kVariation).id)),
       filmBreathEnabled_(
@@ -461,49 +461,49 @@ FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
       stainAmount_(effect.fetchDoubleParam(definition(kStainAmount).id)),
       gateWearAmount_(effect.fetchDoubleParam(definition(kGateWearAmount).id)) {}
 
-EvaluatedFilmtoneFinishParameters FilmtoneFinishParameterSet::evaluate(
+EvaluatedFilmtoneParameters FilmtoneParameterSet::evaluate(
     double time) const {
-    EvaluatedFilmtoneFinishParameters result{};
-    auto& finish = result.filmBreath.finishParameters;
-    finish.variation = readVariation(*variation_, time);
-    finish.filmBreathEnabled =
+    EvaluatedFilmtoneParameters result{};
+    auto& mapping = result.filmBreath.mapping;
+    mapping.variation = readVariation(*variation_, time);
+    mapping.filmBreathEnabled =
         filmBreathEnabled_->getValueAtTime(time) ? 1u : 0u;
-    finish.filmBreathAmount = static_cast<float>(readFiniteReal(
+    mapping.filmBreathAmount = static_cast<float>(readFiniteReal(
         *filmBreathAmount_, definition(kFilmBreathAmount), time));
-    finish.gateWeaveEnabled =
+    mapping.gateWeaveEnabled =
         gateWeaveEnabled_->getValueAtTime(time) ? 1u : 0u;
-    finish.gateWeaveAmount = static_cast<float>(readFiniteReal(
+    mapping.gateWeaveAmount = static_cast<float>(readFiniteReal(
         *gateWeaveAmount_, definition(kGateWeaveAmount), time));
-    finish.gateWeaveHorizontalAmplitude = static_cast<float>(readFiniteReal(
+    mapping.gateWeaveHorizontalAmplitude = static_cast<float>(readFiniteReal(
         *gateWeaveHorizontalAmplitude_,
         definition(kGateWeaveHorizontalAmplitude),
         time));
-    finish.gateWeaveVerticalAmplitude = static_cast<float>(readFiniteReal(
+    mapping.gateWeaveVerticalAmplitude = static_cast<float>(readFiniteReal(
         *gateWeaveVerticalAmplitude_,
         definition(kGateWeaveVerticalAmplitude),
         time));
-    finish.gateWeaveRotationAmplitudeDegrees = static_cast<float>(
+    mapping.gateWeaveRotationAmplitudeDegrees = static_cast<float>(
         readFiniteReal(
             *gateWeaveRotationAmplitudeDegrees_,
             definition(kGateWeaveRotationAmplitudeDegrees),
             time));
-    finish.gateWeaveFrequency = static_cast<float>(readFiniteReal(
+    mapping.gateWeaveFrequency = static_cast<float>(readFiniteReal(
         *gateWeaveFrequency_, definition(kGateWeaveFrequency), time));
-    finish.gateWeaveJitter = static_cast<float>(readFiniteReal(
+    mapping.gateWeaveJitter = static_cast<float>(readFiniteReal(
         *gateWeaveJitter_, definition(kGateWeaveJitter), time));
-    finish.filmDamageEnabled =
+    mapping.filmDamageEnabled =
         filmDamageEnabled_->getValueAtTime(time) ? 1u : 0u;
-    finish.filmDamageAmount = static_cast<float>(readFiniteReal(
+    mapping.filmDamageAmount = static_cast<float>(readFiniteReal(
         *filmDamageAmount_, definition(kFilmDamageAmount), time));
-    finish.dustAmount = static_cast<float>(readFiniteReal(
+    mapping.dustAmount = static_cast<float>(readFiniteReal(
         *dustAmount_, definition(kDustAmount), time));
-    finish.scratchAmount = static_cast<float>(readFiniteReal(
+    mapping.scratchAmount = static_cast<float>(readFiniteReal(
         *scratchAmount_, definition(kScratchAmount), time));
-    finish.fiberAmount = static_cast<float>(readFiniteReal(
+    mapping.fiberAmount = static_cast<float>(readFiniteReal(
         *fiberAmount_, definition(kFiberAmount), time));
-    finish.stainAmount = static_cast<float>(readFiniteReal(
+    mapping.stainAmount = static_cast<float>(readFiniteReal(
         *stainAmount_, definition(kStainAmount), time));
-    finish.gateWearAmount = static_cast<float>(readFiniteReal(
+    mapping.gateWearAmount = static_cast<float>(readFiniteReal(
         *gateWearAmount_, definition(kGateWearAmount), time));
 
     result.filmBreath.exposureResponse = readFiniteFilmBreathResponse(

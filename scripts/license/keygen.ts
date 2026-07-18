@@ -1,4 +1,4 @@
-// Generate the Filmtone Finish signing key pairs (full + trial).
+// Generate the Filmtone signing key pairs (full + trial).
 // Usage: bun run scripts/license/keygen.ts [--out-dir <dir>]
 // Private keys are written OUTSIDE the repo, by default to ~/.filmtone/secrets —
 // deliberately NOT under ~/Documents, which macOS may sync to iCloud. Back both

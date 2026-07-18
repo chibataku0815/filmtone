@@ -1,4 +1,4 @@
-# Filmtone Finish Trial Privacy Notice / Trialプライバシー通知
+# Filmtone Trial Privacy Notice / Trialプライバシー通知
 
 Status: Publication candidate — production service configuration must be verified  
 Effective date: To be set at launch  
@@ -7,7 +7,7 @@ Contact: chiba@fores-tone.co.jp
 
 ## 日本語
 
-この通知は、`Filmtone Finish for DaVinci Resolve`のtrialライセンスを請求するときの
+この通知は、`Filmtone for DaVinci Resolve`のtrialライセンスを請求するときの
 データ処理を説明します。
 
 ### 取得・処理する情報
@@ -50,7 +50,7 @@ trialデータに関する質問、開示、訂正、削除の依頼は、請求
 ## English
 
 This notice explains data processing when you request a trial license for
-`Filmtone Finish for DaVinci Resolve`.
+`Filmtone for DaVinci Resolve`.
 
 ### Information processed
 

@@ -4,7 +4,7 @@ Date: 2026-07-18 JST
 Coordinator-owned: yes
 
 This file is the execution contract for every dedicated Codex task in the
-Filmtone Finish OpenFX lane. Product direction remains in `strategy.md`; live
+Filmtone OpenFX lane. Product direction remains in `strategy.md`; live
 state remains in `progress.md`; bounded scope remains in `workstreams/`.
 
 ## One Task, One Boundary
@@ -59,7 +59,7 @@ Workers report state; only the coordinator changes master state.
 Repeat until a terminal condition:
 
 1. Confirm repository, clean worktree, base, dependencies, and exclusive scope.
-2. Select the smallest unfinished item that directly advances the plan's
+2. Select the smallest incomplete item that directly advances the plan's
    acceptance criteria.
 3. Implement only that item.
 4. Inspect status and diff read-only; reject accidental out-of-scope changes.
@@ -144,7 +144,7 @@ explicitly changes scope.
 ## New Task Prompt Template
 
 ```text
-Filmtone Finish OpenFXの <ID> workstreamを担当してください。
+Filmtone OpenFXの <ID> workstreamを担当してください。
 
 最初に対象repositoryのAGENTS.mdを読み、次に指定されたstrategy.md、
 master progress.md、delegation.md、担当workstream plan、担当progress recordを

@@ -85,7 +85,7 @@ Terminal handoff reviewed. Public artifacts:
   `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core/packages/visual-effect-core/artifacts/cpp/forestone_film_damage_recipe.hpp`
 - deterministic render context v1:
   `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core/packages/visual-render-core/artifacts/cpp/forestone_deterministic_render_context.hpp`
-- Filmtone Finish mapping v1:
+- Filmtone mapping v1:
   `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core/packages/filmtone-pack/artifacts/cpp/forestone_filmtone_finish_mapping.hpp`
 - manifest:
   `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core/packages/filmtone-pack/artifacts/filmtone-finish-contract-v1.json`

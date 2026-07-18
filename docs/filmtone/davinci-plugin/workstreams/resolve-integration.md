@@ -15,7 +15,7 @@ record.
 
 ## Goal
 
-Connect the three isolated modules into one stable Filmtone Finish OpenFX
+Connect the three isolated modules into one stable Filmtone OpenFX
 effect, expose the compact Resolve control surface, and preserve a clear
 boundary from the existing LUT/DCTL/Lua Bridge.
 
@@ -29,7 +29,7 @@ for the first product result.
 
 ## Constraints
 
-- One bundle and one movable Filmtone Finish filter effect.
+- One bundle and one movable Filmtone filter effect.
 - Render order: Film Breath -> Gate Weave -> Film Damage.
 - Every module has an independent bypass and zero-default identity.
 - Compact Basic controls; Advanced groups may expose the frozen module
@@ -56,7 +56,7 @@ This chat alone may edit:
 
 ## Expected Output
 
-- One registered Filmtone Finish effect containing all three modules.
+- One registered Filmtone effect containing all three modules.
 - Stable parameter IDs and Resolve-project persistence.
 - Module bypass/identity short-circuiting and Metal pass scheduling.
 - Manual CinePrint companion node placement guidance.

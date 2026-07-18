@@ -39,7 +39,7 @@ Upstream owner working tree:
 
 - `packages/visual-effect-core/src/features/film-damage/types.ts`
 - `packages/visual-render-core/src/features/film-damage/reference.ts`
-- Film Damage/Filmtone Finish generated artifacts and owner documentation
+- Film Damage/Filmtone generated artifacts and owner documentation
 
 Filmtone Foundation and QUALITY working trees:
 

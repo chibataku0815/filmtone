@@ -1,4 +1,4 @@
-# Filmtone Finish 課金 対応計画書 (Implementation Plan)
+# Filmtone 課金 対応計画書 (Implementation Plan)
 
 Date: 2026-07-18 JST
 戦略正本: [strategy.md](strategy.md) / 進行管理: [progress.md](progress.md)
@@ -25,10 +25,10 @@ coordinator 所有物・Git 操作はオーナー)は課金作業にも適用す
 - MON-2(プラグイン本体)は、Film Breath / Gate Weaveの独立品質iterationが
   owner passを得てcombined/public acceptanceが明示された後にdispatchする。
   それまでは`Blocked`。MON-3 / MON-4は品質回復と並行できる。
-- 2026-07-18時点でローカル`main`は`origin/main`より18 commits先行し、
-  monetization docs / Worker / license toolsは未追跡である。追加deployまたは
-  MON-2 dispatch前に、オーナーがscopeを確認してcommit/pushし、別checkoutから
-  同じsourceを取得できる状態にする。本タスク自身はGit writeを行わない。
+- 2026-07-19に`origin/main`を再取得し、現作業ブランチが最新
+  `origin/main`をすでに含むことを確認済み。追加mergeは不要。名称同期の
+  作業ツリー差分は、追加deployまたはMON-2 dispatch前にscopeを確認し、
+  commit/push後の取得可能なsourceを正とする。
 
 ## 1. 全体像
 
@@ -97,7 +97,7 @@ Breath / Weaveを推測調整しない。
 
 ### ライセンスファイル wire format (`filmtone-license/1`、envelope 形式)
 
-配置: `~/Library/Application Support/Filmtone/FilmtoneFinish.license`
+配置: `~/Library/Application Support/Filmtone/Filmtone.license`
 
 ```json
 {
@@ -187,7 +187,7 @@ Worker base: その時点で`origin/main`から取得できる最新review済み
   - 画素規律: **alpha は不変**(RGB のみに合成)。watermark 領域外の画素は
     bit-exact 不変。負値・1 超の extended-range RGB を clamp しない(watermark
     合成は float のまま行い、NaN を生まない)。
-  - 内容: 四隅の 1 箇所に小さな `FILMTONE FINISH — TRIAL` バッジ + 低透過の
+  - 内容: 四隅の 1 箇所に小さな `FILMTONE — TRIAL` バッジ + 低透過の
     対角テキストタイル(除去を面倒に、評価を邪魔しない濃度)。
   - テキストはフォント描画に依存せず、事前ラスタライズしたビットマップを
     ヘッダ埋め込み(OFX レンダーコンテキストにフォント環境を仮定しない)。
@@ -242,7 +242,7 @@ Ed25519 を実測確認して使用(署名ツールに外部 npm 依存を持ち
 2. [完了 2026-07-18] Polar org は 2026-06-19 作成。適用手数料は
    5% + $0.50。
 3. [製品・クーポン完了 2026-07-18 / benefit は MON-5 後]
-   Polar に製品登録: `Filmtone Finish for DaVinci Resolve` $49、ローンチ用
+   Polar に製品登録: `Filmtone for DaVinci Resolve` $49、ローンチ用
    **固定額 $10 オフ クーポン(= $39 ちょうど。20% だと $39.20 になり LP 表記と
    ずれるため率ではなく固定額)**、購入者向けファイル配信 benefit に .pkg
    (MON-5 成果物)。
@@ -349,25 +349,25 @@ cd apps/filmtone-resolve-ofx
 make sign-bundle \
   SIGN_IDENTITY="Developer ID Application: <existing>"
 codesign --verify --deep --strict --verbose=2 \
-  build/FilmtoneFinish.ofx.bundle
-pkgbuild --component build/FilmtoneFinish.ofx.bundle \
+  build/Filmtone.ofx.bundle
+pkgbuild --component build/Filmtone.ofx.bundle \
   --install-location "/Library/OFX/Plugins" \
-  --identifier com.chibatakumi.filmtone.finish.pkg \
+  --identifier com.chibatakumi.filmtone.resolve.pkg \
   --version <ProductVersion.mk marketing version> raw.pkg
 productbuild --package raw.pkg --sign "Developer ID Installer: <existing>" \
-  FilmtoneFinish-<version>.pkg
-pkgutil --check-signature FilmtoneFinish-<version>.pkg
-xcrun notarytool submit FilmtoneFinish-<version>.pkg \
+  Filmtone-<version>.pkg
+pkgutil --check-signature Filmtone-<version>.pkg
+xcrun notarytool submit Filmtone-<version>.pkg \
   --keychain-profile <existing> --wait
-xcrun stapler staple FilmtoneFinish-<version>.pkg
-xcrun stapler validate FilmtoneFinish-<version>.pkg
+xcrun stapler staple Filmtone-<version>.pkg
+xcrun stapler validate Filmtone-<version>.pkg
 ```
 
 - **署名順序は固定**: OFX bundleをDeveloper ID Application + hardened runtime +
   secure timestampで先に署名し、その署名済みbundleを格納したpkgをDeveloper ID
   Installerで署名する。外側pkgだけを署名した配布物は禁止。
 - README(同梱 + 製品ページ): インストール -> Resolve 再起動 -> Effects に
-  `Filmtone Finish` -> ライセンス配置(Finder へ 1 ドラッグ)-> watermark 消滅
+  `Filmtone` -> ライセンス配置(Finder へ 1 ドラッグ)-> watermark 消滅
   確認、の 5 手順。アンインストール(`/Library/OFX/Plugins` から bundle を
   削除)も明記。
 - 受入: 内包OFXとpkgの署名、notary ticket、stapleを確認し、macOS 14.0+の

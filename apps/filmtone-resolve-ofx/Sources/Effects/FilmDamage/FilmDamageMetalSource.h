@@ -2,8 +2,8 @@
 
 namespace filmtone::resolve::damage::detail {
 
-inline constexpr char kFilmDamageMetalFunctionName[] = "filmtoneFinishFilmDamage";
-inline constexpr char kFilmDamageMetalCacheKey[] = "filmtone.finish.damage.metal.v2";
+inline constexpr char kFilmDamageMetalFunctionName[] = "filmtoneResolveFilmDamage";
+inline constexpr char kFilmDamageMetalCacheKey[] = "filmtone.resolve.damage.metal.v2";
 
 inline constexpr char kFilmDamageMetalLibrarySource[] = R"FILMTONE_METAL(
 #include <metal_stdlib>
@@ -1291,7 +1291,7 @@ float3 applyMaterialDamage(
     return rgb + sparkleTint * (magnitude * sparkleLevel * 0.42f);
 }
 
-kernel void filmtoneFinishFilmDamage(
+kernel void filmtoneResolveFilmDamage(
     device const float4* source [[buffer(0)]],
     device float4* output [[buffer(1)]],
     constant FilmDamageUniforms& uniforms [[buffer(2)]],

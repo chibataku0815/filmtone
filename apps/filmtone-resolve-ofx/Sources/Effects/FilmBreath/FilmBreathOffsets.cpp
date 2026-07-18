@@ -78,7 +78,7 @@ std::optional<FilmBreathOffsets> resolveFilmBreathOffsets(
     const FilmBreathParameters& parameters,
     const host::RenderContext& context) noexcept {
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finishParameters);
+        parameters.mapping);
     const NormalizedFilmBreathResponses responses =
         normalizeResponses(parameters);
     if (mapping.filmBreathAmount <= 0.0f ||
@@ -109,7 +109,7 @@ std::optional<FilmBreathOffsets> resolveFilmBreathOffsets(
     deterministic.boundsHeight = static_cast<float>(boundsHeight);
     deterministic.seed = resolveSeed(
         context,
-        parameters.finishParameters.variation);
+        parameters.mapping.variation);
 
     const auto actualResolveContext = contracts::makeResolveRenderContextV1(
         context.time,

@@ -14,7 +14,7 @@ All dispatches follow `delegation.md`. Master states are:
 
 ## Current Product Decision
 
-- Product surface: working name `Filmtone Finish`.
+- Product surface: working name `Filmtone`.
 - Target: DaVinci Resolve 21, macOS Apple Silicon, OpenFX + Metal.
 - Playback: real-time not required; stopped-frame adjustment must be practical.
 - Modules: Film Breath, Gate Weave, Film Damage.
@@ -152,7 +152,7 @@ path, plugin interface, and clean integration base.
   `feature/davinci-ofx-integration`; coordinator integration commit:
   `915012a`.
 - One registered Filter keeps plugin ID
-  `com.chibatakumi.filmtone.finish`, the generated 17-entry base parameter
+  `com.chibatakumi.filmtone.resolve`, the generated 17-entry base parameter
   surface, and exactly three local Film Breath response controls.
 - Pass order is fixed as Film Breath -> Gate Weave -> Film Damage. Configured
   identity does not require valid host fps; configured-active temporal work
@@ -185,6 +185,10 @@ path, plugin interface, and clean integration base.
 - Untracked evidence remains under
   `apps/filmtone-resolve-ofx/build/quality-evidence/resolve-host/`; it is not
   release packaging or tracked test infrastructure.
+- These host records intentionally keep the pre-rename identifiers and labels
+  they actually observed. The renamed `com.chibatakumi.filmtone.resolve` /
+  `Filmtone.ofx.bundle` product rebuilds from the migrated source but has not
+  yet been re-verified inside Resolve; that re-verification stays open.
 
 ## Proposed File Ownership
 
@@ -192,7 +196,7 @@ The exact scaffold may refine these paths, but ownership must remain disjoint.
 
 | Workstream | Exclusive edit area |
 |---|---|
-| CONTRACT | External Film Damage contract / reference / `filmtone-pack` finish mapping only; Filmtone is read-only. |
+| CONTRACT | External Film Damage contract / reference / `filmtone-pack` product mapping only; Filmtone is read-only. |
 | ADAPTER | Filmtone generated/public C++ adapter and generator boundary only; external repository read-only. |
 | HOST | `apps/filmtone-resolve-ofx/` host wrapper, initial Makefile, bundle resources, shared processor interfaces. |
 | BREATH | `apps/filmtone-resolve-ofx/Sources/Effects/FilmBreath/` only. |
@@ -247,14 +251,13 @@ Foundation Freeze is complete. Feature dispatch base:
 - Deterministic render context: version 1. Resolve conversion is
   `hostTimeSeconds = ofxTimeFrames / resolvedFrameRate`, with explicit frame
   index/fps and no generic 24 fps fallback.
-- Stable generated include:
-  `Sources/Generated/Contracts/filmtone_finish_contracts.hpp`.
+- Stable generated include: the umbrella header under
+  `Sources/Generated/Contracts/`.
 - Film Breath authority: `packages/film-lab-core/src/film-breath.ts`; generated
   handoff: `Sources/Generated/Contracts/filmtone_film_breath.hpp`.
-- Plugin identifier: `com.chibatakumi.filmtone.finish`.
-- Parameter IDs/defaults/ranges: the 17-entry
-  `kFilmtoneFinishParameterDefinitions` array in
-  `forestone_filmtone_finish_mapping.hpp`.
+- Plugin identifier: `com.chibatakumi.filmtone.resolve`.
+- Parameter IDs/defaults/ranges: the 17-entry definition array in the
+  generated Filmtone mapping header.
 - Host context: time, source/timeline frame rates, optional explicit seed,
   render scale, render window, source bounds, and output bounds.
 - Module boundary: `host::ModuleProcessor`; Film Breath offsets and Film
@@ -263,7 +266,7 @@ Foundation Freeze is complete. Feature dispatch base:
 - Buffer contract: Metal-only float RGBA with explicit buffer, row bytes, and
   bounds; alpha and extended-range RGB must be preserved.
 - Build command: `make -C apps/filmtone-resolve-ofx`.
-- Expected bundle: `apps/filmtone-resolve-ofx/build/FilmtoneFinish.ofx.bundle`.
+- Expected bundle: `apps/filmtone-resolve-ofx/build/Filmtone.ofx.bundle`.
 - Tests, builds, Resolve launch, installation, and test-file work: not
   authorized in this feature wave.
 

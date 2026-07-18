@@ -16,7 +16,7 @@ or any native macOS/iOS effect implementation.
 
 Create the smallest macOS arm64 OpenFX product scaffold that establishes a
 correct Resolve host boundary and an exact-identity render path for the later
-Filmtone Finish modules.
+Filmtone modules.
 
 ## Context
 

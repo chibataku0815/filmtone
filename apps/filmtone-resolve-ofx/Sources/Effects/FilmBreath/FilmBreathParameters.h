@@ -15,11 +15,11 @@ struct FilmBreathParameterDescriptor final {
 };
 
 inline constexpr char kFilmBreathExposureResponseParameterId[] =
-    "com.forestone.filmtone.finish.filmBreath.exposureResponse";
+    "com.forestone.filmtone.resolve.filmBreath.exposureResponse";
 inline constexpr char kFilmBreathTonalResponseParameterId[] =
-    "com.forestone.filmtone.finish.filmBreath.tonalResponse";
+    "com.forestone.filmtone.resolve.filmBreath.tonalResponse";
 inline constexpr char kFilmBreathColorResponseParameterId[] =
-    "com.forestone.filmtone.finish.filmBreath.colorResponse";
+    "com.forestone.filmtone.resolve.filmBreath.colorResponse";
 
 // Variation, Film Breath Enabled, and Film Breath Amount IDs/defaults/ranges
 // remain owned by kFilmtoneFinishParameterDefinitions. Only response controls
@@ -44,7 +44,7 @@ inline constexpr std::array<FilmBreathParameterDescriptor, 3>
     }};
 
 struct FilmBreathParameters final {
-    forestone::filmtone::FilmtoneFinishParametersV1 finishParameters{};
+    forestone::filmtone::FilmtoneFinishParametersV1 mapping{};
     double exposureResponse = 1.0;
     double tonalResponse = 1.0;
     double colorResponse = 1.0;

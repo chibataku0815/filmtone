@@ -43,7 +43,7 @@ an arm64 bundle build, which was not authorized in the worker task.
 
 - `apps/filmtone-resolve-ofx/Makefile`
 - `apps/filmtone-resolve-ofx/Resources/Info.plist`
-- `apps/filmtone-resolve-ofx/Sources/Host/FilmtoneFinishPlugin.cpp`
+- `apps/filmtone-resolve-ofx/Sources/Host/FilmtonePlugin.cpp`
 - `apps/filmtone-resolve-ofx/Sources/Host/MetalIdentityBlit.{h,mm}`
 - `apps/filmtone-resolve-ofx/Sources/Host/MetalPipelineCache.{h,mm}`
 - `apps/filmtone-resolve-ofx/Sources/Host/ModuleProcessor.h`

@@ -1,4 +1,4 @@
-# Filmtone Finish ライセンス発行ツール
+# Filmtone ライセンス発行ツール
 
 仕様正本: `docs/filmtone/davinci-plugin/monetization/implementation-plan.md` §2 §4。
 依存パッケージなし(Bun 内蔵 WebCrypto の Ed25519 のみ)。
@@ -16,21 +16,21 @@ bun run license:keygen            # 既定: ~/.filmtone/secrets/(0700)
 # 購入ライセンス発行(full 鍵)
 bun run license:issue -- --key ~/.filmtone/secrets/filmtone-full.key.json \
   --kind full --name "Taro Yamada" --email taro@example.com --order polar_ord_xxx \
-  --out FilmtoneFinish.license
+  --out Filmtone.license
 
 # trial 発行(通常は Worker が行う。手動フォールバック)
 bun run license:issue -- --key ~/.filmtone/secrets/filmtone-trial.key.json \
   --kind trial --name "taro@example.com" --email taro@example.com --order trial-manual-0001
 
 # 検証(kind に対応する鍵を渡す。両方渡せばどちらの kind も検証できる)
-bun run license:verify -- --file FilmtoneFinish.license \
+bun run license:verify -- --file Filmtone.license \
   --full-key ~/.filmtone/secrets/filmtone-full.key.json \
   --trial-key ~/.filmtone/secrets/filmtone-trial.key.json
 # exit 0 = 有効 / 2 = 署名は正しいが期限切れ / 1 = 無効
 ```
 
-購入者への案内: `FilmtoneFinish.license` を
-`~/Library/Application Support/Filmtone/FilmtoneFinish.license` に置き、
+購入者への案内: `Filmtone.license` を
+`~/Library/Application Support/Filmtone/Filmtone.license` に置き、
 Resolve でフレームを再レンダーするとウォーターマークが消える。
 
 ## 鍵の規律

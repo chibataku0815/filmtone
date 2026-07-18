@@ -8,25 +8,25 @@
 
 namespace filmtone::resolve::integration {
 
-struct EvaluatedFilmtoneFinishParameters final {
+struct EvaluatedFilmtoneParameters final {
     effects::film_breath::FilmBreathParameters filmBreath{};
 
     [[nodiscard]] const forestone::filmtone::FilmtoneFinishParametersV1&
-    finish() const noexcept {
-        return filmBreath.finishParameters;
+    mapping() const noexcept {
+        return filmBreath.mapping;
     }
 };
 
 // Registers the generated 17-entry base surface and the three accepted local
 // Film Breath response controls. The generated definitions remain the only
 // owner of base IDs, kinds, defaults, and ranges.
-void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor);
+void describeFilmtoneParameters(OFX::ImageEffectDescriptor& descriptor);
 
-class FilmtoneFinishParameterSet final {
+class FilmtoneParameterSet final {
 public:
-    explicit FilmtoneFinishParameterSet(OFX::ImageEffect& effect);
+    explicit FilmtoneParameterSet(OFX::ImageEffect& effect);
 
-    [[nodiscard]] EvaluatedFilmtoneFinishParameters evaluate(
+    [[nodiscard]] EvaluatedFilmtoneParameters evaluate(
         double time) const;
 
 private:

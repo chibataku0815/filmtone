@@ -1,4 +1,4 @@
-# Filmtone Finish 課金 進行書 (Monetization Progress)
+# Filmtone 課金 進行書 (Monetization Progress)
 
 Date: 2026-07-19 JST
 Coordinator-owned: yes
@@ -10,7 +10,7 @@ Coordinator-owned: yes
 `Queued -> Ready -> Dispatched -> Running -> Review -> Accepted`、
 側状態 `Paused / Blocked`。
 
-## 現在地 (2026-07-18)
+## 現在地 (2026-07-19)
 
 - **MON-1 承認済み**、**対応計画書作成済み**、**MON-3 実装完了・MON-4 の
   Worker 実装完了**(依存パッケージゼロ)。**Codex 外部レビュー 2 巡の反映まで
@@ -36,7 +36,14 @@ Coordinator-owned: yes
 - **Source durability Completed (2026-07-19)**: 統合baseとmonetization sourceを
   commit `f8c4611`として
   `origin/claude/davinci-plugin-pricing-plan-4cb87b`へpush済み。別checkoutから
-  review済みsourceを再取得できる。
+  review済みsourceを再取得できる。名称同期差分も同日
+  `refactor(ofx): align Filmtone product identity`として同ブランチへ
+  commit/push済みで、名称同期版のsource durability gateは通過済み(改訂 14)。
+- **Naming decision (2026-07-19)**: 公開名は `Filmtone`。DaVinci Resolve
+  向けと明示する場合は説明句 `Filmtone for DaVinci Resolve`を使う。
+  配布物は `Filmtone.ofx.bundle` / `Filmtone-<version>.pkg`、OFX 識別子は
+  `com.chibatakumi.filmtone.resolve`に統一。旧生成契約の内部識別子は互換性資料
+  として隔離し、公開コピー・配布名・新規実装には使用しない。
 
 ## ワークストリーム一覧
 
@@ -47,7 +54,7 @@ Coordinator-owned: yes
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
 | MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質回復 + combined/public受入 | **是** | **Blocked** |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
-| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — hostname/action binding版deploy済み。実送達・公開導線・法務最終確認待ち** |
+| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — hostname/action binding版deploy済み。名称同期版はcommit/push済み・deploy未実施。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
 | MON-6 | ローンチ(製品ページ・記事・価格公開) | 対応計画 §7 | MON-2〜5 + release truth | 否 | Queued |
 | MON-7 | 外殻(実売後のみ): 購入側自動発行(Phase L2)、marketplace 展開、edu/bundle 価格、Windows 版検討 | 対応計画 §5 L2 注記 | MON-6 後の実売データ | 一部 | Queued(着手条件未成立) |
@@ -75,7 +82,8 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 - [x] 1 ユーザー 2 台・商用可・v1.x 無償更新(異議なしのため確定扱い。変更は
   strategy.md 改訂で)
 
-名称変更は不要(strategy.md §9)。`Filmtone Finish` をそのまま公開名として扱う。
+公開名は `Filmtone`に固定する。DaVinci Resolve 向けの説明句は
+`Filmtone for DaVinci Resolve`を使う。
 
 ### MON-2 LICENSE 実装(プラグイン本体)
 
@@ -233,7 +241,7 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   実装・仕様化。testing authorizationがないためbuild、test、署名、deploy、endpoint、
   Resolve、notarization等は実行していない。
 - 1Password MCPの同名更新が追記動作になったため、旧Environmentを削除せず
-  retired名へ変更し、新しい`Filmtone Finish Production`をMCPだけで再作成。
+  retired名へ変更し、新しい`Filmtone Production`をMCPだけで再作成。
   必要5変数を重複なしで保存し、変数名一覧だけを確認した。
 
 ## 進行ログ
@@ -242,7 +250,8 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   競合実測、計画書・進行書の初版起案。MON-1 をオーナー承認待ちに設定。
 - 2026-07-18 (改訂 1): オーナー指摘を反映。販路を LS 新規開設案から**既存
   Polar** に変更(新規サービスを増やさない)。名称確定を承認事項から削除
-  (名称変更は不要、`Filmtone Finish` のまま)。
+  (当時の判断は「名称変更は不要、`Filmtone Finish` のまま」— 改訂 13 の
+  naming 決定で撤回)。
 - 2026-07-18 (改訂 2): オーナー要望で 14 日無料体験を追加(strategy.md §3.3)。
   MON-2 に `expires` 対応と状態表示、MON-4 に trial 自動発行(Worker、発売時
   必須)を追加。価格($49/$39)はオーナー了承の方向(正式承認は MON-1)。
@@ -297,3 +306,25 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   `400 invalid_request`、不正tokenを`403 verification_failed`として拒否することを
   本番endpointで確認。メール送信は発生していない。有効token、action/hostname
   mismatch、実送達、添付license検証は未完了。
+- 2026-07-19 (改訂 13 / naming): 公開名を `Filmtone`に固定し、
+  配布物名・OFX識別子・ライセンス名・Worker送信文面・関連文書を同期。
+  `origin/main`は現作業ブランチにすでに含まれ、追加mergeは不要だった。
+  名称同期版のWorkerは未deployで、commit/pushとともに次回の発売ゲートとする。
+  Copy / History Impact: 公開名の確定のみで機能・履歴主張の変更はない。
+  Article Opportunity: Release-note only。Change-History Opportunity: No。
+- 2026-07-19 (改訂 14 / naming同期の検証・commit): オーナー指示のautonomous
+  taskとして名称同期差分を全件レビューし、rename 5ファイルとMakefile/include
+  参照の完全性を確認。`make -C apps/filmtone-resolve-ofx` PASS —
+  `Filmtone.ofx.bundle` / `Filmtone.ofx` / `com.chibatakumi.filmtone.resolve`
+  (0.1.0 / build 1 / macOS 14.0)を生成し、binary文字列監査で
+  chibatakumiドメイン識別子は全て`.resolve`系、`git diff --check` clean。
+  **frozen契約境界(残置)**: `Sources/Generated/Contracts/`の生成artifact、
+  外部manifest key、生成17-entry base parameter ID
+  (`com.forestone.filmtone.finish.*`)、adapter/mapping型・関数名は外部
+  visual-effect-core所有の凍結handoffのため旧識別子を互換性資料として維持
+  (UIには非表示。改名にはCONTRACT改訂が必要)。文書側は、日付入り実測証跡
+  (master progress のResolve host記録・workstream record・改訂1ログ)を
+  実測時の旧識別子へ復元し、rename後bundleのResolve内再検証が未実施である
+  ことを明記。Turnstile widget・1Password Environmentの実ダッシュボード
+  表示名は本タスクで未確認(文書上の名称のみ同期)。名称同期版Workerの
+  deploy・実trial送達・添付license検証は発売ゲートとして未実施のまま。

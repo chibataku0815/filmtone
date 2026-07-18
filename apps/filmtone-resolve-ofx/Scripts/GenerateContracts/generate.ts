@@ -80,7 +80,7 @@ interface LoadedArtifact {
 }
 
 function fail(message: string): never {
-  throw new Error(`Filmtone Finish contract generation failed: ${message}`);
+  throw new Error(`Filmtone contract generation failed: ${message}`);
 }
 
 function parseExternalRoot(args: readonly string[]): string {
@@ -179,7 +179,7 @@ function validateManifest(manifest: ExternalManifest): void {
     FROZEN_EXTERNAL.deterministicRenderContextContractVersion,
   );
   assertEqual(
-    "Filmtone Finish mapping contract version",
+    "Filmtone mapping contract version",
     manifest.filmtoneFinish?.contractVersion,
     FROZEN_EXTERNAL.filmtoneFinishContractVersion,
   );
@@ -199,7 +199,7 @@ function validateManifest(manifest: ExternalManifest): void {
     "@forestone/visual-render-core",
   );
   assertEqual(
-    "Filmtone Finish mapping owner",
+    "Filmtone mapping owner",
     manifest.owners?.filmtoneFinishMapping,
     "@forestone/filmtone-pack",
   );
@@ -708,5 +708,5 @@ for (const [name, contents] of outputContents) {
 }
 
 process.stdout.write(
-  `Generated ${outputContents.size} Filmtone Finish contract artifacts in ${OUTPUT_ROOT}.\n`,
+  `Generated ${outputContents.size} Filmtone contract artifacts in ${OUTPUT_ROOT}.\n`,
 );

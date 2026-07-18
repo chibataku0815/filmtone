@@ -9,7 +9,7 @@ id = "7e939ca054614c57b31ed9503613c87a"
 
 [vars]
 FROM_EMAIL = "Filmtone <filmtone@fores-tone.co.jp>"
-# Public Filmtone family page. The Finish-specific page will share these origins.
+# Public Filmtone family page. The DaVinci Resolve page will share these origins.
 # The trial form widget must set data-action="filmtone_trial"; the Worker also
 # requires Siteverify hostname to match one of these origins.
 ALLOWED_ORIGIN = "https://chibatakumi.studio,https://www.chibatakumi.studio"

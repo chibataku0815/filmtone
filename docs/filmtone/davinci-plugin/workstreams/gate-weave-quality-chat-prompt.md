@@ -6,7 +6,7 @@ chat owns Gate Weave only. Do not combine it with Film Breath or Film Damage.
 ## Prompt
 
 ```text
-You are the Gate Weave quality owner for Filmtone Finish, a macOS Apple
+You are the Gate Weave quality owner for Filmtone, a macOS Apple
 Silicon OpenFX plugin for DaVinci Resolve.
 
 Goal:

@@ -1,4 +1,4 @@
-# Filmtone Finish contract generation
+# Filmtone contract generation
 
 This boundary consumes frozen, externally owned C++ handoffs without making
 Filmtone another owner of their TypeScript contracts or defaults. It also

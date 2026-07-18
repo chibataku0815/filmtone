@@ -17,7 +17,7 @@ Last synced: 2026-07-18 JST
 - Combined feature source: `b214b765b333848131b52578325096bb7a4566f4`
 - External contract: `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f`
 - Frozen contracts: Film Damage 2 / 2.2, deterministic context 1,
-  Filmtone Finish mapping 1, Film Breath 1
+  Filmtone mapping 1, Film Breath 1
 - Runs alone; blocks `QUALITY`
 
 ## Current Loop
@@ -33,7 +33,7 @@ Metal compilation, and Resolve execution.
 ## Checklist
 
 - [x] Accept the exact clean integration base and shared-file ownership.
-- [x] Register one Filmtone Finish Filter and stable generated parameter IDs.
+- [x] Register one Filmtone Filter and stable generated parameter IDs.
 - [x] Register only the three accepted Film Breath local response controls.
 - [x] Connect Film Breath -> Gate Weave -> Film Damage pass order.
 - [x] Preserve independent bypass and exact all-off identity behavior.
@@ -53,11 +53,11 @@ Metal compilation, and Resolve execution.
 
 ## Changed Files
 
-- `apps/filmtone-resolve-ofx/Sources/Host/FilmtoneFinishPlugin.cpp`
-- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneFinishParameters.h`
-- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneFinishParameters.cpp`
-- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneFinishRenderGraph.h`
-- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneFinishRenderGraph.mm`
+- `apps/filmtone-resolve-ofx/Sources/Host/FilmtonePlugin.cpp`
+- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneParameters.h`
+- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneParameters.cpp`
+- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneRenderGraph.h`
+- `apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneRenderGraph.mm`
 - `apps/filmtone-resolve-ofx/Makefile`
 - `docs/filmtone/davinci-plugin/workstreams/progress/resolve-integration.md`
 
@@ -67,22 +67,22 @@ file changed.
 
 ## Public Interfaces And Artifacts
 
-- `describeFilmtoneFinishParameters` registers persistent OFX descriptors from
+- `describeFilmtoneParameters` registers persistent OFX descriptors from
   frozen generated metadata and accepted Film Breath local metadata.
-- `FilmtoneFinishParameterSet` fetches instance handles once and evaluates a
-  bounded `EvaluatedFilmtoneFinishParameters` snapshot at actual OFX time.
+- `FilmtoneParameterSet` fetches instance handles once and evaluates a
+  bounded `EvaluatedFilmtoneParameters` snapshot at actual OFX time.
 - `resolveFrameRates` prefers valid timeline fps for material time and falls
   back between the actual source/timeline host rates without a 24 fps default.
-- `isFilmtoneFinishIdentity` asks all accepted processors for identity using
+- `isFilmtoneIdentity` asks all accepted processors for identity using
   one seeded Host context.
-- `isFilmtoneFinishConfiguredIdentity` asks the accepted processors to prove
+- `isFilmtoneConfiguredIdentity` asks the accepted processors to prove
   identity without a valid temporal context, covering all-off and
   configured-zero states before Host fps resolution.
-- `encodeFilmtoneFinishMetal` owns active-pass selection, fixed pass order,
+- `encodeFilmtoneMetal` owns active-pass selection, fixed pass order,
   intermediate allocation, and delegation through `host::ModuleProcessor` and
   `host::MetalPipelineCache`.
 - The registered product remains one bundle, one Filter factory, and plugin ID
-  `com.chibatakumi.filmtone.finish`.
+  `com.chibatakumi.filmtone.resolve`.
 
 ## Parameter Ownership
 
@@ -166,7 +166,7 @@ host source
   quality fallback was added.
 - The factory and Host render action delegate product responsibility to
   `Sources/Integration/`; no accepted feature or Generated interface widened.
-- The effect description tells a Resolve colorist to add Filmtone Finish
+- The effect description tells a Resolve colorist to add Filmtone
   manually after CinePrint35 by default, notes that it remains movable, and
   tells CinePrint users to keep one Gate Weave and one Dust treatment enabled.
   It does not claim or attempt automatic OFX node insertion.
@@ -232,7 +232,7 @@ Repository / worktree / base: Filmtone / `/Users/chibatakumi/.codex/worktrees/97
 
 Changed files: Host factory/effect, four new `Sources/Integration/` files, root OFX Makefile, and this assigned INTEGRATION progress record; no frozen feature/Generated or coordinator-owned master file changed
 
-Public interfaces or artifacts: `describeFilmtoneFinishParameters`, `FilmtoneFinishParameterSet`, `EvaluatedFilmtoneFinishParameters`, `resolveFrameRates`, `isFilmtoneFinishConfiguredIdentity`, `isFilmtoneFinishIdentity`, `encodeFilmtoneFinishMetal`, one registered `com.chibatakumi.filmtone.finish` Filter, and Makefile source wiring for all accepted modules
+Public interfaces or artifacts: `describeFilmtoneParameters`, `FilmtoneParameterSet`, `EvaluatedFilmtoneParameters`, `resolveFrameRates`, `isFilmtoneConfiguredIdentity`, `isFilmtoneIdentity`, `encodeFilmtoneMetal`, one registered `com.chibatakumi.filmtone.resolve` Filter, and Makefile source wiring for all accepted modules
 
 Decisions fixed: generated 17-entry base ownership plus exactly three local Film Breath responses; configured identity needs no valid fps, while configured-active temporal work still rejects both rates missing; no fallback clock; actual OFX time and resolved host fps; Variation as explicit seed; fixed Breath -> Weave -> Damage order; zero intermediates for normal zero/one-pass work, one temporary plus exact copy-back for a single aliased Gate Weave, one intermediate for two active passes, and two for three; full-bounds safety before a downstream Gate Weave; exact all-off identity; Metal only; manual post-CinePrint35 guidance with Gate Weave/Dust overlap off by default; no automatic insertion or sidecar/release shell
 

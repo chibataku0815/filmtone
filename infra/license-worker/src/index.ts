@@ -1,4 +1,4 @@
-// Filmtone Finish trial license worker (Cloudflare Workers, free tier).
+// Filmtone trial license worker (Cloudflare Workers, free tier).
 // Single endpoint: POST /trial { email, turnstileToken } -> signs a trial
 // license with the trial key and emails it via Resend.
 // Abuse posture (implementation-plan §5): Turnstile REQUIRED (fail-closed),
@@ -201,17 +201,17 @@ async function ipThrottled(env: Env, request: Request): Promise<boolean> {
 
 function trialEmailText(days: number, expiresAt: string, productUrl: string): string {
   return [
-    `Filmtone Finish — ${days}日無料体験ライセンス / ${days}-day trial license`,
+    `Filmtone — ${days}日無料体験ライセンス / ${days}-day trial license`,
     "",
     "[日本語]",
-    "添付の FilmtoneFinish.license を次の場所に置いてください:",
-    "  ~/Library/Application Support/Filmtone/FilmtoneFinish.license",
+    "添付の Filmtone.license を次の場所に置いてください:",
+    "  ~/Library/Application Support/Filmtone/Filmtone.license",
     "DaVinci Resolve でフレームを再レンダーすると、ウォーターマークが消えます。",
     `体験期限: ${expiresAt}(UTC)。期限が切れると、ウォーターマーク付きの試用状態に戻ります。`,
     "",
     "[English]",
-    "Place the attached FilmtoneFinish.license at:",
-    "  ~/Library/Application Support/Filmtone/FilmtoneFinish.license",
+    "Place the attached Filmtone.license at:",
+    "  ~/Library/Application Support/Filmtone/Filmtone.license",
     "Re-render a frame in DaVinci Resolve and the watermark disappears.",
     `Trial ends: ${expiresAt} (UTC). After that the plugin simply returns to the watermarked trial mode.`,
     "",
@@ -239,7 +239,9 @@ async function handleTrial(request: Request, env: Env): Promise<Response> {
   }
 
   const emailHmac = await hmacHex(env.TRIAL_HASH_SECRET, body.email);
-  const emailKey = `trial:${emailHmac}`;
+  // v2 separates licenses issued for the current product identity from the
+  // discarded pre-release identity without retaining plaintext email.
+  const emailKey = `trial:v2:${emailHmac}`;
   if ((await env.TRIAL_KV.get(emailKey)) !== null) {
     // Generic response: do not reveal whether this email already claimed a trial.
     return json(env, request, 200, { ok: true });
@@ -273,14 +275,14 @@ async function handleTrial(request: Request, env: Env): Promise<Response> {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
       "User-Agent": USER_AGENT,
-      "Idempotency-Key": `trial-${emailHmac}`,
+      "Idempotency-Key": `trial-v2-${emailHmac}`,
     },
     body: JSON.stringify({
       from: env.FROM_EMAIL,
       to: [body.email],
-      subject: `Filmtone Finish — ${days}日無料体験ライセンス / ${days}-day trial license`,
+      subject: `Filmtone — ${days}日無料体験ライセンス / ${days}-day trial license`,
       text: trialEmailText(days, payload.expiresAt as string, env.PRODUCT_URL ?? ""),
-      attachments: [{ filename: "FilmtoneFinish.license", content: attachment }],
+      attachments: [{ filename: "Filmtone.license", content: attachment }],
     }),
   });
   let delivered = sent.ok;

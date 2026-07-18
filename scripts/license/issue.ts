@@ -1,4 +1,4 @@
-// Issue a signed Filmtone Finish license file (envelope format).
+// Issue a signed Filmtone license file (envelope format).
 // Usage:
 //   bun run license:issue -- --key <key.json> --kind full \
 //     --name "Taro Yamada" --email taro@example.com --order polar_ord_x [--out <path>]
@@ -60,7 +60,7 @@ function parseArgs(argv: string[]): Args {
     email: map.get("email") as string,
     order: map.get("order") as string,
     days,
-    out: map.get("out") ?? "FilmtoneFinish.license",
+    out: map.get("out") ?? "Filmtone.license",
   };
 }
 
@@ -118,4 +118,4 @@ console.log(`  order:   ${payload.orderRef}`);
 console.log(`  issued:  ${payload.issuedAt}`);
 console.log(`  expires: ${payload.expiresAt ?? "never"}`);
 console.log(`  self-check: ${selfCheck.status}`);
-console.log('Install path: ~/Library/Application Support/Filmtone/FilmtoneFinish.license');
+console.log('Install path: ~/Library/Application Support/Filmtone/Filmtone.license');

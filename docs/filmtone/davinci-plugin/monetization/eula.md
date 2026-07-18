@@ -1,4 +1,4 @@
-# Filmtone Finish End User License Agreement / 使用許諾契約
+# Filmtone End User License Agreement / 使用許諾契約
 
 Status: Publication candidate — owner legal review required before release  
 Effective date: To be set at launch  
@@ -7,7 +7,7 @@ Contact: chiba@fores-tone.co.jp
 
 ## 日本語
 
-本契約は、`Filmtone Finish for DaVinci Resolve`（以下「本ソフトウェア」）の
+本契約は、`Filmtone for DaVinci Resolve`（以下「本ソフトウェア」）の
 利用条件を定めるものです。購入またはインストールを行う前に確認してください。
 
 ### 1. 使用許諾
@@ -62,7 +62,7 @@ trialの有効期限が切れると、ウォーターマーク付きの状態へ
 
 ## English
 
-This agreement governs use of `Filmtone Finish for DaVinci Resolve` (the
+This agreement governs use of `Filmtone for DaVinci Resolve` (the
 “Software”). Review it before purchasing or installing the Software.
 
 ### 1. License grant

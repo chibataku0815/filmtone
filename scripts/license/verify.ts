@@ -1,6 +1,6 @@
-// Verify a Filmtone Finish license file (envelope format).
+// Verify a Filmtone license file (envelope format).
 // The signed `kind` selects the public key — pass the keys you trust:
-//   bun run license:verify -- --file <FilmtoneFinish.license> \
+//   bun run license:verify -- --file <Filmtone.license> \
 //     [--full-key <full.key.json>] [--trial-key <trial.key.json>] \
 //     [--full-pub <rawHex32>] [--trial-pub <rawHex32>]
 // At least one key source is required.

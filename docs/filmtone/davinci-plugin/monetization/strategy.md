@@ -1,11 +1,11 @@
-# Filmtone Finish 課金戦略 計画書 (Monetization Strategy)
+# Filmtone 課金戦略 計画書 (Monetization Strategy)
 
 Date opened: 2026-07-18 JST
 Status: 価格($49 / ローンチ $39)・14 日体験は 2026-07-18 にオーナー承認済み。
 実装進行中(progress.md 参照)。公開クレームは MON-6 の release truth ゲート
 通過後のみ。
 
-この文書は DaVinci Resolve OpenFX プラグイン **Filmtone Finish** の課金・販売の
+この文書は DaVinci Resolve OpenFX プラグイン **Filmtone** の課金・販売の
 長期正本である。進行状態は同ディレクトリの `progress.md` に置く。実装レーンの
 正本は `docs/filmtone/davinci-plugin/strategy.md`であり、本文書は製品挙動の
 正本ではない。2026-07-18時点の最新統合sourceはローカル`main` `cb9b465`に
@@ -33,10 +33,10 @@ product acceptanceが明示された後にのみdispatchする。それまでは
 
 | 項目 | 内容 |
 |---|---|
-| 製品名 | Filmtone Finish for DaVinci Resolve |
+| 製品名 | Filmtone for DaVinci Resolve |
 | 内容 | Film Breath / Gate Weave / Film Damage の 3 モジュールを持つ 1 つの OFX Filter |
 | 対応環境 (v1候補) | DaVinci Resolve 21.x / macOS 14.0+ / Apple Silicon / Metal。Phase Dの実機互換性確認前は公開クレームにしない |
-| 識別子 | `com.chibatakumi.filmtone.finish` |
+| 識別子 | `com.chibatakumi.filmtone.resolve` |
 | 非対象 | フィルムエマルション・グレイン・ハレーション・入力色管理(strategy.md の Product Boundary に従う) |
 
 ## 2. 競合価格の実測 (2026-07-18 検証済み、記憶ベースではない)
@@ -75,7 +75,7 @@ product acceptanceが明示された後にのみdispatchする。それまでは
 | サブスク | **やらない**(決済・解約・比例配分の運用負担=個人開発の外殻。買い切りが差別化そのもの) |
 
 ポジショニング 1 行: 「Film Breath / Gate Weave / Film Damage を、**単体の
-買い切り OFX** として提供する。CinePrint35 の後段に置く finishing layer」。
+買い切り OFX** として提供する。CinePrint35 の後段に置く processing layer」。
 
 公開コピーの精密化(Codex レビュー Major 12): 「サブスク専売の市場に〜」の
 ような広い主張はしない。正確な事実は「この 3 点**だけ**を買い切りで買う選択肢
@@ -161,7 +161,7 @@ parity を示唆する表現は使わない — 同**カテゴリ**の 3 モジ�
 |---|---|
 | 検証方式 | ed25519 署名付きライセンスファイル(envelope 形式 — 署名対象は payload バイト列そのもの)のローカル検証。公開鍵はプラグインに埋め込み、署名済み kind が検証鍵を内部選択 |
 | 実装 | TS 側は WebCrypto(依存ゼロ、実装済み)。C 側は orlp/ed25519 を vendored(**zlib license・複数ファイル**。LICENSE 同梱 + commit pin — 対応計画 §3) |
-| 配置 | `~/Library/Application Support/Filmtone/FilmtoneFinish.license` |
+| 配置 | `~/Library/Application Support/Filmtone/Filmtone.license` |
 | 内容 | 署名済み payload: 氏名 / メール / 製品 ID / エディション(v1 固定)/ kind / 発行日 / 注文参照 / **expiresAt(購入版は明示 `null` = 永続、trial は発行 +14 日必須)**。trial は未来日発行を拒否(1 通の有効期間を最長 34 日に制限。鍵漏洩時の失効はローテーションで) |
 | 未ライセンス時 | 全機能動作 + deterministic watermark(最終パスで合成。Breath -> Weave -> Damage -> Watermark)。**expires 超過時も同じ状態に戻る** |
 | 検証タイミング | インスタンス生成時 + ファイル mtime 変化時のみ再読込(レンダーごとの I/O はしない)。expires はレンダー要求時刻と比較 |
@@ -234,9 +234,9 @@ parity を示唆する表現は使わない — 同**カテゴリ**の 3 モジ�
 
 実行仕様は [implementation-plan.md](implementation-plan.md)(対応計画書)が正。
 
-名称について: **名称変更は不要。** 実装レーンの strategy.md が `Filmtone Finish`
-を「working name」と表記しているが、本計画ではこの名前をそのまま公開名として
-扱う。オーナーから別名の指示がない限り、名称に関する作業・判断は発生しない。
+名称について: **公開名は `Filmtone`。** DaVinci Resolve 向けと明示する
+場合は説明句 `Filmtone for DaVinci Resolve`を使う。配布物名・ライセンス・
+プラグイン表示・販売文面はすべてこの決定に従う。
 
 ## 10. Copy / History Impact
 
@@ -260,8 +260,9 @@ parity を示唆する表現は使わない — 同**カテゴリ**の 3 モジ�
 - 2026-07-18 (改訂 1): オーナー指摘により販路を Lemon Squeezy 新規開設案から
   **既存の Polar** へ変更(新規サービスを増やさない)。Polar の MoR・license
   key・手数料(Early Member 4% + $0.40 / 新規 org 5% + $0.50)は公式・複数
-  ソースで検証済み。「名称確定」を承認事項から削除 — 名称変更は不要で、
-  `Filmtone Finish` をそのまま公開名として扱う。
+  ソースで検証済み。「名称確定」を承認事項から削除 — 当時の判断は「名称変更は
+  不要で、`Filmtone Finish` をそのまま公開名として扱う」(2026-07-19 の naming
+  決定で撤回 — §9 と progress.md 改訂 13 を参照)。
 - 2026-07-18 (改訂 2): オーナー要望により **14 日間の無料体験期間を追加**。
   常設 watermark trial の上に、署名ライセンスの `expires` フィールドで実装する
   clean trial を重ねる 2 段構え(§3.3)。サーバー・オンライン認証は増えない。
@@ -281,3 +282,7 @@ parity を示唆する表現は使わない — 同**カテゴリ**の 3 モジ�
   「1 通の有効期間 ≤34 日」へ精密化。trial 使用済み購入者の優先発行例外を
   §3.3 に追加。Worker 側の残指摘(B4 実効化・Turnstile fail-closed・Resend
   冪等性)は対応計画書 改訂 2 を参照。
+- 2026-07-19 (改訂 6、naming 決定): 公開名を `Filmtone` に確定し、改訂 1 の
+  「名称変更は不要」判断を撤回。§1 の製品名・識別子と §9 を同期。配布物は
+  `Filmtone.ofx.bundle` / `Filmtone-<version>.pkg`、OFX 識別子は
+  `com.chibatakumi.filmtone.resolve`。実装同期の記録は progress.md 改訂 13 以降。

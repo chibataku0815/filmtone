@@ -1,4 +1,4 @@
-// Filmtone Finish license core — runtime-agnostic (Bun CLI + Cloudflare Worker).
+// Filmtone license core — runtime-agnostic (Bun CLI + Cloudflare Worker).
 // Uses only WebCrypto (Ed25519), TextEncoder/TextDecoder, atob/btoa. No dependencies.
 // Spec: docs/filmtone/davinci-plugin/monetization/implementation-plan.md §2
 //
@@ -10,7 +10,7 @@
 // select the public key by the signed `kind` (full/trial) — never by caller choice.
 
 export const LICENSE_SCHEMA = "filmtone-license/1";
-export const PRODUCT_ID = "com.chibatakumi.filmtone.finish";
+export const PRODUCT_ID = "com.chibatakumi.filmtone.resolve";
 export const EDITION_V1 = "v1";
 export const TRIAL_MAX_DAYS = 31;
 // Trial containment: issuedAt may not be further in the future than this skew.

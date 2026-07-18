@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "../Integration/FilmtoneFinishParameters.h"
-#include "../Integration/FilmtoneFinishRenderGraph.h"
+#include "../Integration/FilmtoneParameters.h"
+#include "../Integration/FilmtoneRenderGraph.h"
 #include "MetalPipelineCache.h"
 #include "RenderContext.h"
 #include "ofxsImageEffect.h"
@@ -12,12 +12,12 @@
 namespace filmtone::resolve::host {
 namespace {
 
-constexpr char kPluginName[] = "Filmtone Finish";
+constexpr char kPluginName[] = "Filmtone";
 constexpr char kPluginGrouping[] = "Filmtone";
-constexpr char kPluginIdentifier[] = "com.chibatakumi.filmtone.finish";
+constexpr char kPluginIdentifier[] = "com.chibatakumi.filmtone.resolve";
 constexpr char kPluginDescription[] =
     "Adds deterministic Film Breath, Gate Weave, and Film Damage. Apply "
-    "Filmtone Finish manually after CinePrint35 by default; the effect remains "
+    "Filmtone manually after CinePrint35 by default; the effect remains "
     "movable. When using CinePrint35, keep only one Gate Weave treatment and "
     "one Dust treatment enabled.";
 constexpr int kPluginVersionMajor = 0;
@@ -32,9 +32,9 @@ bool isFloatRGBA(const OFX::Image& image) {
            image.getPixelComponents() == OFX::ePixelComponentRGBA;
 }
 
-class FilmtoneFinishEffect final : public OFX::ImageEffect {
+class FilmtoneEffect final : public OFX::ImageEffect {
 public:
-    explicit FilmtoneFinishEffect(OfxImageEffectHandle handle)
+    explicit FilmtoneEffect(OfxImageEffectHandle handle)
         : OFX::ImageEffect(handle),
           outputClip_(fetchClip(kOfxImageEffectOutputClipName)),
           sourceClip_(fetchClip(kOfxImageEffectSimpleSourceClipName)),
@@ -61,7 +61,7 @@ public:
             sourceFrameRate,
             timelineFrameRate);
         if (!resolvedFrameRates.has_value() &&
-            !integration::isFilmtoneFinishConfiguredIdentity(evaluated)) {
+            !integration::isFilmtoneConfiguredIdentity(evaluated)) {
             OFX::throwSuiteStatusException(kOfxStatErrValue);
         }
         const FrameRates frameRates = resolvedFrameRates.has_value()
@@ -71,7 +71,7 @@ public:
         const RenderContext context{
             args.time,
             frameRates,
-            static_cast<std::uint64_t>(evaluated.finish().variation),
+            static_cast<std::uint64_t>(evaluated.mapping().variation),
             PointD{args.renderScale.x, args.renderScale.y},
             makeRect(args.renderWindow),
             makeRect(source->getBounds()),
@@ -94,7 +94,7 @@ public:
         };
 
         std::string error;
-        if (!integration::encodeFilmtoneFinishMetal(
+        if (!integration::encodeFilmtoneMetal(
                 evaluated,
                 context,
                 invocation,
@@ -102,7 +102,7 @@ public:
                 error)) {
             OFX::Log::error(
                 true,
-                "Filmtone Finish render failed: %s",
+                "Filmtone render failed: %s",
                 error.c_str());
             OFX::throwSuiteStatusException(kOfxStatFailed);
         }
@@ -113,7 +113,7 @@ public:
         OFX::Clip*& identityClip,
         double& identityTime) override {
         const auto evaluated = parameters_.evaluate(args.time);
-        if (integration::isFilmtoneFinishConfiguredIdentity(evaluated)) {
+        if (integration::isFilmtoneConfiguredIdentity(evaluated)) {
             identityClip = sourceClip_;
             identityTime = args.time;
             return true;
@@ -128,13 +128,13 @@ public:
         const RenderContext context{
             args.time,
             *frameRates,
-            static_cast<std::uint64_t>(evaluated.finish().variation),
+            static_cast<std::uint64_t>(evaluated.mapping().variation),
             PointD{args.renderScale.x, args.renderScale.y},
             renderWindow,
             renderWindow,
             renderWindow,
         };
-        if (!integration::isFilmtoneFinishIdentity(evaluated, context)) {
+        if (!integration::isFilmtoneIdentity(evaluated, context)) {
             return false;
         }
         identityClip = sourceClip_;
@@ -145,14 +145,14 @@ public:
 private:
     OFX::Clip* outputClip_;
     OFX::Clip* sourceClip_;
-    integration::FilmtoneFinishParameterSet parameters_;
+    integration::FilmtoneParameterSet parameters_;
 };
 
-class FilmtoneFinishFactory final
-    : public OFX::PluginFactoryHelper<FilmtoneFinishFactory> {
+class FilmtoneFactory final
+    : public OFX::PluginFactoryHelper<FilmtoneFactory> {
 public:
-    FilmtoneFinishFactory()
-        : OFX::PluginFactoryHelper<FilmtoneFinishFactory>(
+    FilmtoneFactory()
+        : OFX::PluginFactoryHelper<FilmtoneFactory>(
               kPluginIdentifier,
               kPluginVersionMajor,
               kPluginVersionMinor) {}
@@ -195,20 +195,20 @@ public:
         output->addSupportedComponent(OFX::ePixelComponentRGBA);
         output->setSupportsTiles(false);
 
-        integration::describeFilmtoneFinishParameters(descriptor);
+        integration::describeFilmtoneParameters(descriptor);
     }
 
     OFX::ImageEffect* createInstance(
         OfxImageEffectHandle handle,
         OFX::ContextEnum) override {
-        return new FilmtoneFinishEffect(handle);
+        return new FilmtoneEffect(handle);
     }
 };
 
 }  // namespace
 
 void appendPluginFactory(OFX::PluginFactoryArray& factories) {
-    static FilmtoneFinishFactory factory;
+    static FilmtoneFactory factory;
     factories.push_back(&factory);
 }
 

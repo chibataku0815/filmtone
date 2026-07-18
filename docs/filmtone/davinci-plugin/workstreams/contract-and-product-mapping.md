@@ -26,7 +26,7 @@ authorization in that task.
 
 ## Goal
 
-Freeze one portable, versioned contract handoff for Filmtone Finish so the OFX
+Freeze one portable, versioned contract handoff for Filmtone so the OFX
 feature chats do not invent independent time, seed, Gate Weave, Film Damage, or
 default semantics.
 

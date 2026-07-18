@@ -47,7 +47,7 @@ and must not be repurposed as one.
 ## Goal
 
 Build a macOS Apple Silicon OpenFX effect that adds Filmtone's living-film
-finish to DaVinci Resolve without becoming a Dehancer clone or replacing
+character to DaVinci Resolve without becoming a Dehancer clone or replacing
 Resolve and CinePrint35.
 
 Dehancer Pro is a reference for control depth and temporal quality only. The
@@ -55,7 +55,7 @@ product identity is Filmtone: deterministic, restrained by default, visually
 coherent with existing Filmtone output, and portable through the shared effect
 contract ecosystem.
 
-The first finish owns three independently bypassable modules:
+The first release owns three independently bypassable modules:
 
 1. **Film Breath** — an OFX realization of the existing Filmtone temporal
    exposure, contrast, and color movement.
@@ -69,7 +69,7 @@ The first finish owns three independently bypassable modules:
 
 ## Product Boundary
 
-Filmtone Finish owns:
+Filmtone owns:
 
 - deterministic frame-to-frame photometric drift;
 - subpixel X/Y transport movement and rotation;
@@ -104,11 +104,11 @@ Recommended node responsibility:
 Resolve input color management
   -> Filmtone Optics
   -> CinePrint35
-  -> Filmtone Finish
+  -> Filmtone
   -> output transform
 ```
 
-`Filmtone Finish` remains movable because a colorist may intentionally place
+`Filmtone` remains movable because a colorist may intentionally place
 Film Breath before a film-emulation tree. The CinePrint companion default is
 post-CinePrint because it provides one predictable working relationship and
 keeps the new feature outside CinePrint's negative/print color model.
@@ -120,10 +120,10 @@ CinePrint35 overlap policy:
 | Film Breath | No equivalent documented | Filmtone core differentiator. |
 | Gate Weave | `Gate Wv` node | Use CinePrint or Filmtone, never both by default. |
 | Dust | Optional Resolve Film Damage node | CinePrint companion default keeps Filmtone Dust off. |
-| Fibers / hairs | No CinePrint use documented | Available as Filmtone material finish. |
-| Scratches | No CinePrint use documented | Available as Filmtone material finish. |
+| Fibers / hairs | No CinePrint use documented | Available as Filmtone surface texture. |
+| Scratches | No CinePrint use documented | Available as Filmtone surface texture. |
 | Grain | Tuned Resolve Film Grain OFX | Do not add standalone Filmtone grain here. |
-| Halation | Linear-space CinePrint node | Do not add it to Filmtone Finish. |
+| Halation | Linear-space CinePrint node | Do not add it to Filmtone. |
 | Negative / print response | Core CinePrint responsibility | Do not duplicate. |
 
 When Filmtone Gate Weave or Dust is enabled, the usage note must tell the user
@@ -137,7 +137,7 @@ which CinePrint node to disable. No preset may silently stack both versions.
 | Film Breath Swift parity evidence | `packages/film-lab-swift-core/.../FilmtoneFilmBreath.swift` | Read-only parity evidence for the OFX port. |
 | Generic Film Damage / Gate Weave recipe | `@forestone/visual-effect-core` Film Damage contract v2 / revision 2.3 | Consume the frozen public handoff; never add a second Filmtone-local contract. |
 | Generic deterministic reference | `@forestone/visual-render-core` Film Damage reference | Use as the semantic and fixture authority for the Metal realization. |
-| Filmtone taste and compatibility mapping | `@forestone/filmtone-pack` | Add a finish-specific public mapping instead of hiding Dust/Scratch as lossy grade fields. |
+| Filmtone taste and compatibility mapping | `@forestone/filmtone-pack` | Add a product-specific public mapping instead of hiding Dust/Scratch as lossy grade fields. |
 | OFX host wrapper, product IDs, UI groups, bundle | Filmtone `apps/filmtone-resolve-ofx/` | Product-specific only; no generic contract ownership. |
 | Package/LUT/DCTL/Lua workflow | Existing Filmtone DaVinci Bridge | Preserve as a distinct fallback/orchestration rail. |
 
@@ -152,7 +152,7 @@ in the generic recipe.
 Initial target:
 
 - DaVinci Resolve 21 on macOS Apple Silicon;
-- one `FilmtoneFinish.ofx.bundle` product bundle;
+- one `Filmtone.ofx.bundle` product bundle;
 - one movable Filter effect with separate Film Breath, Gate Weave, and Film
   Damage control groups;
 - OpenFX float RGBA input/output;
@@ -306,7 +306,7 @@ public product acceptance are not declared.
 
 ## Measurable Done Conditions
 
-- Resolve 21 on Apple Silicon discovers and instantiates Filmtone Finish.
+- Resolve 21 on Apple Silicon discovers and instantiates Filmtone.
 - All modules off returns the input unchanged and preserves alpha.
 - Film Breath produces continuous, mean-neutral photometric movement with no
   cumulative drift.
@@ -374,5 +374,5 @@ public product acceptance are not declared.
 - Article Opportunity: **Full article**, only after the Resolve effect is
   visually accepted and the distribution claim is true.
 - Change-History Opportunity: **Yes** — this is the point where Filmtone adds a
-  native Resolve temporal/material finish while preserving external generic
+  native Resolve temporal/material processing while preserving external generic
   effect ownership.

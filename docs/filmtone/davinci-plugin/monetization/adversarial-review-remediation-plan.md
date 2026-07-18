@@ -1,4 +1,4 @@
-# Filmtone Finish Monetization 全体対応計画書
+# Filmtone Monetization 全体対応計画書
 
 Date: 2026-07-18 JST  
 Status: Active  
@@ -192,7 +192,7 @@ Accepted risks:
 オーナー操作:
 
 1. Polar org作成日を確認して手数料tierを確定する。
-2. `Filmtone Finish for DaVinci Resolve`を$49で登録する。
+2. `Filmtone for DaVinci Resolve`を$49で登録する。
 3. ローンチ用の$10固定額クーポンを作成する。
 4. [完了 2026-07-18] Resendで送信domainを検証し、送信専用・domain限定keyを
    発行する。現契約に送信量alert設定はないため、超過課金オフとUsage監視を維持する。
@@ -318,7 +318,7 @@ Phase EはQ/SまたはMON-2〜5のどれかが未完なら開始しない。
 ## 10. Agent Execution Brief (English)
 
 Goal:
-Complete the Filmtone Finish monetization lane from the current reviewed state to
+Complete the Filmtone monetization lane from the current reviewed state to
 a launch-ready product, including the remaining Worker correction, native OFX
 license enforcement, sales operations, packaging, and release gates.
 
@@ -349,7 +349,7 @@ Expected output:
 - Close the quality-recovery and source-durability gates, implement and accept
   MON-2, complete MON-4 runtime gates, MON-5 packaging, and MON-6 release.
 - Record evidence for each gate in `progress.md`.
-- Finish with both purchase and trial user journeys working end to end.
+- Complete both purchase and trial user journeys end to end.
 
 Non-goals:
 - Do not redesign the licensing business model.

@@ -6,7 +6,7 @@ chat owns Film Damage only. Do not combine it with Film Breath or Gate Weave.
 ## Prompt
 
 ```text
-You are the Film Damage quality owner for Filmtone Finish, a macOS Apple
+You are the Film Damage quality owner for Filmtone, a macOS Apple
 Silicon OpenFX plugin for DaVinci Resolve.
 
 Goal:

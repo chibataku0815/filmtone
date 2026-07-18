@@ -8,9 +8,9 @@ OFX_SDK_ROOT ?= /Library/Application Support/Blackmagic Design/DaVinci Resolve/D
 
 BUILD_DIR := build
 OBJECT_DIR := $(BUILD_DIR)/objects
-BUNDLE_NAME := FilmtoneFinish.ofx.bundle
+BUNDLE_NAME := Filmtone.ofx.bundle
 BUNDLE_ROOT := $(BUILD_DIR)/$(BUNDLE_NAME)
-BUNDLE_BINARY := $(BUNDLE_ROOT)/Contents/MacOS/FilmtoneFinish.ofx
+BUNDLE_BINARY := $(BUNDLE_ROOT)/Contents/MacOS/Filmtone.ofx
 BUNDLE_INFO := $(BUNDLE_ROOT)/Contents/Info.plist
 
 CPPFLAGS := -I"$(OFX_SDK_ROOT)/OpenFX-1.4/include" \
@@ -19,20 +19,20 @@ CPPFLAGS := -I"$(OFX_SDK_ROOT)/OpenFX-1.4/include" \
 	-ISources/Host
 CXXFLAGS := -std=c++17 -O2 -arch arm64 -fvisibility=hidden \
 	-fvisibility-inlines-hidden -Wall -Wextra -Wpedantic \
-	-mmacosx-version-min=$(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET)
+	-mmacosx-version-min=$(FILMTONE_RESOLVE_MACOS_DEPLOYMENT_TARGET)
 LDFLAGS := -bundle -arch arm64 -fvisibility=hidden \
-	-mmacosx-version-min=$(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET) \
+	-mmacosx-version-min=$(FILMTONE_RESOLVE_MACOS_DEPLOYMENT_TARGET) \
 	-framework AppKit -framework Foundation -framework Metal
 
 SIGN_IDENTITY ?=
 
-PLUGIN_CPP_SOURCES := Sources/Host/FilmtoneFinishPlugin.cpp \
-	Sources/Integration/FilmtoneFinishParameters.cpp \
+PLUGIN_CPP_SOURCES := Sources/Host/FilmtonePlugin.cpp \
+	Sources/Integration/FilmtoneParameters.cpp \
 	Sources/Effects/FilmBreath/FilmBreathOffsets.cpp \
 	Sources/Effects/GateWeave/GateWeaveTransform.cpp
 PLUGIN_MM_SOURCES := Sources/Host/MetalIdentityBlit.mm \
 	Sources/Host/MetalPipelineCache.mm \
-	Sources/Integration/FilmtoneFinishRenderGraph.mm \
+	Sources/Integration/FilmtoneRenderGraph.mm \
 	Sources/Effects/FilmBreath/FilmBreathProcessor.mm \
 	Sources/Effects/GateWeave/GateWeaveProcessor.mm \
 	Sources/Effects/FilmDamage/FilmDamageProcessor.mm
@@ -47,7 +47,7 @@ OBJECTS := $(PLUGIN_CPP_OBJECTS) $(PLUGIN_MM_OBJECTS) $(SUPPORT_OBJECTS)
 
 .PHONY: all clean sign-bundle
 
-# Expected product: build/FilmtoneFinish.ofx.bundle
+# Expected product: build/Filmtone.ofx.bundle
 all: $(BUNDLE_BINARY) $(BUNDLE_INFO)
 
 $(BUNDLE_BINARY): $(OBJECTS)
@@ -57,9 +57,9 @@ $(BUNDLE_BINARY): $(OBJECTS)
 $(BUNDLE_INFO): Resources/Info.plist Resources/ProductVersion.mk
 	@mkdir -p "$(@D)"
 	cp "$<" "$@"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(FILMTONE_FINISH_MARKETING_VERSION)" "$@"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(FILMTONE_FINISH_BUILD_VERSION)" "$@"
-	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET)" "$@"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(FILMTONE_RESOLVE_MARKETING_VERSION)" "$@"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(FILMTONE_RESOLVE_BUILD_VERSION)" "$@"
+	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $(FILMTONE_RESOLVE_MACOS_DEPLOYMENT_TARGET)" "$@"
 
 $(OBJECT_DIR)/%.o: Sources/%.cpp Resources/ProductVersion.mk
 	@mkdir -p "$(@D)"

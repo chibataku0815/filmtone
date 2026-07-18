@@ -17,7 +17,7 @@ namespace {
 
 constexpr std::size_t kFloatRGBABytesPerPixel = sizeof(float) * 4u;
 constexpr char kFilmBreathPipelineCacheKey[] =
-    "filmtone.finish.film-breath.photometric.v2";
+    "filmtone.resolve.film-breath.photometric.v2";
 constexpr char kFilmBreathKernelFunction[] = "filmtoneFilmBreathV2";
 
 constexpr char kFilmBreathMetalSource[] = R"METAL(
@@ -380,7 +380,7 @@ bool FilmBreathProcessor::encodeMetal(
         error = "Film Breath could not create a Metal command buffer.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Film Breath";
+    commandBuffer.label = @"Filmtone Film Breath";
 
     id<MTLComputeCommandEncoder> encoder =
         [commandBuffer computeCommandEncoder];

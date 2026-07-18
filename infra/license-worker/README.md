@@ -1,10 +1,10 @@
 # filmtone-license-worker
 
-Filmtone Finish の 14 日 trial ライセンスを自動発行する Cloudflare Worker。
+Filmtone の 14 日 trial ライセンスを自動発行する Cloudflare Worker。
 仕様正本: `docs/filmtone/davinci-plugin/monetization/implementation-plan.md` §5。
 
 - `POST /trial` `{ "email": "...", "turnstileToken": "..." }`(両方とも文字列
-  必須)-> trial 鍵で署名した `FilmtoneFinish.license`(envelope 形式)を
+  必須)-> trial 鍵で署名した `Filmtone.license`(envelope 形式)を
   Resend でメール添付送付。
 - 乱用対策: **Turnstile 必須・fail-closed**(secret 未設定は 500、Siteverifyの
   `success`に加えて`action == filmtone_trial`と`hostname`が`ALLOWED_ORIGIN`の
@@ -37,24 +37,26 @@ Filmtone Finish の 14 日 trial ライセンスを自動発行する Cloudflare
 - KV binding: `TRIAL_KV` (`7e939ca054614c57b31ed9503613c87a`)
 - Resend: `fores-tone.co.jp` 検証済み。API key は Sending access かつ同 domain
   限定で、1Password と Worker secret に保存済み。
-- Turnstile: `Filmtone Finish Trial` 本番 widget を作成済み。許可 domain は
+- Turnstile: `Filmtone Trial` 本番 widget を作成済み。許可 domain は
   `chibatakumi.studio` / `www.chibatakumi.studio`。secret は1Passwordと
   Worker secretに保存済み。MON-6のフォームはwidgetへ
   `data-action="filmtone_trial"`を設定し、別action/別hostnameのtokenをWorkerが
   拒否する構成にする。
 - Worker secret 4 件(`TRIAL_PRIVATE_KEY` / `RESEND_API_KEY` /
   `TRIAL_HASH_SECRET` / `TURNSTILE_SECRET`)は登録済み。秘密値は本書へ記載しない。
-- 1Password Environment: `Filmtone Finish Production`
+- 1Password Environment: `Filmtone Production`
   (`w4plqx7tjh2zmaojldj6r3jfp4`)。上記4 secretと公開
   `TURNSTILE_SITE_KEY`を重複なしで保管。旧Environmentは削除せず
-  `Filmtone Finish Production (retired 2026-07-18)`として保持する。
+  `Filmtone Production (retired 2026-07-18)`として保持する。
 - 現 Resend 契約は月 50,000 通・日次上限なし。送信量アラートの設定項目は
   現行 UI / API にない。超過課金はオフを維持し、Resend Usage と Worker の
   Turnstile・IP throttle・email単位制限で管理する。
-- current sourceの再deployまでは完了。公開endpointへの実trial請求、実メール
+- hostname/action binding版sourceの再deployまでは完了。公開endpointへの実trial請求、実メール
   送達、添付license検証は別の発売ゲートとして未実施。2026-07-19に本番endpointで
   token欠落=`400 invalid_request`、不正token=`403 verification_failed`を確認済み
   (メール送信なし)。
+- 公開名とライセンス識別子を同期した現在のrepository sourceは未deploy。
+  source durability gateを通して再deployした後に、実trialの発行・送達・検証を行う。
 
 ## デプロイ(オーナー操作、初回のみ)
 
@@ -63,7 +65,7 @@ cd infra/license-worker
 bunx wrangler login
 bunx wrangler kv namespace create TRIAL_KV   # 出力された id を wrangler.toml へ
 # ALLOWED_ORIGIN / PRODUCT_URL は現在の公開 Filmtone page を設定済み。
-# Finish 専用ページ公開時は同 origin の PRODUCT_URL だけを差し替える
+# DaVinci Resolve 専用ページ公開時は同 origin の PRODUCT_URL だけを差し替える
 bunx wrangler secret put TRIAL_PRIVATE_KEY   # ~/.filmtone/secrets/filmtone-trial.key.json の privateKeyPkcs8Hex
 bunx wrangler secret put RESEND_API_KEY      # Resend(fores-tone.co.jp ドメイン検証済み)の API key
 bunx wrangler secret put TRIAL_HASH_SECRET   # openssl rand -hex 32 の出力
@@ -89,6 +91,6 @@ curl -sX POST https://<worker>/trial -H 'Content-Type: application/json' \
   -d '{"email":"you@example.com","turnstileToken":"test"}'
 # 成功: {"ok":true} + メール着信(既発行メールでも同じ {"ok":true} が返る仕様)
 # 添付の検証:
-#   bun run license:verify -- --file FilmtoneFinish.license \
+#   bun run license:verify -- --file Filmtone.license \
 #     --trial-key ~/.filmtone/secrets/filmtone-trial.key.json
 ```

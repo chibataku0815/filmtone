@@ -541,7 +541,7 @@ bool FilmDamageProcessor::encodeMetal(
         error = "Film Damage could not create a Metal command buffer.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Film Damage";
+    commandBuffer.label = @"Filmtone Film Damage";
 
     id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
     if (encoder == nil) {

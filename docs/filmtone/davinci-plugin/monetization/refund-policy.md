@@ -1,4 +1,4 @@
-# Filmtone Finish Refund Policy / 返金ポリシー
+# Filmtone Refund Policy / 返金ポリシー
 
 Status: Publication candidate — owner legal review and Polar checkout sync required  
 Effective date: To be set at launch  
@@ -8,7 +8,7 @@ Contact: chiba@fores-tone.co.jp
 
 ### 14日間の返金受付
 
-`Filmtone Finish for DaVinci Resolve`が制作環境や用途に合わなかった場合、
+`Filmtone for DaVinci Resolve`が制作環境や用途に合わなかった場合、
 購入日から14暦日以内に返金を申請できます。
 
 申請は、購入に使用したメールアドレスから `chiba@fores-tone.co.jp` へ、
@@ -35,7 +35,7 @@ Polarの注文番号を添えて送ってください。確認に必要な場合
 
 ### 14-day refund window
 
-If `Filmtone Finish for DaVinci Resolve` does not fit your production setup or
+If `Filmtone for DaVinci Resolve` does not fit your production setup or
 intended use, you may request a refund within 14 calendar days of purchase.
 
 Email `chiba@fores-tone.co.jp` from the address used for purchase and include

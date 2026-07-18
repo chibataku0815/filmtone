@@ -20,7 +20,7 @@ constexpr double kDegreesToRadians =
     0.017453292519943295769236907684886;
 constexpr double kCubicFootprintEpsilonPixels = 0.001;
 constexpr char kPipelineCacheKey[] =
-    "filmtone.finish.gate-weave.catmull-rom.v1";
+    "filmtone.resolve.gate-weave.catmull-rom.v1";
 constexpr char kMetalFunctionName[] = "filmtoneGateWeaveWarp";
 
 constexpr char kMetalSource[] = R"METAL(
@@ -487,7 +487,7 @@ bool GateWeaveProcessor::encodeMetal(
         error = "Gate Weave Metal command buffer creation failed.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Gate Weave";
+    commandBuffer.label = @"Filmtone Gate Weave";
     id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
     if (encoder == nil) {
         error = "Gate Weave Metal compute encoder creation failed.";

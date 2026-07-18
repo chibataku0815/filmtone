@@ -1,6 +1,6 @@
 #import <Metal/Metal.h>
 
-#include "FilmtoneFinishRenderGraph.h"
+#include "FilmtoneRenderGraph.h"
 
 #include <array>
 #include <cmath>
@@ -57,11 +57,11 @@ const host::RectI* selectFullBounds(
 }
 
 host::RenderContext makeSeededContext(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept {
     const std::uint64_t seed = context.explicitSeed.has_value()
         ? *context.explicitSeed
-        : static_cast<std::uint64_t>(parameters.finish().variation);
+        : static_cast<std::uint64_t>(parameters.mapping().variation);
     return host::RenderContext{
         context.time,
         context.frameRates,
@@ -125,14 +125,14 @@ public:
             return true;
         }
         if (commandQueue == nullptr) {
-            error = "Filmtone Finish cannot allocate an intermediate without a Metal queue.";
+            error = "Filmtone cannot allocate an intermediate without a Metal queue.";
             return false;
         }
 
         id<MTLCommandQueue> queue =
             static_cast<id<MTLCommandQueue>>(commandQueue);
         if (queue == nil || queue.device == nil) {
-            error = "Filmtone Finish received an invalid Metal command queue for its pass graph.";
+            error = "Filmtone received an invalid Metal command queue for its pass graph.";
             return false;
         }
 
@@ -140,7 +140,7 @@ public:
         views_.reserve(requestedBounds.size());
         for (const host::RectI& bounds : requestedBounds) {
             if (bounds.isEmpty()) {
-                error = "Filmtone Finish received empty full bounds for an active-pass intermediate.";
+                error = "Filmtone received empty full bounds for an active-pass intermediate.";
                 return false;
             }
             const std::size_t width =
@@ -149,7 +149,7 @@ public:
                 static_cast<std::size_t>(bounds.height());
             if (width > std::numeric_limits<std::size_t>::max() /
                             kFloatRGBABytesPerPixel) {
-                error = "Filmtone Finish intermediate row size is not representable.";
+                error = "Filmtone intermediate row size is not representable.";
                 return false;
             }
             const std::size_t rowBytes = width * kFloatRGBABytesPerPixel;
@@ -158,7 +158,7 @@ public:
                 (height != 0u &&
                  rowBytes > std::numeric_limits<std::size_t>::max() /
                                 height)) {
-                error = "Filmtone Finish intermediate buffer size is not representable.";
+                error = "Filmtone intermediate buffer size is not representable.";
                 return false;
             }
             const std::size_t length = rowBytes * height;
@@ -166,10 +166,10 @@ public:
                 newBufferWithLength:length
                              options:MTLResourceStorageModePrivate];
             if (buffer == nil) {
-                error = "Filmtone Finish could not allocate an active-pass Metal intermediate.";
+                error = "Filmtone could not allocate an active-pass Metal intermediate.";
                 return false;
             }
-            buffer.label = @"Filmtone Finish Active Pass Intermediate";
+            buffer.label = @"Filmtone Active Pass Intermediate";
             buffers_.push_back(buffer);
             views_.push_back(host::MetalImageView{
                 static_cast<void*>(buffer),
@@ -202,19 +202,19 @@ bool validateMultiPassLayout(
     std::string& error) {
     if (context.sourceBounds.has_value() &&
         !rectsEqual(*context.sourceBounds, invocation.source.bounds)) {
-        error = "Filmtone Finish source bounds disagree with the shared render context.";
+        error = "Filmtone source bounds disagree with the shared render context.";
         return false;
     }
     if (context.outputBounds.has_value() &&
         !rectsEqual(*context.outputBounds, invocation.output.bounds)) {
-        error = "Filmtone Finish output bounds disagree with the shared render context.";
+        error = "Filmtone output bounds disagree with the shared render context.";
         return false;
     }
 
     for (std::size_t index = 1u; index < activeCount; ++index) {
         if (active[index].kind == ModuleKind::gateWeave &&
             !rectsEqual(context.renderWindow, invocation.source.bounds)) {
-            error = "Filmtone Finish requires a full-bounds host render when Gate Weave follows another active module.";
+            error = "Filmtone requires a full-bounds host render when Gate Weave follows another active module.";
             return false;
         }
     }
@@ -223,14 +223,14 @@ bool validateMultiPassLayout(
 
 }  // namespace
 
-bool isFilmtoneFinishConfiguredIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+bool isFilmtoneConfiguredIdentity(
+    const EvaluatedFilmtoneParameters& parameters) noexcept {
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finish());
+        parameters.mapping());
     const host::RenderContext configurationOnlyContext{
         0.0,
         host::FrameRates{0.0, 0.0},
-        static_cast<std::uint64_t>(parameters.finish().variation),
+        static_cast<std::uint64_t>(parameters.mapping().variation),
         host::PointD{0.0, 0.0},
         host::RectI{0, 0, 0, 0},
         std::nullopt,
@@ -252,12 +252,12 @@ bool isFilmtoneFinishConfiguredIdentity(
            filmDamage.isIdentity(configurationOnlyContext);
 }
 
-bool isFilmtoneFinishIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+bool isFilmtoneIdentity(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept {
     const host::RenderContext seededContext = makeSeededContext(parameters, context);
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finish());
+        parameters.mapping());
 
     effects::film_breath::FilmBreathProcessor filmBreath(
         parameters.filmBreath);
@@ -271,8 +271,8 @@ bool isFilmtoneFinishIdentity(
            filmDamage.isIdentity(seededContext);
 }
 
-bool encodeFilmtoneFinishMetal(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+bool encodeFilmtoneMetal(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context,
     const host::MetalRenderInvocation& invocation,
     host::MetalPipelineCache& pipelineCache,
@@ -284,7 +284,7 @@ bool encodeFilmtoneFinishMetal(
     }
 
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finish());
+        parameters.mapping());
     effects::film_breath::FilmBreathProcessor filmBreath(
         parameters.filmBreath);
     gate_weave::GateWeaveProcessor gateWeave(mapping);
@@ -302,7 +302,7 @@ bool encodeFilmtoneFinishMetal(
     if (filmDamageActive) {
         const auto damageContext = makeDamageRenderContext(seededContext);
         if (!damageContext.has_value()) {
-            error = "Filmtone Finish could not resolve Film Damage time, frame rate, scale, seed, and bounds.";
+            error = "Filmtone could not resolve Film Damage time, frame rate, scale, seed, and bounds.";
             return false;
         }
         filmDamage.emplace(mapping, *damageContext);
