@@ -41,11 +41,16 @@ import { crossFilterPeakSpacingMaxFragmentShader } from "./shaders/cross-filter-
 import { crossFilterTemporalFragmentShader } from "./shaders/cross-filter-temporal.frag";
 import type { RenderBackend, RenderBackendParams } from "../webgpu/Backend";
 import {
-  activeMotionBlurFramesForShutter,
   clampMotionShutterAngle,
-  computeMotionBlurWeights,
   isShutterMotionActive,
 } from "../motionBlurMath";
+import { computeMipWeights as computeMipWeightsPass } from "./passes/pyramid";
+import { renderBloom as renderBloomPass } from "./passes/bloom";
+import { renderHalation as renderHalationPass } from "./passes/halation";
+import { renderDiffusion as renderDiffusionPass } from "./passes/diffusion";
+import { renderLightShafts as renderLightShaftsPass } from "./passes/lightShafts";
+import { renderMotionBlur as renderMotionBlurPass } from "./passes/motionBlur";
+import { renderCrossFilter as renderCrossFilterPass } from "./passes/crossFilter";
 
 export interface ViewportOptions {
   vertexShader: string;
@@ -74,8 +79,8 @@ const RT_OPTIONS: THREE.RenderTargetOptions = {
   type: THREE.HalfFloatType,
 };
 
-const CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48.0;
-const CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX = 24.0;
+// CROSS_FILTER_SPACING_RADIUS_MAX_PX / _EXTRA_MAX_PX moved to
+// `./passes/crossFilter` (sole consumer was `renderCrossFilter`).
 
 export type CrossFilterDebugView =
   | "off"
@@ -624,32 +629,9 @@ export class WebGLBackend implements RenderBackend {
     }
   }
 
-  /**
-   * shutterAngle から有効フレーム数を算出する。
-   * 180° 以下は通常素材の基準として temporal blend なし。
-   */
-  private getActiveFrameCount(): number {
-    return activeMotionBlurFramesForShutter(
-      this.shutterAngle,
-      WebGLBackend.MOTION_BLUR_RING_SIZE,
-    );
-  }
-
-  /**
-   * weightCurve に応じた正規化済みブレンドウェイトを計算する。
-   * index 0 = newest, index N-1 = oldest。
-   * shutterAngle は短い追加露光窓を決め、長い残像は trailIntensity が担当する。
-   * shutterAngle > 360° では triangle → box へ自動的にフラット化する。
-   */
-  private computeBlendWeights(activeFrames: number): Float32Array {
-    return computeMotionBlurWeights(
-      this.shutterAngle,
-      activeFrames,
-      this.ringFilledFrames,
-      WebGLBackend.MOTION_BLUR_RING_SIZE,
-      this.weightCurve,
-    );
-  }
+  // `getActiveFrameCount` / `computeBlendWeights` moved to
+  // `./passes/motionBlur` (sole caller was `renderMotionBlur`, which moved
+  // alongside them).
 
   /**
    * Dust & Scratches 用の ShaderMaterial とテクスチャを遅延生成する。
@@ -852,60 +834,9 @@ export class WebGLBackend implements RenderBackend {
     }
   }
 
-  /**
-   * Phase 6: Renders the central halo around peak light sources for Hard Mode.
-   * Reuses bloom downsample/upsample materials on the rtCrossPeak texture (the
-   * point-source-only output from the cross filter peak detection pass).
-   *
-   * Pattern mirrors renderBloom():
-   *   1. Seed mip 0 by downsampling rtCrossPeak.
-   *   2. Downsample chain (mip 1 → 3).
-   *   3. Upsample chain back to mip 0 with autoClear=false (additive blend) — CRITICAL.
-   */
-  private renderCentralBloom(
-    renderer: THREE.WebGLRenderer,
-    sourceTexture: THREE.Texture,
-    sourceWidth: number,
-    sourceHeight: number,
-  ): void {
-    const mips = this.rtCentralBloomMips;
-    if (mips.length === 0) return;
-
-    // Step 1: Seed mip 0 from the current peak mask via the downsample shader.
-    const ds = this.downsampleMaterial.uniforms;
-    ds.uSource!.value = sourceTexture;
-    ds.uTexelSize!.value.set(1.0 / sourceWidth, 1.0 / sourceHeight);
-    this.postMesh.material = this.downsampleMaterial;
-    renderer.setRenderTarget(mips[0]!);
-    renderer.render(this.postScene, this.postCamera);
-
-    // Step 2: Downsample chain (mip 1 → mip last).
-    for (let i = 1; i < mips.length; i++) {
-      const src = mips[i - 1]!;
-      ds.uSource!.value = src.texture;
-      ds.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
-      renderer.setRenderTarget(mips[i]!);
-      renderer.render(this.postScene, this.postCamera);
-    }
-
-    // Step 3: Upsample chain (mip last → mip 0) with additive blend.
-    // CRITICAL: autoClear must be false so the previous downsample data persists in the destination mip
-    // and the upsample shader's THREE.AdditiveBlending accumulates on top.
-    const us = this.upsampleMaterial.uniforms;
-    const weights = WebGLBackend.computeMipWeights(0.5, mips.length);
-    this.postMesh.material = this.upsampleMaterial;
-    const prevAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-    for (let i = mips.length - 2; i >= 0; i--) {
-      const src = mips[i + 1]!;
-      us.uSource!.value = src.texture;
-      us.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
-      us.uWeight!.value = weights[i + 1]!;
-      renderer.setRenderTarget(mips[i]!);
-      renderer.render(this.postScene, this.postCamera);
-    }
-    renderer.autoClear = prevAutoClear;
-  }
+  // `renderCentralBloom` moved to `./passes/crossFilter` (module-private
+  // there too — its sole caller was `renderCrossFilter`, which moved
+  // alongside it).
 
   /**
    * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
@@ -1194,54 +1125,26 @@ export class WebGLBackend implements RenderBackend {
     target: THREE.WebGLRenderTarget | null,
   ): void {
     this.ensureMotionBlurResources();
-    if (!this.ringCopyMaterial || !this.ringBlendMaterial || this.rtRingBuffer.length === 0) return;
-
-    const N = WebGLBackend.MOTION_BLUR_RING_SIZE;
-    const prevAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-
-    // Draw 1: Feedback copy — mix(source, prevSlot, trail) → ring slot
-    const cu = this.ringCopyMaterial.uniforms;
-    cu.uSource!.value = sourceTexture;
-    // Previous slot for feedback: the most recently written slot
-    const prevSlotIdx = (this.ringWriteIndex - 1 + N) % N;
-    cu.uPrevSlot!.value = this.ringFilledFrames > 0
-      ? this.rtRingBuffer[prevSlotIdx]!.texture
-      : getBlackTexture();
-    cu.uTrail!.value = this.ringFilledFrames > 0 ? this.trailIntensity : 0.0;
-    this.postMesh.material = this.ringCopyMaterial;
-    renderer.setRenderTarget(this.rtRingBuffer[this.ringWriteIndex]!);
-    renderer.render(this.postScene, this.postCamera);
-
-    // Advance write head
-    this.ringWriteIndex = (this.ringWriteIndex + 1) % N;
-    this.ringFilledFrames = Math.min(this.ringFilledFrames + 1, N);
-
-    // Draw 2: Weighted blend → target
-    const activeFrames = this.getActiveFrameCount();
-    const weights = this.computeBlendWeights(activeFrames);
-
-    const bu = this.ringBlendMaterial.uniforms;
-    const black = getBlackTexture();
-
-    // Bind ring slots in temporal order: newest first (index 0 = newest)
-    for (let i = 0; i < N; i++) {
-      // ringWriteIndex was just advanced, so newest = ringWriteIndex - 1
-      const slotIndex = (this.ringWriteIndex - 1 - i + N * 2) % N;
-      const filled = i < this.ringFilledFrames;
-      bu[`uFrame${i}` as keyof typeof bu]!.value = filled
-        ? this.rtRingBuffer[slotIndex]!.texture
-        : black;
-      bu[`uWeight${i}` as keyof typeof bu]!.value = weights[i]!;
-    }
-    bu.uActiveFrames!.value = Math.min(activeFrames, this.ringFilledFrames);
-    bu.uMotionThreshold!.value = this.motionThreshold;
-
-    this.postMesh.material = this.ringBlendMaterial;
-    renderer.setRenderTarget(target);
-    renderer.render(this.postScene, this.postCamera);
-
-    renderer.autoClear = prevAutoClear;
+    const result = renderMotionBlurPass(renderer, sourceTexture, target, {
+      ringSize: WebGLBackend.MOTION_BLUR_RING_SIZE,
+      ringCopyMaterial: this.ringCopyMaterial,
+      ringBlendMaterial: this.ringBlendMaterial,
+      rtRingBuffer: this.rtRingBuffer,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      shutterAngle: this.shutterAngle,
+      weightCurve: this.weightCurve,
+      trailIntensity: this.trailIntensity,
+      motionThreshold: this.motionThreshold,
+      ring: {
+        ringWriteIndex: this.ringWriteIndex,
+        ringFilledFrames: this.ringFilledFrames,
+      },
+      getBlackTexture,
+    });
+    this.ringWriteIndex = result.ringWriteIndex;
+    this.ringFilledFrames = result.ringFilledFrames;
   }
 
   /**
@@ -1259,86 +1162,23 @@ export class WebGLBackend implements RenderBackend {
     target: THREE.WebGLRenderTarget | null,
   ): void {
     this.ensureShaftResources();
-    if (!this.shaftMaterial || !this.shaftBlendMaterial || !this.rtShaft) return;
-
-    // 9a: Radial blur at 1/4 res
-    const su = this.shaftMaterial.uniforms;
-    su.uSource!.value = sourceTexture;
-    su.uLightOrigin!.value.set(this.shaftOriginX, 1.0 - this.shaftOriginY); // UV flip
-    su.uDecay!.value = 0.92 + this.shaftDecay * 0.075; // Map 0-1 to 0.92-0.995
-    this.postMesh.material = this.shaftMaterial;
-    renderer.setRenderTarget(this.rtShaft);
-    renderer.render(this.postScene, this.postCamera);
-
-    // 9b: Additive blend at full res
-    const bu = this.shaftBlendMaterial.uniforms;
-    bu.uSource!.value = sourceTexture;
-    bu.uShaftTexture!.value = this.rtShaft.texture;
-    bu.uIntensity!.value = this.shaftIntensity;
-    this.postMesh.material = this.shaftBlendMaterial;
-    renderer.setRenderTarget(target);
-    renderer.render(this.postScene, this.postCamera);
+    renderLightShaftsPass(renderer, sourceTexture, target, {
+      shaftMaterial: this.shaftMaterial,
+      shaftBlendMaterial: this.shaftBlendMaterial,
+      rtShaft: this.rtShaft,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      shaftOriginX: this.shaftOriginX,
+      shaftOriginY: this.shaftOriginY,
+      shaftDecay: this.shaftDecay,
+      shaftIntensity: this.shaftIntensity,
+    });
   }
 
-  private resolveCrossFilterDebugSource(
-    view: CrossFilterDebugView,
-    currentPeakTarget: THREE.WebGLRenderTarget,
-    peakTarget: THREE.WebGLRenderTarget,
-  ): { texture: THREE.Texture; gain: number; falseColor: boolean } | null {
-    switch (view) {
-      case "threshold":
-        return this.rtCrossThreshold
-          ? { texture: this.rtCrossThreshold.texture, gain: 8.0, falseColor: true }
-          : null;
-      case "peak":
-        return this.rtCrossPeak
-          ? { texture: this.rtCrossPeak.texture, gain: 16.0, falseColor: true }
-          : null;
-      case "peakSpaced":
-        return { texture: currentPeakTarget.texture, gain: 16.0, falseColor: true };
-      case "peakHeld":
-        return { texture: peakTarget.texture, gain: 16.0, falseColor: true };
-      case "streak0":
-      case "streak1":
-      case "streak2":
-      case "streak3": {
-        const index = Number(view.slice(-1));
-        const rt = this.rtCrossStreak[index];
-        return rt ? { texture: rt.texture, gain: 3.0, falseColor: false } : null;
-      }
-      default:
-        return null;
-    }
-  }
-
-  private renderCrossFilterDebug(
-    renderer: THREE.WebGLRenderer,
-    target: THREE.WebGLRenderTarget | null,
-    currentPeakTarget: THREE.WebGLRenderTarget,
-    peakTarget: THREE.WebGLRenderTarget,
-  ): boolean {
-    if (!this.crossFilterDebugMaterial || this.crossFilterDebugView === "off") {
-      return false;
-    }
-
-    const debugSource = this.resolveCrossFilterDebugSource(
-      this.crossFilterDebugView,
-      currentPeakTarget,
-      peakTarget,
-    );
-    if (!debugSource) {
-      return false;
-    }
-
-    const du = this.crossFilterDebugMaterial.uniforms;
-    du.uSource!.value = debugSource.texture;
-    du.uGain!.value = debugSource.gain;
-    du.uFalseColor!.value = debugSource.falseColor ? 1.0 : 0.0;
-    this.postMesh.material = this.crossFilterDebugMaterial;
-    renderer.setRenderTarget(target);
-    renderer.render(this.postScene, this.postCamera);
-    return true;
-  }
+  // `resolveCrossFilterDebugSource` / `renderCrossFilterDebug` moved to
+  // `./passes/crossFilter` (module-private there too — their sole caller
+  // was `renderCrossFilter`, which moved alongside them).
 
   private renderCrossFilter(
     renderer: THREE.WebGLRenderer,
@@ -1346,170 +1186,57 @@ export class WebGLBackend implements RenderBackend {
     target: THREE.WebGLRenderTarget | null,
   ): void {
     this.ensureCrossFilterResources();
-    if (!this.crossFilterStreakMaterial || !this.crossFilterPeakSpacingMaterial || !this.crossFilterPeakSpacingMaxMaterial || !this.crossFilterBlendMaterial
-        || !this.crossFilterPeakMaterial || !this.crossFilterTemporalMaterial
-        || !this.rtCrossThreshold || !this.rtCrossPeak || !this.rtCrossPeakSpacingWork || !this.rtCrossPeakSpacingMax || !this.rtCrossPeakSpaced
-        || this.rtCrossPeakHistory.length < 2 || this.rtCrossStreak.length === 0) return;
-
-    const dirCount = Math.floor(this.crossFilterSpikes / 2);
-    const angleRad = (this.crossFilterAngle * Math.PI) / 180;
-
-    // Phase 6: Effective values pattern.
-    // Hard Mode overrides 3 user-controlled values at uniform-set time.
-    // CRITICAL: Never mutate this.crossFilter* fields → user values stay round-trip safe.
-    // NOTE: Length is NOT boosted in Hard Mode — the streak shader uses the same MAX_STREAK_PX (64)
-    // as Phase 5 to prevent UV wrap artifacts on smaller images. Hard Mode's distinguishing
-    // character comes from gain/falloff/threshold/bloom changes instead of longer marches.
-    const isHard = this.crossFilterHardMode >= 0.5;
-    const effectiveThreshold  = isHard ? 0.70 : this.crossFilterThreshold;
-    const effectiveSizeLimit  = isHard ? 1.0  : this.crossFilterSizeLimit;
-    const effectiveRandomness = isHard ? 1.0  : this.crossFilterRandomness;
-    const hardModeUniform     = isHard ? 1.0  : 0.0;
-
-    // Sub-pass 1: Threshold extraction (reuse bloom prefilter shader)
-    const pu = this.bloomPrefilterMaterial.uniforms;
-    const savedThreshold = pu.uThreshold!.value;
-    const savedKnee = pu.uKnee!.value;
-    pu.uSource!.value = sourceTexture;
-    pu.uThreshold!.value = effectiveThreshold;
-    pu.uKnee!.value = 0.1;
-    this.postMesh.material = this.bloomPrefilterMaterial;
-    renderer.setRenderTarget(this.rtCrossThreshold);
-    renderer.render(this.postScene, this.postCamera);
-    pu.uThreshold!.value = savedThreshold;
-    pu.uKnee!.value = savedKnee;
-
-    // Sub-pass 1.5: Peak detection (suppress uniform bright areas, preserve point sources)
-    const pk = this.crossFilterPeakMaterial!.uniforms;
-    pk.uSource!.value = this.rtCrossThreshold.texture;
-    pk.uTexelSize!.value.set(1.0 / this.rtCrossThreshold.width, 1.0 / this.rtCrossThreshold.height);
-    pk.uSizeLimit!.value = effectiveSizeLimit;
-    this.postMesh.material = this.crossFilterPeakMaterial!;
-    renderer.setRenderTarget(this.rtCrossPeak!);
-    renderer.render(this.postScene, this.postCamera);
-
-    let currentPeakTarget = this.rtCrossPeak!;
-    if (this.crossFilterMinSpacing >= 0.001) {
-      const spacingBoost = Math.min(1, Math.max(0, this.crossFilterMinSpacing - 1.0));
-      const radiusPx = Math.round(
-        CROSS_FILTER_SPACING_RADIUS_MAX_PX +
-          CROSS_FILTER_SPACING_RADIUS_EXTRA_MAX_PX *
-            THREE.MathUtils.smoothstep(spacingBoost, 0.0, 1.0),
-      );
-
-      const smu = this.crossFilterPeakSpacingMaxMaterial.uniforms;
-      smu.uSource!.value = this.rtCrossPeak.texture;
-      smu.uTexelSize!.value.set(1.0 / this.rtCrossPeak.width, 1.0 / this.rtCrossPeak.height);
-      smu.uAxis!.value.set(1, 0);
-      smu.uRadiusPx!.value = radiusPx;
-      smu.uReadMetadata!.value = 0.0;
-      this.postMesh.material = this.crossFilterPeakSpacingMaxMaterial;
-      renderer.setRenderTarget(this.rtCrossPeakSpacingWork);
-      renderer.render(this.postScene, this.postCamera);
-
-      smu.uSource!.value = this.rtCrossPeakSpacingWork.texture;
-      smu.uAxis!.value.set(0, 1);
-      smu.uReadMetadata!.value = 1.0;
-      this.postMesh.material = this.crossFilterPeakSpacingMaxMaterial;
-      renderer.setRenderTarget(this.rtCrossPeakSpacingMax);
-      renderer.render(this.postScene, this.postCamera);
-
-      const spu = this.crossFilterPeakSpacingMaterial.uniforms;
-      spu.uSource!.value = this.rtCrossPeak.texture;
-      spu.uLocalMax!.value = this.rtCrossPeakSpacingMax.texture;
-      spu.uTexelSize!.value.set(1.0 / this.rtCrossPeak.width, 1.0 / this.rtCrossPeak.height);
-      spu.uMinSpacing!.value = this.crossFilterMinSpacing;
-      this.postMesh.material = this.crossFilterPeakSpacingMaterial;
-      currentPeakTarget = this.rtCrossPeakSpaced!;
-      renderer.setRenderTarget(currentPeakTarget);
-      renderer.render(this.postScene, this.postCamera);
-    }
-
-    const temporalHoldActive = isHard && !this.compareRenderActive;
-    let peakTarget = currentPeakTarget;
-    if (temporalHoldActive) {
-      const writeIndex = this.crossFilterPeakHistoryWriteIndex;
-      const prevIndex = (writeIndex + this.rtCrossPeakHistory.length - 1) % this.rtCrossPeakHistory.length;
-      const tu = this.crossFilterTemporalMaterial.uniforms;
-      tu.uSource!.value = currentPeakTarget.texture;
-      tu.uPrev!.value = this.crossFilterPeakHistoryFilledFrames > 0
-        ? this.rtCrossPeakHistory[prevIndex]!.texture
-        : getBlackTexture();
-      this.postMesh.material = this.crossFilterTemporalMaterial;
-      peakTarget = this.rtCrossPeakHistory[writeIndex]!;
-      renderer.setRenderTarget(peakTarget);
-      renderer.render(this.postScene, this.postCamera);
-      this.crossFilterPeakHistoryWriteIndex = (writeIndex + 1) % this.rtCrossPeakHistory.length;
-      this.crossFilterPeakHistoryFilledFrames = Math.min(
-        this.crossFilterPeakHistoryFilledFrames + 1,
-        this.rtCrossPeakHistory.length,
-      );
-    }
-    this.lastCrossPeakSpacedTarget = currentPeakTarget;
-    this.lastCrossPeakHeldTarget = peakTarget;
-    this.lastCrossTemporalHoldActive = temporalHoldActive;
-
-    // Phase 6 NEW: Sub-pass 1.75 — Hard Mode central bloom (skipped entirely in Soft Mode).
-    if (isHard) {
-      this.ensureCentralBloomResources();
-      this.renderCentralBloom(renderer, peakTarget.texture, peakTarget.width, peakTarget.height);
-    }
-
-    // Sub-pass 2..N: Directional blur per spike direction
-    const su = this.crossFilterStreakMaterial.uniforms;
-    const qw = peakTarget.width;
-    const qh = peakTarget.height;
-    su.uSource!.value = peakTarget.texture;
-    su.uTexelSize!.value.set(1.0 / qw, 1.0 / qh);
-    su.uChromatic!.value = this.crossFilterChromatic;
-    su.uRandomness!.value = effectiveRandomness;
-    su.uHardMode!.value = hardModeUniform;
-
-    // Deterministic hash for per-direction organic variation
-    const hash = (n: number): number => {
-      const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-      return s - Math.floor(s);
-    };
-
-    for (let i = 0; i < dirCount; i++) {
-      const seed = i * 17 + 7;
-      const angleJitter = (hash(seed) - 0.5) * 2 * (5 * Math.PI / 180);
-      const lengthMul = 1.0 + (hash(seed + 1) - 0.5) * 0.5;
-      const brightMul = 1.0 + (hash(seed + 2) - 0.5) * 0.4;
-
-      const dirAngle = angleRad + (i * Math.PI) / dirCount + angleJitter;
-      su.uDirection!.value.set(Math.cos(dirAngle), Math.sin(dirAngle));
-      su.uLength!.value = this.crossFilterLength * lengthMul;
-      su.uBrightnessMul!.value = brightMul;
-      this.postMesh.material = this.crossFilterStreakMaterial;
-      renderer.setRenderTarget(this.rtCrossStreak[i]!);
-      renderer.render(this.postScene, this.postCamera);
-    }
-    this.lastCrossStreakCount = dirCount;
-    su.uLength!.value = this.crossFilterLength;
-
-    if (this.renderCrossFilterDebug(renderer, target, currentPeakTarget, peakTarget)) {
-      return;
-    }
-
-    // Final sub-pass: Screen blend
-    const black = getBlackTexture();
-    const bu = this.crossFilterBlendMaterial.uniforms;
-    bu.uSource!.value = sourceTexture;
-    bu.uStreak0!.value = dirCount >= 1 ? this.rtCrossStreak[0]!.texture : black;
-    bu.uStreak1!.value = dirCount >= 2 ? this.rtCrossStreak[1]!.texture : black;
-    bu.uStreak2!.value = dirCount >= 3 ? this.rtCrossStreak[2]!.texture : black;
-    bu.uStreak3!.value = dirCount >= 4 ? this.rtCrossStreak[3]!.texture : black;
-    // Phase 6: bind central bloom mip 0 (full half-res result), or black in Soft Mode → bloom term = 0 in shader.
-    bu.uCentralBloom!.value = isHard && this.rtCentralBloomMips[0]
-      ? this.rtCentralBloomMips[0].texture
-      : black;
-    bu.uStreakCount!.value = dirCount;
-    bu.uIntensity!.value = this.crossFilterStrength;
-    bu.uHardMode!.value = hardModeUniform;
-    this.postMesh.material = this.crossFilterBlendMaterial;
-    renderer.setRenderTarget(target);
-    renderer.render(this.postScene, this.postCamera);
+    const result = renderCrossFilterPass(renderer, sourceTexture, target, {
+      crossFilterStreakMaterial: this.crossFilterStreakMaterial,
+      crossFilterPeakSpacingMaterial: this.crossFilterPeakSpacingMaterial,
+      crossFilterPeakSpacingMaxMaterial: this.crossFilterPeakSpacingMaxMaterial,
+      crossFilterBlendMaterial: this.crossFilterBlendMaterial,
+      crossFilterPeakMaterial: this.crossFilterPeakMaterial,
+      crossFilterTemporalMaterial: this.crossFilterTemporalMaterial,
+      crossFilterDebugMaterial: this.crossFilterDebugMaterial,
+      bloomPrefilterMaterial: this.bloomPrefilterMaterial,
+      downsampleMaterial: this.downsampleMaterial,
+      upsampleMaterial: this.upsampleMaterial,
+      rtCrossThreshold: this.rtCrossThreshold,
+      rtCrossPeak: this.rtCrossPeak,
+      rtCrossPeakSpacingWork: this.rtCrossPeakSpacingWork,
+      rtCrossPeakSpacingMax: this.rtCrossPeakSpacingMax,
+      rtCrossPeakSpaced: this.rtCrossPeakSpaced,
+      rtCrossPeakHistory: this.rtCrossPeakHistory,
+      rtCrossStreak: this.rtCrossStreak,
+      rtCentralBloomMips: this.rtCentralBloomMips,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      crossFilterSpikes: this.crossFilterSpikes,
+      crossFilterAngle: this.crossFilterAngle,
+      crossFilterHardMode: this.crossFilterHardMode,
+      crossFilterThreshold: this.crossFilterThreshold,
+      crossFilterSizeLimit: this.crossFilterSizeLimit,
+      crossFilterRandomness: this.crossFilterRandomness,
+      crossFilterMinSpacing: this.crossFilterMinSpacing,
+      crossFilterChromatic: this.crossFilterChromatic,
+      crossFilterLength: this.crossFilterLength,
+      crossFilterStrength: this.crossFilterStrength,
+      crossFilterDebugView: this.crossFilterDebugView,
+      compareRenderActive: this.compareRenderActive,
+      getBlackTexture,
+      ensureCentralBloomResources: () => this.ensureCentralBloomResources(),
+      history: {
+        crossFilterPeakHistoryWriteIndex: this.crossFilterPeakHistoryWriteIndex,
+        crossFilterPeakHistoryFilledFrames: this.crossFilterPeakHistoryFilledFrames,
+        lastCrossPeakSpacedTarget: this.lastCrossPeakSpacedTarget,
+        lastCrossPeakHeldTarget: this.lastCrossPeakHeldTarget,
+        lastCrossTemporalHoldActive: this.lastCrossTemporalHoldActive,
+        lastCrossStreakCount: this.lastCrossStreakCount,
+      },
+    });
+    this.crossFilterPeakHistoryWriteIndex = result.history.crossFilterPeakHistoryWriteIndex;
+    this.crossFilterPeakHistoryFilledFrames = result.history.crossFilterPeakHistoryFilledFrames;
+    this.lastCrossPeakSpacedTarget = result.history.lastCrossPeakSpacedTarget;
+    this.lastCrossPeakHeldTarget = result.history.lastCrossPeakHeldTarget;
+    this.lastCrossTemporalHoldActive = result.history.lastCrossTemporalHoldActive;
+    this.lastCrossStreakCount = result.history.lastCrossStreakCount;
   }
 
   /**
@@ -1688,101 +1415,40 @@ export class WebGLBackend implements RenderBackend {
    * radius=0 → tight bloom (only first mips). radius=1 → diffuse wide haze.
    */
   private static computeMipWeights(radius: number, levels: number): number[] {
-    const weights: number[] = [];
-    for (let i = 0; i < levels; i++) {
-      const t = i / Math.max(levels - 1, 1);
-      const base = Math.exp(-3.0 * (1.0 - radius) * t);
-      const wide = Math.exp(-0.5 * radius * (1.0 - t));
-      weights.push(base * (1 - radius) + wide * radius);
-    }
-    return weights;
+    return computeMipWeightsPass(radius, levels);
   }
 
   private renderBloom(renderer: THREE.WebGLRenderer): void {
-    const mips = this.rtBloomMips;
-
-    // Step 1: Prefilter into mip[0]
-    const bu = this.bloomPrefilterMaterial.uniforms;
-    bu.uSource!.value = this.opticalSourceTexture();
-    bu.uThreshold!.value = this.bloomThreshold;
-    bu.uKnee!.value = this.bloomSoftKnee;
-    this.postMesh.material = this.bloomPrefilterMaterial;
-    renderer.setRenderTarget(mips[0]!);
-    renderer.render(this.postScene, this.postCamera);
-
-    // Step 2: Progressive downsample
-    for (let i = 1; i < mips.length; i++) {
-      const src = mips[i - 1]!;
-      const dst = mips[i]!;
-      const du = this.downsampleMaterial.uniforms;
-      du.uSource!.value = src.texture;
-      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
-      this.postMesh.material = this.downsampleMaterial;
-      renderer.setRenderTarget(dst);
-      renderer.render(this.postScene, this.postCamera);
-    }
-
-    // Step 3: Progressive upsample with additive blending
-    // Disable autoClear so the existing downsample data in each mip is preserved.
-    // The upsample material uses AdditiveBlending to accumulate on top of it.
-    const prevAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-    const weights = WebGLBackend.computeMipWeights(this.bloomRadius, mips.length);
-    for (let i = mips.length - 2; i >= 0; i--) {
-      const lowRes = mips[i + 1]!;
-      const highRes = mips[i]!;
-      const uu = this.upsampleMaterial.uniforms;
-      uu.uSource!.value = lowRes.texture;
-      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
-      uu.uWeight!.value = weights[i + 1]!;
-      this.postMesh.material = this.upsampleMaterial;
-      renderer.setRenderTarget(highRes);
-      renderer.render(this.postScene, this.postCamera);
-    }
-    renderer.autoClear = prevAutoClear;
+    renderBloomPass(renderer, {
+      mips: this.rtBloomMips,
+      bloomPrefilterMaterial: this.bloomPrefilterMaterial,
+      downsampleMaterial: this.downsampleMaterial,
+      upsampleMaterial: this.upsampleMaterial,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      opticalSourceTexture: this.opticalSourceTexture(),
+      bloomThreshold: this.bloomThreshold,
+      bloomSoftKnee: this.bloomSoftKnee,
+      bloomRadius: this.bloomRadius,
+    });
   }
 
   private renderHalation(renderer: THREE.WebGLRenderer): void {
-    const mips = this.rtHalationMips;
-
-    // Step 1: Prefilter + tint into mip[0]
-    const hu = this.halationPrefilterMaterial.uniforms;
-    hu.uSource!.value = this.opticalSourceTexture();
-    hu.uHalationColor!.value.copy(this.halationColor);
-    hu.uThreshold!.value = this.halationThreshold;
-    hu.uKnee!.value = this.halationSoftKnee;
-    this.postMesh.material = this.halationPrefilterMaterial;
-    renderer.setRenderTarget(mips[0]!);
-    renderer.render(this.postScene, this.postCamera);
-
-    // Step 2: Progressive downsample
-    for (let i = 1; i < mips.length; i++) {
-      const src = mips[i - 1]!;
-      const dst = mips[i]!;
-      const du = this.downsampleMaterial.uniforms;
-      du.uSource!.value = src.texture;
-      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
-      this.postMesh.material = this.downsampleMaterial;
-      renderer.setRenderTarget(dst);
-      renderer.render(this.postScene, this.postCamera);
-    }
-
-    // Step 3: Progressive upsample with additive blending
-    const prevAutoClear2 = renderer.autoClear;
-    renderer.autoClear = false;
-    const weights = WebGLBackend.computeMipWeights(this.halationRadius, mips.length);
-    for (let i = mips.length - 2; i >= 0; i--) {
-      const lowRes = mips[i + 1]!;
-      const highRes = mips[i]!;
-      const uu = this.upsampleMaterial.uniforms;
-      uu.uSource!.value = lowRes.texture;
-      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
-      uu.uWeight!.value = weights[i + 1]!;
-      this.postMesh.material = this.upsampleMaterial;
-      renderer.setRenderTarget(highRes);
-      renderer.render(this.postScene, this.postCamera);
-    }
-    renderer.autoClear = prevAutoClear2;
+    renderHalationPass(renderer, {
+      mips: this.rtHalationMips,
+      halationPrefilterMaterial: this.halationPrefilterMaterial,
+      downsampleMaterial: this.downsampleMaterial,
+      upsampleMaterial: this.upsampleMaterial,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      opticalSourceTexture: this.opticalSourceTexture(),
+      halationColor: this.halationColor,
+      halationThreshold: this.halationThreshold,
+      halationSoftKnee: this.halationSoftKnee,
+      halationRadius: this.halationRadius,
+    });
   }
 
   /**
@@ -1791,46 +1457,16 @@ export class WebGLBackend implements RenderBackend {
    */
   private renderDiffusion(renderer: THREE.WebGLRenderer): void {
     this.ensureDiffusionResources();
-    const mips = this.rtDiffusionMips;
-    if (mips.length === 0) return;
-
-    // Step 1: First downsample from optical source (NO prefilter — full image)
-    const du = this.downsampleMaterial.uniforms;
-    du.uSource!.value = this.opticalSourceTexture();
-    du.uTexelSize!.value.set(
-      1.0 / this.rtColorGraded!.width,
-      1.0 / this.rtColorGraded!.height,
-    );
-    this.postMesh.material = this.downsampleMaterial;
-    renderer.setRenderTarget(mips[0]!);
-    renderer.render(this.postScene, this.postCamera);
-
-    // Step 2: Progressive downsample
-    for (let i = 1; i < mips.length; i++) {
-      const src = mips[i - 1]!;
-      const dst = mips[i]!;
-      du.uSource!.value = src.texture;
-      du.uTexelSize!.value.set(1.0 / src.width, 1.0 / src.height);
-      renderer.setRenderTarget(dst);
-      renderer.render(this.postScene, this.postCamera);
-    }
-
-    // Step 3: Progressive upsample with additive blending
-    const prevAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-    const weights = WebGLBackend.computeMipWeights(0.7, mips.length); // wide fixed radius
-    for (let i = mips.length - 2; i >= 0; i--) {
-      const lowRes = mips[i + 1]!;
-      const highRes = mips[i]!;
-      const uu = this.upsampleMaterial.uniforms;
-      uu.uSource!.value = lowRes.texture;
-      uu.uTexelSize!.value.set(1.0 / lowRes.width, 1.0 / lowRes.height);
-      uu.uWeight!.value = weights[i + 1]!;
-      this.postMesh.material = this.upsampleMaterial;
-      renderer.setRenderTarget(highRes);
-      renderer.render(this.postScene, this.postCamera);
-    }
-    renderer.autoClear = prevAutoClear;
+    renderDiffusionPass(renderer, {
+      mips: this.rtDiffusionMips,
+      downsampleMaterial: this.downsampleMaterial,
+      upsampleMaterial: this.upsampleMaterial,
+      postMesh: this.postMesh,
+      postScene: this.postScene,
+      postCamera: this.postCamera,
+      opticalSourceTexture: this.opticalSourceTexture(),
+      rtColorGraded: this.rtColorGraded!,
+    });
   }
 
   // ===== Texture =====

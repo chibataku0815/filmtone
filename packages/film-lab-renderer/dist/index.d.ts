@@ -191,18 +191,6 @@ declare class WebGLBackend implements RenderBackend {
      */
     private ensureMotionBlurResources;
     /**
-     * shutterAngle から有効フレーム数を算出する。
-     * 180° 以下は通常素材の基準として temporal blend なし。
-     */
-    private getActiveFrameCount;
-    /**
-     * weightCurve に応じた正規化済みブレンドウェイトを計算する。
-     * index 0 = newest, index N-1 = oldest。
-     * shutterAngle は短い追加露光窓を決め、長い残像は trailIntensity が担当する。
-     * shutterAngle > 360° では triangle → box へ自動的にフラット化する。
-     */
-    private computeBlendWeights;
-    /**
      * Dust & Scratches 用の ShaderMaterial とテクスチャを遅延生成する。
      * dustAmount > 0 || scratchAmount > 0 になるまで GPU リソースを消費しない。
      */
@@ -218,17 +206,6 @@ declare class WebGLBackend implements RenderBackend {
      * Allocated only when Hard Mode first becomes active to keep VRAM cost off Soft-only sessions.
      */
     private ensureCentralBloomResources;
-    /**
-     * Phase 6: Renders the central halo around peak light sources for Hard Mode.
-     * Reuses bloom downsample/upsample materials on the rtCrossPeak texture (the
-     * point-source-only output from the cross filter peak detection pass).
-     *
-     * Pattern mirrors renderBloom():
-     *   1. Seed mip 0 by downsampling rtCrossPeak.
-     *   2. Downsample chain (mip 1 → 3).
-     *   3. Upsample chain back to mip 0 with autoClear=false (additive blend) — CRITICAL.
-     */
-    private renderCentralBloom;
     /**
      * #98 の post-composite seam で使う RT を、画面サイズに合わせて広げ直す。
      *
@@ -311,8 +288,6 @@ declare class WebGLBackend implements RenderBackend {
      * @param target 最終出力先（null = 画面）
      */
     private renderLightShafts;
-    private resolveCrossFilterDebugSource;
-    private renderCrossFilterDebug;
     private renderCrossFilter;
     /**
      * Pass 9+ の受け皿。

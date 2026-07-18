@@ -1,6 +1,7 @@
 # Filmtone Documentation Inventory
 
-Snapshot: 2026-07-14 JST
+Snapshot: 2026-07-14 JST（2026-07-19 refresh: DaVinci OFX / spatial optics 波と
+codemap-feature-audit lane を反映）
 
 この表はファイルの移動台帳ではなく、どの情報を現在の正本として読めるかを決める
 分類台帳である。履歴本文は当時の根拠として保持し、現在性は入口文書と truth gate
@@ -8,14 +9,14 @@ Snapshot: 2026-07-14 JST
 
 ## Snapshot
 
-| 対象 | 件数 | 扱い |
+| 対象 | 件数（2026-07-19） | 扱い |
 |---|---:|---|
-| `docs/**/*.md` | 420 | この台帳の対象 |
-| `docs/filmtone/**/*.md` | 406 | Filmtone の主なドキュメント領域 |
-| `**/archive/**/*.md` | 324 | 歴史記録。現在状態としては使わない |
+| `docs/**/*.md` | 450 | この台帳の対象 |
+| `docs/filmtone/**/*.md` | 436 | Filmtone の主なドキュメント領域 |
+| `**/archive/**/*.md` | 316 | 歴史記録。現在状態としては使わない |
 | `**/paused/**/*.md` | 9 | 中断中の作業記録。再開時だけ読む |
-| `strategy.md` | 11 | 長期のレーン正本 |
-| `active.md` | 1 | 現在の作業。各レーンの規則に従う |
+| `strategy.md` | 13 | 長期のレーン正本 |
+| `active.md` | 1 | 現在の作業（davinci-bridge DB-M13。codemap-feature-audit は監査完了で archive 済み） |
 
 ## Classification
 
@@ -52,6 +53,13 @@ Snapshot: 2026-07-14 JST
 | `apps/capacitor-film-lab-ios/{CLAUDE.md,docs/**,fastlane/**/README.md}` | iOS implementation / operation docs | iOS | iOS 実装・source math・release asset の正本。 |
 | `apps/desktop-film-lab-batch/{README.md,docs/**}` | Frozen legacy Electron evidence | Legacy Electron | legacy / rollback 依頼に限り読む。通常の Desktop 正本ではない。 |
 | `packages/*/docs/**` | Package-specific specification | Respective package | package contract の正本。特に core の terminology、LUT、preset versioning を優先する。 |
+| `apps/filmtone-resolve-ofx/{Makefile,Sources/**,Scripts/GenerateContracts/README.md}` | DaVinci Resolve OFX plugin 実装 | Resolve OFX / DaVinci plugin | 新規 app（2026-07 OFX 波）。設計・進行正本は `docs/filmtone/davinci-plugin/`。build は app 直下 `Makefile`（root に `verify:*` script なし = ドリフト所見）。`Sources/Generated` は生成物。 |
+| `packages/film-lab-swift-core/**` | Shared Swift runtime core package | film-lab-swift-core | Swift payload の共有 runtime。`Sources/**/Generated/` は `bun run generate:ios-swift` 生成物で手編集しない。 |
+| `packages/film-lab-codex-mcp/**` | MCP automation server package | film-lab-codex-mcp | Filmtone automation を MCP として公開。build/verify は root `verify:filmtone-mcp` / `filmtone:mcp`。 |
+| `docs/filmtone/davinci-plugin/{strategy,progress,delegation}.md` + `workstreams/**` | Active product lane（OFX / spatial optics） | DaVinci plugin | resolve-ofx の設計・進行正本。live lane として本整理では本文を移動・改稿しない。索引追加のみ。 |
+| `docs/filmtone/codemap-feature-audit/{strategy,active}.md` | Codemap / feature-matrix 監査 lane | Documentation governance | 本監査ループの計画・進行。完了後に active を archive へ。 |
+| `docs/filmtone/filmtone-codemap.md` | Canonical code-structure map | Filmtone cross-cutting | 全 app/package の構造・責務・入口・生成境界・verify の SSOT。 |
+| `docs/filmtone/filmtone-feature-matrix.md` | User-facing feature coverage matrix | Filmtone cross-cutting | 全機能網羅の目視検証用。機能の現行仕様は各 source を優先する。 |
 
 ## Maintenance Decision Table
 
@@ -67,7 +75,17 @@ Snapshot: 2026-07-14 JST
 ## Known Exceptions
 
 - DaVinci Bridge は `active.md` を持つが strategy がない。現在の DB-M13 作業と
-  衝突するため、本整理では新しい strategy を作らない。
+  衝突するため、本整理では新しい strategy を作らない。DB-M13 `active.md` は
+  2026-07-19 時点で全 checklist 完了・検証済みだが未アーカイブ。archive 判断は
+  lane owner の closeout 領分で、本整理は所見提示のみ行う。
+- `docs/filmtone/davinci-plugin/` は strategy/progress/delegation + workstreams を
+  持つ live lane（resolve-ofx / spatial optics）。本整理は入口索引の追加と read の
+  みで、本文は改稿しない。
+- 2026-07 の OFX / spatial optics 波で `apps/filmtone-resolve-ofx`・
+  `packages/film-lab-swift-core`・`packages/film-lab-codex-mcp` が入口 doc
+  （`README.md` / `AGENTS.md` routing / `docs/filmtone/README.md` / `.ai/*`）へ
+  未登録のまま着地した。この索引ドリフトは codemap-feature-audit lane が
+  reconcile 中。
 - 過去の release runbook には当時の version、環境、操作が残る。歴史記録として
   保持し、現在値を主張する入口にはしない。
 - `docs/guides/` はこのリポジトリの旧移行前 handoff を含む。life の

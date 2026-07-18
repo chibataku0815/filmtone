@@ -14,6 +14,7 @@ Filmtone は色再現・LUT・smart-look を提供するクロスプラットフ
 |----|------|
 | Desktop | Native macOS app (`apps/filmtone-desktop-macos/`); Electron は legacy / rollback 専用 |
 | iOS | Capacitor 7.4.3 + Native Swift（Xcode automatic signing） |
+| Resolve | DaVinci Resolve OFX plugin (`apps/filmtone-resolve-ofx/`, C++/Metal) |
 | Renderer | WebGL / WebGPU（Three.js, three-stdlib） |
 | Runtime | Bun |
 | Workspace | bun workspaces（Turbo なし） |
@@ -31,6 +32,8 @@ Filmtone は色再現・LUT・smart-look を提供するクロスプラットフ
 | `docs/filmtone/desktop/native-desktop-v2/strategy.md` | Native Desktop v2 長期戦略 | 全ツール |
 | `docs/filmtone/desktop/native-desktop-v2/active.md` | Native Desktop v2 現在の単一 subtask | 全ツール |
 | `messages/{en,ja}.json` | 共通コピー | 全ツール |
+| `docs/filmtone/filmtone-codemap.md` | 全 app/package の構造・責務・入口・生成境界・verify の SSOT | 全ツール |
+| `docs/filmtone/filmtone-feature-matrix.md` | user-facing 機能のサーフェス別網羅表 | 全ツール |
 
 ---
 

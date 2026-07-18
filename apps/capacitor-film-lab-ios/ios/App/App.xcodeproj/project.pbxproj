@@ -19,7 +19,6 @@
 		0C5B2A197CEFA21002FDC4A6 /* DepthSourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000010000000000000020 /* DepthSourceService.swift */; };
 		0E798E60D43732D602D894E2 /* FilmtoneCaptureTopStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008B /* FilmtoneCaptureTopStatusBar.swift */; };
 		0F432292C35AA746C1B5029F /* OpticalKernels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F866759EC6B64193580EDDE6 /* OpticalKernels.swift */; };
-		108E7AD3D3FC14B80367B427 /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		11DAE7E9115406049E511862 /* ExportRenderHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 544A796C6E480CD796B35227 /* ExportRenderHelpers.swift */; };
 		1477C4A522D3B117EF0803A7 /* FilmtoneCaptureBottomDeck.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000008C /* FilmtoneCaptureBottomDeck.swift */; };
 		14933E6A1D7F3756CB2EDF51 /* FilmtoneRootChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000024 /* FilmtoneRootChrome.swift */; };
@@ -36,6 +35,8 @@
 		210298DEDED7573D37D52D75 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
 		21779BAB64D1E845064E3FBA /* FilmtonePadStillCompareLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */; };
 		2387CB087F9C55289E8B88B6 /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
+		7A1F1FDA2CE74E2E3F7C8965 /* EditorPreviewGradeFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000E /* EditorPreviewGradeFactory.swift */; };
+		B394E3C6CAFA5067A85A2B4D /* EditorProjectRecomputeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000010 /* EditorProjectRecomputeController.swift */; };
 		24060960CA10182EB65C2C8F /* FilmtoneLutControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2000001000000000000001D /* FilmtoneLutControls.swift */; };
 		264A1292ED91913F429E9A59 /* CaptureDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000022 /* CaptureDeviceManager.swift */; };
 		26DA91BDF9587F845F74E3F3 /* FilmtoneCaptureLensChipRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000090 /* FilmtoneCaptureLensChipRow.swift */; };
@@ -60,6 +61,7 @@
 		42D1A00148FB68BB1924A545 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
 		4379605E18C0593866D66DE3 /* SourceColorMetadataNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000002 /* SourceColorMetadataNormalizer.swift */; };
 		43CB8CECAC145B9AEF1DAC33 /* FilmtoneTermHelpSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000011 /* FilmtoneTermHelpSheet.swift */; };
+		43DF1506AC94E1BDC3C17079 /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		44138438F38EC2D62679C1E6 /* ExportMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F3FEA9C2799183E1F2B32E4 /* ExportMetrics.swift */; };
 		47BCC8AFAFCFEF98340A87BF /* CaptureAudioSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000029 /* CaptureAudioSupport.swift */; };
 		4834B221C07285097FC03D87 /* FilmtoneExportLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 571136E1E02CD259CA471AF1 /* FilmtoneExportLiveActivity.swift */; };
@@ -214,6 +216,8 @@
 		C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */; };
 		C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000A /* EditorExportCoordinator.swift */; };
 		C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
+		C3000001000000000000000F /* EditorPreviewGradeFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000E /* EditorPreviewGradeFactory.swift */; };
+		C30000010000000000000011 /* EditorProjectRecomputeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000010 /* EditorProjectRecomputeController.swift */; };
 		C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000022 /* CaptureDeviceManager.swift */; };
 		C30000010000000000000025 /* RecordingStateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000024 /* RecordingStateController.swift */; };
 		C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000010000000000000026 /* CapturePackageAssembler.swift */; };
@@ -423,6 +427,7 @@
 		27AC4B71358558416D8A1808 /* FilmtoneExportActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneExportActivity.swift; sourceTree = "<group>"; };
 		3A8953B81D88E54A0BD66518 /* ExportSessionModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSessionModels.swift; sourceTree = "<group>"; };
 		40484CC1C45635EFA996007B /* FilmtonePadLookPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadLookPanel.swift; sourceTree = "<group>"; };
+		46CB6520825AD29704ECC83F /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadWorkspaceView.swift; sourceTree = "<group>"; };
 		4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadStillCompareLayer.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -442,7 +447,6 @@
 		9C2BA1AAE89F8EF13CDDD304 /* FilmtoneMotionBlurAccumulator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneMotionBlurAccumulator.swift; sourceTree = "<group>"; };
 		A32825E944D19050B1B4DCBB /* FilmtonePadInspectorRail.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadInspectorRail.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		B10000010000000000000001 /* AssetPickerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetPickerService.swift; sourceTree = "<group>"; };
 		B10000010000000000000002 /* CacheStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheStore.swift; sourceTree = "<group>"; };
 		B10000010000000000000004 /* FilmtoneExportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneExportSession.swift; sourceTree = "<group>"; };
@@ -576,6 +580,7 @@
 		C200000100000000000000A1 /* FilmtoneCreativePack01Patches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePack01Patches.swift; sourceTree = "<group>"; };
 		C200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePack01Adaptation.swift; sourceTree = "<group>"; };
 		C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSidecarDateFormatter.swift; sourceTree = "<group>"; };
+		C26BAF84EB4DF4549B18580B /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadToolbar.swift; sourceTree = "<group>"; };
 		C30000010000000000000002 /* EditorProjectController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectController.swift; sourceTree = "<group>"; };
 		C30000010000000000000004 /* EditorLibraryController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorLibraryController.swift; sourceTree = "<group>"; };
@@ -583,6 +588,8 @@
 		C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectMutationCoordinator.swift; sourceTree = "<group>"; };
 		C3000001000000000000000A /* EditorExportCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorExportCoordinator.swift; sourceTree = "<group>"; };
 		C3000001000000000000000C /* EditorCaptureRelay.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorCaptureRelay.swift; sourceTree = "<group>"; };
+		C3000001000000000000000E /* EditorPreviewGradeFactory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewGradeFactory.swift; sourceTree = "<group>"; };
+		C30000010000000000000010 /* EditorProjectRecomputeController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectRecomputeController.swift; sourceTree = "<group>"; };
 		C30000010000000000000022 /* CaptureDeviceManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CaptureDeviceManager.swift; sourceTree = "<group>"; };
 		C30000010000000000000024 /* RecordingStateController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecordingStateController.swift; sourceTree = "<group>"; };
 		C30000010000000000000026 /* CapturePackageAssembler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CapturePackageAssembler.swift; sourceTree = "<group>"; };
@@ -601,7 +608,6 @@
 		F41C944E366CA27CE1E948DE /* FilmtoneExportActivityIPad.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FilmtoneExportActivityIPad.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F5389D2AC1264A75C8259AC3 /* FilmtoneExportSession+Cancelable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "FilmtoneExportSession+Cancelable.swift"; sourceTree = "<group>"; };
 		F866759EC6B64193580EDDE6 /* OpticalKernels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpticalKernels.swift; sourceTree = "<group>"; };
-		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		FFB20542EA38D7520A693144 /* FilmtoneSharedGradeProcessor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtoneSharedGradeProcessor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -619,6 +625,7 @@
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
 				F40000010000000000000001 /* FilmLabSwiftCore in Frameworks */,
+				43DF1506AC94E1BDC3C17079 /* Pods_App.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -626,7 +633,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				108E7AD3D3FC14B80367B427 /* Pods_App.framework in Frameworks */,
 				2D5D38403E576112C5E86527 /* FilmLabSwiftCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -861,8 +867,8 @@
 		7F8756D8B27F46E3366F6CEA /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */,
-				AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */,
+				46CB6520825AD29704ECC83F /* Pods-App.debug.xcconfig */,
+				C26BAF84EB4DF4549B18580B /* Pods-App.release.xcconfig */,
 			);
 			name = Pods;
 			sourceTree = "<group>";
@@ -956,6 +962,8 @@
 				C30000010000000000000008 /* EditorProjectMutationCoordinator.swift */,
 				C3000001000000000000000A /* EditorExportCoordinator.swift */,
 				C3000001000000000000000C /* EditorCaptureRelay.swift */,
+				C3000001000000000000000E /* EditorPreviewGradeFactory.swift */,
+				C30000010000000000000010 /* EditorProjectRecomputeController.swift */,
 			);
 			name = Internal;
 			path = Internal;
@@ -1395,6 +1403,8 @@
 				BE352BAFE0B9770C39897517 /* EditorProjectMutationCoordinator.swift in Sources */,
 				6DD0FF4A674C960E4F351918 /* EditorExportCoordinator.swift in Sources */,
 				2387CB087F9C55289E8B88B6 /* EditorCaptureRelay.swift in Sources */,
+				7A1F1FDA2CE74E2E3F7C8965 /* EditorPreviewGradeFactory.swift in Sources */,
+				B394E3C6CAFA5067A85A2B4D /* EditorProjectRecomputeController.swift in Sources */,
 				264A1292ED91913F429E9A59 /* CaptureDeviceManager.swift in Sources */,
 				6805657091D088AE17A2F629 /* RecordingStateController.swift in Sources */,
 				798231D7AE7CE36FFFB42EEB /* CapturePackageAssembler.swift in Sources */,
@@ -1564,6 +1574,8 @@
 				C30000010000000000000009 /* EditorProjectMutationCoordinator.swift in Sources */,
 				C3000001000000000000000B /* EditorExportCoordinator.swift in Sources */,
 				C3000001000000000000000D /* EditorCaptureRelay.swift in Sources */,
+				C3000001000000000000000F /* EditorPreviewGradeFactory.swift in Sources */,
+				C30000010000000000000011 /* EditorProjectRecomputeController.swift in Sources */,
 				C30000010000000000000023 /* CaptureDeviceManager.swift in Sources */,
 				C30000010000000000000025 /* RecordingStateController.swift in Sources */,
 				C30000010000000000000027 /* CapturePackageAssembler.swift in Sources */,
@@ -1692,7 +1704,6 @@
 		};
 		41DC2C7414737FABBFC163F8 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -1819,7 +1830,7 @@
 		};
 		504EC3171FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */;
+			baseConfigurationReference = 46CB6520825AD29704ECC83F /* Pods-App.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -1842,7 +1853,7 @@
 		};
 		504EC3181FED79650016851F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */;
+			baseConfigurationReference = C26BAF84EB4DF4549B18580B /* Pods-App.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -1913,7 +1924,6 @@
 		};
 		BAB8FAF4993DC6126481E7E3 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;

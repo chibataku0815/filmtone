@@ -14,6 +14,9 @@ Filmtone の現在の正本、運用ルール、歴史記録への入口。
 | [`ios/`](./ios/) | iOS (Capacitor + SwiftUI) docs index and archive |
 | [`web/`](./web/) | Web support / LP copy docs index and archive |
 | [`documentation-governance/`](./documentation-governance/) | 横断ドキュメントの情報設計・整理作業の計画と進行書 |
+| [`davinci-plugin/`](./davinci-plugin/) | DaVinci Resolve OFX plugin（`apps/filmtone-resolve-ofx`）の設計・進行 lane（live） |
+| [`davinci-bridge/`](./davinci-bridge/) | DaVinci Bridge / Imported Grade（DB-M13）作業記録 |
+| [`codemap-feature-audit/`](./codemap-feature-audit/) | codemap / 機能表 監査ループの計画・進行 |
 
 ## Documentation Governance
 
@@ -32,6 +35,8 @@ Filmtone の現在の正本、運用ルール、歴史記録への入口。
 | [`filmtone-copy-context-sync.md`](./filmtone-copy-context-sync.md) | Implementation changes と copy / history claim の同期ルール |
 | [`filmtone-implementation-history.md`](./filmtone-implementation-history.md) | WebGPU / WebGL → React + Capacitor → native SwiftUI / AVFoundation の実装経緯 |
 | [`filmtone-release-version-sources.md`](./filmtone-release-version-sources.md) | Filmtone release version の正本ソース一覧 |
+| [`filmtone-codemap.md`](./filmtone-codemap.md) | 全 app/package の構造・責務・入口・生成境界・verify の SSOT（code map） |
+| [`filmtone-feature-matrix.md`](./filmtone-feature-matrix.md) | user-facing 機能のサーフェス別網羅表（目視検証用） |
 | [`web/filmtone-lp-copy-handoff-2026-05-05-jst.md`](./web/filmtone-lp-copy-handoff-2026-05-05-jst.md) | LP copy discussion handoff; do not implement portfolio LP copy from this without a fresh copy decision |
 | [`archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/`](./archive/cross-cutting-legacy-2026-04-26-to-2026-05-01/) | Older cross-cutting handoffs retained as evidence |
 

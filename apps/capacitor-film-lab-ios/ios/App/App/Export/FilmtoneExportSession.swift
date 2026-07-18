@@ -90,8 +90,13 @@ final class FilmtoneExportSession {
         )
     /// Phase 2B-6A: non-optics color stage collaborator. Owns prepared
     /// input/creative LUT state and the kernel-based color stages (base
-    /// grade, tone compression, print) plus LUT application. Stage
-    /// ordering and `applyGrade` orchestration still live on the session.
+    /// grade, tone compression, print) plus LUT application.
+    /// R3: also owns the per-frame `applyGrade` stage orchestration plus
+    /// `applyVideoMotionStage` / grain / film-damage / film-breath, taking
+    /// `opticsCompositor`, `loadedDepthMap`, and the render-stage
+    /// profiling hook as parameters from the session. `request`,
+    /// `opticsCompositor`'s instance, and `loadedDepthMap`'s mutable
+    /// per-frame lifetime stay session-owned.
     private let gradeRenderPipeline: GradeRenderPipeline
     /// Phase 2B-7A: media writer / reader primitive collaborator. Owns
     /// writer construction, video input / reader-output settings, audio
@@ -317,8 +322,8 @@ final class FilmtoneExportSession {
         self.sourceImageNormalizer = ExportSourceImageNormalizer(
             colorPipeline: colorPipeline
         )
-        self.sourceSeed = Self.makeStableSourceSeed(from: sourceURL.absoluteString)
-        self.sourceDetailBias = Self.resolveSourceDetailBias(
+        self.sourceSeed = GradeRenderPipeline.makeStableSourceSeed(from: sourceURL.absoluteString)
+        self.sourceDetailBias = GradeRenderPipeline.resolveSourceDetailBias(
             from: request.sourceProbe,
             cameraProfile: cameraProfile
         )
@@ -964,59 +969,19 @@ final class FilmtoneExportSession {
         timeSeconds: Double,
         stageProfilingOutputSize: CGSize? = nil
     ) -> CIImage {
-        // Backlight Veil Phase 1c — when a Backlight Veil family is active,
-        // its 12 spatial keys (bloom / halation / diffusion / lensSoftness /
-        // rgbShift) override the user's optical signature so the scatter
-        // math has the canonical plate inputs. Color-grade params (exposure
-        // / contrast / LUT etc.) stay untouched, so the user's Look color
-        // is preserved and the Veil layers on top as a lens veil.
-        let params = paramsApplyingFilmBreath(
-            to: opticsCompositor.paramsApplyingBacklightVeil(to: request.grade.params),
-            timeSeconds: timeSeconds
+        gradeRenderPipeline.applyGrade(
+            to: image,
+            timeSeconds: timeSeconds,
+            rawParams: request.grade.params,
+            presetVersion: request.grade.presetVersion,
+            sourceDetailBias: sourceDetailBias,
+            sourceSeed: sourceSeed,
+            opticsCompositor: opticsCompositor,
+            loadedDepthMap: loadedDepthMap,
+            profileSubstage: { [self] stage, image in
+                profileRenderSubstage(stage, image: image, outputSize: stageProfilingOutputSize)
+            }
         )
-        let presetVersion = request.grade.presetVersion
-        var current = image
-
-        // Phase 2 段階 1: clear the per-frame Metal vignette flag before any
-        // stage runs. `applyGlowFamilyStage` sets it true when the Metal
-        // optics chain absorbs the vignette pass; `applyVignetteStage`
-        // consumes it to skip the CI path.
-        opticsCompositor.resetFrameState()
-
-        current = gradeRenderPipeline.applyInputLutStage(to: current)
-        profileRenderSubstage(.inputLut, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyBaseGradeStage(to: current, params: params, presetVersion: presetVersion)
-        profileRenderSubstage(.baseGrade, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyToneCompressionStage(to: current, params: params, presetVersion: presetVersion)
-        profileRenderSubstage(.toneCompression, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyShadowLatitudeStage(to: current, params: params)
-        profileRenderSubstage(.shadowLatitude, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyDetailSoftnessStage(
-            to: current,
-            params: params,
-            sourceDetailBias: sourceDetailBias
-        )
-        profileRenderSubstage(.detailSoftness, image: current, outputSize: stageProfilingOutputSize)
-        current = opticsCompositor.applyEdgeOpticsStage(to: current, params: params)
-        profileRenderSubstage(.edgeOptics, image: current, outputSize: stageProfilingOutputSize)
-        current = opticsCompositor.applyGlowFamilyStage(
-            to: current,
-            params: params,
-            loadedDepthMap: loadedDepthMap
-        )
-        profileRenderSubstage(.glowFamily, image: current, outputSize: stageProfilingOutputSize)
-        current = opticsCompositor.applyVignetteStage(to: current, params: params)
-        profileRenderSubstage(.vignette, image: current, outputSize: stageProfilingOutputSize)
-        current = applyGrainStage(to: current, params: params, timeSeconds: timeSeconds)
-        profileRenderSubstage(.grain, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyCreativeLutStage(to: current)
-        profileRenderSubstage(.creativeLut, image: current, outputSize: stageProfilingOutputSize)
-        current = gradeRenderPipeline.applyPrintStage(to: current, params: params)
-        profileRenderSubstage(.printStage, image: current, outputSize: stageProfilingOutputSize)
-        current = applyFilmDamageStage(to: current, params: params, timeSeconds: timeSeconds)
-        profileRenderSubstage(.filmDamage, image: current, outputSize: stageProfilingOutputSize)
-
-        return current.cropped(to: image.extent)
     }
 
     func applyLivePreviewGrade(
@@ -1065,14 +1030,12 @@ final class FilmtoneExportSession {
         outputSize: CGSize,
         accumulator: FilmtoneMotionBlurAccumulator?
     ) -> CIImage {
-        guard let accumulator else {
-            return image
-        }
-        return accumulator.apply(
+        gradeRenderPipeline.applyVideoMotionStage(
             to: image,
-            params: request.grade.params,
             timeSeconds: timeSeconds,
-            outputSize: outputSize
+            outputSize: outputSize,
+            accumulator: accumulator,
+            params: request.grade.params
         )
     }
 
@@ -1087,159 +1050,12 @@ final class FilmtoneExportSession {
         renderStageProfiler?.forceRender(stage, image: image, outputSize: outputSize)
     }
 
-    private func applyGrainStage(
-        to image: CIImage,
-        params: Phase0ParamsDTO,
-        timeSeconds: Double
-    ) -> CIImage {
-        let grainIntensity = max(0, min(FilmtonePhase0Generated.grainIntensityMax, params.grainIntensity))
-        guard grainIntensity > 0.0001 else {
-            return image
-        }
-        guard let kernel = OpticalKernels.grain else {
-            return image
-        }
-        let normalizedTime = timeSeconds.isFinite ? max(timeSeconds, 0) : 0
-        return kernel.apply(extent: image.extent, arguments: [
-            image,
-            grainIntensity,
-            params.grainRadialMix,
-            params.grainSize,
-            normalizedTime,
-            sourceSeed,
-            OpticsResampling.extentOriginVector(for: image.extent),
-            OpticsResampling.extentSizeVector(for: image.extent),
-        ]) ?? image
-    }
-
-    private func applyFilmDamageStage(
-        to image: CIImage,
-        params: Phase0ParamsDTO,
-        timeSeconds: Double
-    ) -> CIImage {
-        let dustAmount = max(0, min(1, params.dustAmount))
-        let scratchAmount = max(0, min(1, params.scratchAmount))
-        guard dustAmount > 0.0001 || scratchAmount > 0.0001 else {
-            return image
-        }
-        guard let kernel = OpticalKernels.filmDamage else {
-            return image
-        }
-        let normalizedTime = timeSeconds.isFinite ? max(timeSeconds, 0) : 0
-        return kernel.apply(extent: image.extent, arguments: [
-            image,
-            dustAmount,
-            scratchAmount,
-            normalizedTime,
-            sourceSeed,
-            OpticsResampling.extentOriginVector(for: image.extent),
-            OpticsResampling.extentSizeVector(for: image.extent),
-        ]) ?? image
-    }
-
-    private func paramsApplyingFilmBreath(
-        to params: Phase0ParamsDTO,
-        timeSeconds: Double
-    ) -> Phase0ParamsDTO {
-        let offsets = FilmtoneFilmBreath.deriveOffsets(
-            amount: params.filmBreathAmount,
-            timeSeconds: timeSeconds,
-            sourceSeed: sourceSeed
-        )
-        guard !offsets.isIdentity else {
-            return params
-        }
-        return Phase0ParamsDTO(
-            exposure: max(-2, min(2, params.exposure + offsets.exposure)),
-            contrast: max(0, min(2, params.contrast + offsets.contrast)),
-            saturation: params.saturation,
-            temperature: max(-1, min(1, params.temperature + offsets.temperature)),
-            tint: max(-1, min(1, params.tint + offsets.tint)),
-            rgbShift: params.rgbShift,
-            lensSoftness: params.lensSoftness,
-            detailSoftness: params.detailSoftness,
-            grainRadialMix: params.grainRadialMix,
-            grainSize: params.grainSize,
-            bloomThreshold: params.bloomThreshold,
-            bloomStrength: params.bloomStrength,
-            bloomRadius: params.bloomRadius,
-            diffusion: params.diffusion,
-            halationIntensity: params.halationIntensity,
-            halationSpread: params.halationSpread,
-            halationHue: params.halationHue,
-            halationThreshold: params.halationThreshold,
-            halationRadius: params.halationRadius,
-            bloomSoftKnee: params.bloomSoftKnee,
-            halationSoftKnee: params.halationSoftKnee,
-            compressionAmount: params.compressionAmount,
-            compressionRange: params.compressionRange,
-            printContrast: params.printContrast,
-            cyan: params.cyan,
-            magenta: params.magenta,
-            yellow: params.yellow,
-            shutterAngle: params.shutterAngle,
-            trailIntensity: params.trailIntensity,
-            filmBreathAmount: params.filmBreathAmount,
-            dustAmount: params.dustAmount,
-            scratchAmount: params.scratchAmount,
-            fade: params.fade,
-            shadowTone: params.shadowTone,
-            shadowLatitude: params.shadowLatitude,
-            highlightTone: params.highlightTone,
-            shadowHue: params.shadowHue,
-            highlightHue: params.highlightHue,
-            vignette: params.vignette,
-            grainIntensity: params.grainIntensity
-        )
-    }
-
-    private static func makeStableSourceSeed(from string: String) -> Double {
-        var hash: UInt64 = 1_469_598_103_934_665_603
-        for byte in string.utf8 {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return Double(hash % 8_192)
-    }
-
-    // Phase 4-B Detail Softness: resolve `sourceDetailBias` once per
-    // export from the metadata already on `SourceProbeDTO`. Combined
-    // with `request.grade.params.detailSoftness` at the stage via
-    // `FilmtoneDetailSoftness.deriveUniforms(...)`. Not stored.
-    //
-    // M1 Look Director: when the caller passes an explicit built-in
-    // Camera Profile, contribute the matching `sourceProfileId` so the
-    // resolver can promote confidence and pick the right log/profile
-    // bucket. `.auto` and `.userImport` leave the profile id unset so
-    // the existing auto path keeps owning detection.
-    private static func resolveSourceDetailBias(
-        from probe: SourceProbeDTO?,
-        cameraProfile: CameraProfileSelection?
-    ) -> Double {
-        guard let probe else { return 0 }
-        let video = probe.sourceVideoMetadata
-        let logTransfer = video?.logTransferFunction ?? probe.logTransferFunction
-        let transformStrategy = (video?.inputTransformPolicy ?? probe.inputTransformPolicy)?.strategy
-        let codec = video?.codecFamily ?? probe.codecFamily
-        let resolvedProfileId: String? = {
-            switch cameraProfile {
-            case .some(.builtIn(let catalogId)):
-                return catalogId
-            case .some(.auto), .some(.userImport), nil:
-                return nil
-            }
-        }()
-        let input = FilmtoneSourceDetailCompensationInput(
-            cameraMake: probe.cameraOptics?.cameraMake,
-            cameraModel: probe.cameraOptics?.cameraModel,
-            logTransferFunction: logTransfer?.rawValue,
-            inputTransformStrategy: transformStrategy?.rawValue,
-            codecFamily: codec?.rawValue,
-            colorClass: video?.colorClass.rawValue,
-            sourceProfileId: resolvedProfileId
-        )
-        return FilmtoneSourceDetailCompensation.resolve(input).recommendedBias
-    }
+    // Phase 4-B Detail Softness / M1 Look Director / grain / film damage /
+    // film breath: `resolveSourceDetailBias`, `makeStableSourceSeed`,
+    // `applyGrainStage`, `applyFilmDamageStage`, and `paramsApplyingFilmBreath`
+    // moved to `GradeRenderPipeline` (R3, god-object regrowth pass). See
+    // `gradeRenderPipeline`'s property doc above and `applyGrade`'s call
+    // into `gradeRenderPipeline.applyGrade(...)`.
 
     private func checkCancelled() throws {
         if cancelled {

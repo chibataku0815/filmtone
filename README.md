@@ -12,10 +12,17 @@ explicit legacy or rollback work only.
 - `apps/desktop-film-lab-batch` - legacy Electron Desktop app, frozen/reference
   only unless a task explicitly targets the old rail.
 - `apps/capacitor-film-lab-ios` - iOS app shell and native export pipeline.
+- `apps/filmtone-resolve-ofx` - DaVinci Resolve OFX plugin (C++/Metal); design lane in `docs/filmtone/davinci-plugin/`.
 - `packages/film-lab-core` - shared color, schema, preset, LUT, and Swift payload logic.
 - `packages/film-lab-renderer` - WebGL/WebGPU renderer.
 - `packages/film-lab-ui` - shared UI surface.
 - `packages/film-lab-smart-look` - smart look package.
+- `packages/film-lab-swift-core` - shared Swift runtime core.
+- `packages/film-lab-codex-mcp` - batch automation MCP server.
+
+Full structure, responsibilities, generated regions, and per-surface verify
+commands: [`docs/filmtone/filmtone-codemap.md`](docs/filmtone/filmtone-codemap.md).
+User-facing feature coverage: [`docs/filmtone/filmtone-feature-matrix.md`](docs/filmtone/filmtone-feature-matrix.md).
 
 ## Core Commands
 

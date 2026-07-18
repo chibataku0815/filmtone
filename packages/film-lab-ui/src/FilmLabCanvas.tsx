@@ -36,68 +36,16 @@ import { FILM_LAB_NEXT_INTL_NAMESPACE } from "./filmLabUiContract";
 import type { VideoPlaybackRate, VideoPlaybackState } from "./videoPlaybackContract";
 import { computeContainedCanvasDisplaySize } from "./canvas-display-size";
 import {
-  DEV_DEPTH_PROBE_DATA_URIS,
   DEV_DEPTH_PROBE_KEYFRAME_STRIDE,
   DEV_DEPTH_PROBE_FPS,
   DEV_DEPTH_PROBE_PER_FRAME,
 } from "./dev-depth-probe-data";
-
-/**
- * Legacy debug fallback for depth-aware Mist / Glow.
- * When no runtime `depthTrack` prop is supplied, `?depthProbe=1|2` keeps the
- * pre-bundled probe frames available for local debugging without making the
- * shared preview/export contract depend on URL state.
- */
-/**
- * Reads `?depthProbe=` from the URL.
- *   "1" → normal amplified modulation (near=0x, far=5x mist) → gain 1.0
- *   "2" → debug view (raw depth texture as grayscale) → gain 2.0
- *   anything else → 0 (depth probe disabled)
- */
-function readDepthProbeGain(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const v = new URL(window.location.href).searchParams.get("depthProbe");
-    if (v === "1") return 1.0;
-    if (v === "2") return 2.0;
-    return 0;
-  } catch {
-    return 0;
-  }
-}
-
-function readDepthProbeFlag(): boolean {
-  return readDepthProbeGain() > 0;
-}
-
-function readRayAngleProbeFlag(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return new URL(window.location.href).searchParams.get("rayAngleProbe") === "1";
-  } catch {
-    return false;
-  }
-}
-
-function rayAngleProbeOpticsLabel(
-  optics: CameraOptics | null | undefined,
-): CameraOptics["source"] | "fallback65" {
-  if (!optics) {
-    return "fallback65";
-  }
-  const hasFov = [optics.fovXDeg, optics.fovYDeg].some(
-    (value) =>
-      typeof value === "number" &&
-      Number.isFinite(value) &&
-      value >= 1 &&
-      value <= 178,
-  );
-  const hasFocalPixels = [optics.fxPx, optics.fyPx].some(
-    (value) => typeof value === "number" && Number.isFinite(value) && value > 0,
-  );
-  const hasFiniteOptics = hasFov || hasFocalPixels;
-  return hasFiniteOptics ? optics.source : "fallback65";
-}
+import {
+  readDepthProbeGain,
+  readRayAngleProbeFlag,
+  rayAngleProbeOpticsLabel,
+} from "./dev/filmLabCanvasDevProbes";
+import { useDevDepthProbeBitmaps } from "./dev/useDevDepthProbeBitmaps";
 
 const DEPTH_TEXTURE_WIDTH = 512;
 const DEPTH_TEXTURE_HEIGHT = 288;
@@ -626,10 +574,6 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   const activeTextureRef = useRef<THREE.Texture | null>(null);
   /** @description 現在のプレビュー動画要素。画像のときは null。 */
   const previewVideoElementRef = useRef<HTMLVideoElement | null>(null);
-  /**
-   * Legacy debug fallback frames loaded from `?depthProbe=1|2`.
-   */
-  const depthProbeBitmapsRef = useRef<ImageBitmap[] | null>(null);
   /** @description Shared runtime depth-track frames. Preview/export parity uses this first. */
   const runtimeDepthTrackBitmapsRef = useRef<ImageBitmap[] | null>(null);
   const runtimeDepthTrackFpsRef = useRef(0);
@@ -790,34 +734,11 @@ export const FilmLabCanvas = forwardRef<FilmLabCanvasRef | null, FilmLabCanvasPr
   /**
    * Legacy debug fallback: decode the pre-bundled probe frames when the URL
    * asks for `?depthProbe=1|2`. Shared runtime depth tracks still win.
+   * Extracted to `useDevDepthProbeBitmaps` (dev-only module); called here at
+   * the exact slot the inline `useRef` + `useEffect` pair used to occupy, so
+   * this effect's position relative to every other effect is unchanged.
    */
-  useEffect(() => {
-    if (!readDepthProbeFlag()) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const blobs = await Promise.all(
-          DEV_DEPTH_PROBE_DATA_URIS.map((uri) => fetch(uri).then((r) => r.blob())),
-        );
-        const bitmaps = await Promise.all(blobs.map((b) => createImageBitmap(b)));
-        if (cancelled) {
-          bitmaps.forEach((b) => b.close());
-          return;
-        }
-        depthProbeBitmapsRef.current = bitmaps;
-        console.log(
-          `[FilmLabCanvas] dev-depth-probe: loaded ${bitmaps.length} depth keyframes`,
-        );
-      } catch (err) {
-        console.error("[FilmLabCanvas] dev-depth-probe: decode failed", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      depthProbeBitmapsRef.current?.forEach((b) => b.close());
-      depthProbeBitmapsRef.current = null;
-    };
-  }, []);
+  const depthProbeBitmapsRef = useDevDepthProbeBitmaps();
 
   useEffect(() => {
     let cancelled = false;

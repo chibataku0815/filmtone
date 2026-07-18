@@ -28,9 +28,10 @@ extension FilmtoneLookDirector {
         probe?.sourceVideoMetadata?.colorClass.rawValue
     }
 
-    /// Mirror of `FilmtoneExportSession.resolveSourceDetailBias` so the
-    /// editor / capture relay can coordinate detail softness against the
-    /// same compensation profile the export pipeline will pick.
+    /// Mirror of `GradeRenderPipeline.resolveSourceDetailBias` (moved there
+    /// from `FilmtoneExportSession` in the R3 god-object regrowth pass) so
+    /// the editor / capture relay can coordinate detail softness against
+    /// the same compensation profile the export pipeline will pick.
     static func resolveSourceDetailBias(
         probe: SourceProbeDTO?,
         cameraProfile: CameraProfileSelection?
