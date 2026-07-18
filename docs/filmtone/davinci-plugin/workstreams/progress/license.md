@@ -124,6 +124,26 @@ MON-2 code checklist (implementation-plan §3):
       then expired->watermark, tamper->watermark) (owner authorization).
 ```
 
+## Runtime risks to verify FIRST (owner testing authorization)
+
+1. **Canonical-JSON parity (crown jewel).** The C++ `canonicalize`
+   (NSJSONSerialization parse -> re-serialize -> byte-compare) must produce bytes
+   identical to the TS `issue.ts` `canonicalize`, or a genuinely valid **full**
+   license decodes as `Invalid` and a paying customer is watermarked. Subtle
+   surface: string escaping, key sort order, non-ASCII names, NSJSONSerialization
+   quirks. VERIFY THIS BEFORE ANYTHING ELSE: issue a real full + trial envelope
+   with `issue.ts`, run each through `evaluateBytes()`, confirm `Licensed`/`Trial`.
+2. **GPU cross-command-buffer ordering (newly introduced).** The watermark reads
+   `invocation.output` in a *separate* command buffer after the final module wrote
+   it. The prior passes synchronized through Metal hazard tracking on private
+   intermediates; the host output buffer's hazard-tracking mode is set by Resolve.
+   If it is untracked, the watermark can race the module write (flicker/garbage in
+   the watermark region only). CHECK: watermark samples the completed module
+   output. If it races, the fix is a same-command-buffer encode or an explicit
+   barrier — not a constant tweak.
+3. **`eStringTypeLabel` host compatibility** — confirm the read-only License status
+   renders in Resolve's OFX param panel.
+
 ## Cross-verification plan (when owner authorizes testing)
 
 `LicenseStore::evaluateBytes(bytes, len, nowUnix)` is the pure entry point. Feed
@@ -131,4 +151,7 @@ it: one real `scripts/license/issue.ts` envelope (expect Licensed/Trial), plus t
 adversarial vectors from implementation-plan §3 (trial-signed `full`, future
 issuedAt, non-canonical payload, unknown/dup/missing fields, type errors,
 date-only/offset datetimes, 31-day overflow, bad base64, non-64-byte sig,
-oversize) — all must return Invalid, matching `core.ts`.
+oversize) — all must return Invalid, matching `core.ts`. Then the runtime state
+matrix in Resolve: unlicensed->watermark, full->clean, trial->clean then
+expired->watermark, tamper->watermark, and licensed + all modules off = bit-exact
+identity.
