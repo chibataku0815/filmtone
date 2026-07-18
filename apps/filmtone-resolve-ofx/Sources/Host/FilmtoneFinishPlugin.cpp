@@ -1,9 +1,9 @@
-#include <cmath>
+#include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
 
-#include "MetalIdentityBlit.h"
+#include "../Integration/FilmtoneFinishParameters.h"
+#include "../Integration/FilmtoneFinishRenderGraph.h"
 #include "MetalPipelineCache.h"
 #include "RenderContext.h"
 #include "ofxsImageEffect.h"
@@ -15,6 +15,11 @@ namespace {
 constexpr char kPluginName[] = "Filmtone Finish";
 constexpr char kPluginGrouping[] = "Filmtone";
 constexpr char kPluginIdentifier[] = "com.chibatakumi.filmtone.finish";
+constexpr char kPluginDescription[] =
+    "Adds deterministic Film Breath, Gate Weave, and Film Damage. Apply "
+    "Filmtone Finish manually after CinePrint35 by default; the effect remains "
+    "movable. When using CinePrint35, keep only one Gate Weave treatment and "
+    "one Dust treatment enabled.";
 constexpr int kPluginVersionMajor = 0;
 constexpr int kPluginVersionMinor = 1;
 
@@ -32,7 +37,8 @@ public:
     explicit FilmtoneFinishEffect(OfxImageEffectHandle handle)
         : OFX::ImageEffect(handle),
           outputClip_(fetchClip(kOfxImageEffectOutputClipName)),
-          sourceClip_(fetchClip(kOfxImageEffectSimpleSourceClipName)) {}
+          sourceClip_(fetchClip(kOfxImageEffectSimpleSourceClipName)),
+          parameters_(*this) {}
 
     void render(const OFX::RenderArguments& args) override {
         if (!args.isEnabledMetalRender || args.pMetalCmdQ == nullptr) {
@@ -48,17 +54,24 @@ public:
             OFX::throwSuiteStatusException(kOfxStatErrUnsupported);
         }
 
+        const auto evaluated = parameters_.evaluate(args.time);
         const double sourceFrameRate = sourceClip_->getFrameRate();
         const double timelineFrameRate = getFrameRate();
-        if (!std::isfinite(sourceFrameRate) || sourceFrameRate <= 0.0 ||
-            !std::isfinite(timelineFrameRate) || timelineFrameRate <= 0.0) {
+        const auto resolvedFrameRates = integration::resolveFrameRates(
+            sourceFrameRate,
+            timelineFrameRate);
+        if (!resolvedFrameRates.has_value() &&
+            !integration::isFilmtoneFinishConfiguredIdentity(evaluated)) {
             OFX::throwSuiteStatusException(kOfxStatErrValue);
         }
+        const FrameRates frameRates = resolvedFrameRates.has_value()
+            ? *resolvedFrameRates
+            : FrameRates{sourceFrameRate, timelineFrameRate};
 
         const RenderContext context{
             args.time,
-            FrameRates{sourceFrameRate, timelineFrameRate},
-            std::nullopt,
+            frameRates,
+            static_cast<std::uint64_t>(evaluated.finish().variation),
             PointD{args.renderScale.x, args.renderScale.y},
             makeRect(args.renderWindow),
             makeRect(source->getBounds()),
@@ -81,8 +94,16 @@ public:
         };
 
         std::string error;
-        if (!encodeMetalIdentityBlit(context, invocation, error)) {
-            OFX::Log::error(true, "Filmtone Finish identity render failed: %s", error.c_str());
+        if (!integration::encodeFilmtoneFinishMetal(
+                evaluated,
+                context,
+                invocation,
+                MetalPipelineCache::shared(),
+                error)) {
+            OFX::Log::error(
+                true,
+                "Filmtone Finish render failed: %s",
+                error.c_str());
             OFX::throwSuiteStatusException(kOfxStatFailed);
         }
     }
@@ -91,6 +112,31 @@ public:
         const OFX::IsIdentityArguments& args,
         OFX::Clip*& identityClip,
         double& identityTime) override {
+        const auto evaluated = parameters_.evaluate(args.time);
+        if (integration::isFilmtoneFinishConfiguredIdentity(evaluated)) {
+            identityClip = sourceClip_;
+            identityTime = args.time;
+            return true;
+        }
+        const auto frameRates = integration::resolveFrameRates(
+            sourceClip_->getFrameRate(),
+            getFrameRate());
+        if (!frameRates.has_value()) {
+            return false;
+        }
+        const RectI renderWindow = makeRect(args.renderWindow);
+        const RenderContext context{
+            args.time,
+            *frameRates,
+            static_cast<std::uint64_t>(evaluated.finish().variation),
+            PointD{args.renderScale.x, args.renderScale.y},
+            renderWindow,
+            renderWindow,
+            renderWindow,
+        };
+        if (!integration::isFilmtoneFinishIdentity(evaluated, context)) {
+            return false;
+        }
         identityClip = sourceClip_;
         identityTime = args.time;
         return true;
@@ -99,6 +145,7 @@ public:
 private:
     OFX::Clip* outputClip_;
     OFX::Clip* sourceClip_;
+    integration::FilmtoneFinishParameterSet parameters_;
 };
 
 class FilmtoneFinishFactory final
@@ -116,7 +163,7 @@ public:
     void describe(OFX::ImageEffectDescriptor& descriptor) override {
         descriptor.setLabels(kPluginName, kPluginName, kPluginName);
         descriptor.setPluginGrouping(kPluginGrouping);
-        descriptor.setPluginDescription(kPluginName);
+        descriptor.setPluginDescription(kPluginDescription);
         descriptor.addSupportedContext(OFX::eContextFilter);
         descriptor.addSupportedBitDepth(OFX::eBitDepthFloat);
 
@@ -147,6 +194,8 @@ public:
             descriptor.defineClip(kOfxImageEffectOutputClipName);
         output->addSupportedComponent(OFX::ePixelComponentRGBA);
         output->setSupportsTiles(false);
+
+        integration::describeFilmtoneFinishParameters(descriptor);
     }
 
     OFX::ImageEffect* createInstance(

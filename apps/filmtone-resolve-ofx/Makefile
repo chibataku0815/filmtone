@@ -13,23 +13,31 @@ BUNDLE_INFO := $(BUNDLE_ROOT)/Contents/Info.plist
 
 CPPFLAGS := -I"$(OFX_SDK_ROOT)/OpenFX-1.4/include" \
 	-I"$(OFX_SDK_ROOT)/Support/include" \
+	-ISources \
 	-ISources/Host
 CXXFLAGS := -std=c++17 -O2 -arch arm64 -fvisibility=hidden \
 	-fvisibility-inlines-hidden -Wall -Wextra -Wpedantic
 LDFLAGS := -bundle -arch arm64 -fvisibility=hidden \
 	-framework AppKit -framework Foundation -framework Metal
 
-HOST_CPP_SOURCES := Sources/Host/FilmtoneFinishPlugin.cpp
-HOST_MM_SOURCES := Sources/Host/MetalIdentityBlit.mm \
-	Sources/Host/MetalPipelineCache.mm
-HOST_CPP_OBJECTS := $(patsubst Sources/Host/%.cpp,$(OBJECT_DIR)/Host/%.o,$(HOST_CPP_SOURCES))
-HOST_MM_OBJECTS := $(patsubst Sources/Host/%.mm,$(OBJECT_DIR)/Host/%.o,$(HOST_MM_SOURCES))
+PLUGIN_CPP_SOURCES := Sources/Host/FilmtoneFinishPlugin.cpp \
+	Sources/Integration/FilmtoneFinishParameters.cpp \
+	Sources/Effects/FilmBreath/FilmBreathOffsets.cpp \
+	Sources/Effects/GateWeave/GateWeaveTransform.cpp
+PLUGIN_MM_SOURCES := Sources/Host/MetalIdentityBlit.mm \
+	Sources/Host/MetalPipelineCache.mm \
+	Sources/Integration/FilmtoneFinishRenderGraph.mm \
+	Sources/Effects/FilmBreath/FilmBreathProcessor.mm \
+	Sources/Effects/GateWeave/GateWeaveProcessor.mm \
+	Sources/Effects/FilmDamage/FilmDamageProcessor.mm
+PLUGIN_CPP_OBJECTS := $(patsubst Sources/%.cpp,$(OBJECT_DIR)/%.o,$(PLUGIN_CPP_SOURCES))
+PLUGIN_MM_OBJECTS := $(patsubst Sources/%.mm,$(OBJECT_DIR)/%.o,$(PLUGIN_MM_SOURCES))
 
 SUPPORT_UNITS := ofxsCore ofxsImageEffect ofxsInteract ofxsLog \
 	ofxsMultiThread ofxsParams ofxsProperty ofxsPropertyValidation
 SUPPORT_OBJECTS := $(addprefix $(OBJECT_DIR)/Support/,$(addsuffix .o,$(SUPPORT_UNITS)))
 
-OBJECTS := $(HOST_CPP_OBJECTS) $(HOST_MM_OBJECTS) $(SUPPORT_OBJECTS)
+OBJECTS := $(PLUGIN_CPP_OBJECTS) $(PLUGIN_MM_OBJECTS) $(SUPPORT_OBJECTS)
 
 .PHONY: all clean
 
@@ -44,11 +52,11 @@ $(BUNDLE_INFO): Resources/Info.plist
 	@mkdir -p "$(@D)"
 	cp "$<" "$@"
 
-$(OBJECT_DIR)/Host/%.o: Sources/Host/%.cpp
+$(OBJECT_DIR)/%.o: Sources/%.cpp
 	@mkdir -p "$(@D)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c "$<" -o "$@"
 
-$(OBJECT_DIR)/Host/%.o: Sources/Host/%.mm
+$(OBJECT_DIR)/%.o: Sources/%.mm
 	@mkdir -p "$(@D)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c "$<" -o "$@"
 
