@@ -30,7 +30,8 @@ All dispatches follow `delegation.md`. Master states are:
 - Integration wave: source accepted and integrated. One Filter now owns the
   generated parameter surface and the deterministic Breath -> Weave -> Damage
   pass graph; compiled and Resolve proof remains explicit verification debt.
-- Tests, installation, and release: not started.
+- QUALITY build, bundle, installation, and Resolve verification: explicitly
+  authorized and running; packaging and release remain not started.
 
 ## Workstream Status
 
@@ -43,7 +44,7 @@ All dispatches follow `delegation.md`. Master states are:
 | `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Accepted — source integrated; compiled/Resolve verification debt retained |
-| `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Blocked — explicit verification authorization and Resolve runtime proof required |
+| `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Running — build and Resolve proof dispatched |
 
 ## Parallel Launch Order
 
@@ -71,6 +72,7 @@ path, plugin interface, and clean integration base.
 | WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc` |
 | DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `3ddc56cb95aeb093712a56d301358ff796f3d1f7` |
 | INTEGRATION | `019f74a1-81dc-7572-bf8c-3dea21472755` | `/Users/chibatakumi/.codex/worktrees/97f1/filmtone` | `eb860dfeea7a4d45fa159839ad5454a371afbab9` | Accepted as `57434fc1187df8a8175d74b69c18e63c94ee5a52`; integrated as `915012a` |
+| QUALITY | `019f74bc-834b-7ce0-9a22-0297ab4a84cc` | `/Users/chibatakumi/.codex/worktrees/1433/filmtone` | `f16aa4a6bdeaff740f59a60c5029af40c491e905` | Running — owner authorized build/Metal/install/Resolve verification |
 
 ## Foundation Integration Record
 
