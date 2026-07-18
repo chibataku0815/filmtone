@@ -27,8 +27,8 @@ All dispatches follow `delegation.md`. Master states are:
   accepted into one clean integration branch; verification debt is retained.
 - Feature wave: BREATH, WEAVE, and DAMAGE source handoffs are accepted and
   integrated; verification debt is retained.
-- Integration wave: ready for a single shared-file worker from the combined
-  feature source base.
+- Integration wave: dispatched from the clean combined feature source base;
+  shared OFX registration and pass-graph implementation is running.
 - Tests, installation, and release: not started.
 
 ## Workstream Status
@@ -41,7 +41,7 @@ All dispatches follow `delegation.md`. Master states are:
 | `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
 | `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Accepted — source integrated; verification debt retained |
-| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Ready |
+| `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Dispatched — clean base confirmed |
 | `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Blocked |
 
 ## Parallel Launch Order
@@ -69,6 +69,7 @@ path, plugin interface, and clean integration base.
 | BREATH | `019f746f-c80c-7b90-963d-f6cd3b05ef95` | `/Users/chibatakumi/.codex/worktrees/e9c57c76-3e12-4d11-b2d7-7dbb1c661cbc/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `a678b9153a5505e62b084ad337a461553da107f3` |
 | WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc` |
 | DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `3ddc56cb95aeb093712a56d301358ff796f3d1f7` |
+| INTEGRATION | `019f74a1-81dc-7572-bf8c-3dea21472755` | `/Users/chibatakumi/.codex/worktrees/97f1/filmtone` | `eb860dfeea7a4d45fa159839ad5454a371afbab9` | Dispatched — clean base confirmed |
 
 ## Foundation Integration Record
 
@@ -100,8 +101,11 @@ path, plugin interface, and clean integration base.
   `b214b765b333848131b52578325096bb7a4566f4`.
 - Feature progress records were reviewed and incorporated individually; the
   coordinator master record remained coordinator-owned.
-- INTEGRATION dispatch base: the readiness commit containing this record; its
-  exact SHA and task/worktree are recorded after task creation.
+- INTEGRATION dispatch base:
+  `eb860dfeea7a4d45fa159839ad5454a371afbab9`.
+- Stable starting ref: `feature/davinci-ofx-integration-base`.
+- INTEGRATION task: `019f74a1-81dc-7572-bf8c-3dea21472755`; clean detached
+  worktree: `/Users/chibatakumi/.codex/worktrees/97f1/filmtone`.
 
 ## Proposed File Ownership
 
