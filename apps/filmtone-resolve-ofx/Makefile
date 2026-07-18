@@ -40,7 +40,8 @@ PLUGIN_MM_SOURCES := Sources/Host/MetalIdentityBlit.mm \
 	Sources/Effects/FilmBreath/FilmBreathProcessor.mm \
 	Sources/Effects/GateWeave/GateWeaveProcessor.mm \
 	Sources/Effects/FilmDamage/FilmDamageProcessor.mm \
-	Sources/License/LicenseStore.mm
+	Sources/License/LicenseStore.mm \
+	Sources/License/WatermarkPass.mm
 PLUGIN_C_SOURCES := Sources/License/vendor/ed25519/fe.c \
 	Sources/License/vendor/ed25519/ge.c \
 	Sources/License/vendor/ed25519/sc.c \

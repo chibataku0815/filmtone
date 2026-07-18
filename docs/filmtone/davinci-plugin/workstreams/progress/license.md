@@ -53,6 +53,40 @@ Stop reason: natural checkpoint at a build-verified, behavior-neutral core befor
   the identity-invariant-sensitive watermark integration.
 ```
 
+## Handoff — 2026-07-19 (watermark enforcement + render-graph integration)
+
+```text
+Terminal state: Running — trial watermark enforcement implemented and build-verified;
+  only the read-only License status-string parameter remains for MON-2 code.
+Changed files (added to the prior checkpoint):
+  apps/filmtone-resolve-ofx/Sources/License/WatermarkPass.h/.mm  (new)
+  apps/filmtone-resolve-ofx/Sources/Integration/FilmtoneRenderGraph.mm
+    (extract encodeModulesGraph(); evaluate license once; composite watermark
+     on the final output when watermarked)
+  apps/filmtone-resolve-ofx/Sources/Host/FilmtonePlugin.cpp
+    (isIdentity() returns false when watermarked so the Host renders the frame)
+  apps/filmtone-resolve-ofx/Makefile  (WatermarkPass.mm)
+Behavior:
+  - Licensed / active-trial: no watermark; encodeModulesGraph unchanged, and
+    isIdentity() falls through to the original module-identity logic, so the
+    bit-exact identity invariant is preserved for licensed users.
+  - Unlicensed / invalid / expired-trial: isIdentity() returns false; the graph
+    runs (identity blit when all modules off) then composites the watermark.
+  - Watermark: deterministic, in-place per-pixel on the output (no cross-pixel
+    dependency), alpha preserved, extended-range RGB not clamped, global
+    output-bounds canonical coords (proxy == full), diagonal tiled "FILMTONE
+    TRIAL" from an embedded 5x7 font.
+Default look (OWNER VISUAL REVIEW pending, §3): mid-gray 0.5, opacity 0.16,
+  30-degree diagonal tile, ~28-canonical-px text. Constants in WatermarkPass.mm
+  (kOpacity/kColor*/kRotationDegrees/kTexel*/kTileGap*) — provide 2-3 candidates
+  for owner acceptance; not final.
+Remaining MON-2 code: read-only License status-string param (statusLine()).
+Verification performed: make -C apps/filmtone-resolve-ofx => exit 0. Symbols
+  (encodeMetalTrialWatermark) + embedded MSL present; identity strings intact.
+Verification not performed: no Resolve run; watermark not visually inspected;
+  no TS<->C cross-verify (owner testing authorization pending).
+```
+
 ## Cross-verification plan (when owner authorizes testing)
 
 `LicenseStore::evaluateBytes(bytes, len, nowUnix)` is the pure entry point. Feed

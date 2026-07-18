@@ -14,6 +14,8 @@
 #include "../Effects/FilmDamage/FilmDamageProcessor.h"
 #include "../Effects/GateWeave/GateWeaveProcessor.h"
 #include "../Host/MetalIdentityBlit.h"
+#include "../License/LicenseStore.h"
+#include "../License/WatermarkPass.h"
 
 namespace filmtone::resolve::integration {
 namespace {
@@ -271,18 +273,12 @@ bool isFilmtoneIdentity(
            filmDamage.isIdentity(seededContext);
 }
 
-bool encodeFilmtoneMetal(
+static bool encodeModulesGraph(
     const EvaluatedFilmtoneParameters& parameters,
-    const host::RenderContext& context,
+    const host::RenderContext& seededContext,
     const host::MetalRenderInvocation& invocation,
     host::MetalPipelineCache& pipelineCache,
     std::string& error) {
-    error.clear();
-    const host::RenderContext seededContext = makeSeededContext(parameters, context);
-    if (seededContext.renderWindow.isEmpty()) {
-        return true;
-    }
-
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
         parameters.mapping());
     effects::film_breath::FilmBreathProcessor filmBreath(
@@ -427,6 +423,34 @@ bool encodeFilmtoneMetal(
         currentSource = currentOutput;
     }
     return true;
+}
+
+bool encodeFilmtoneMetal(
+    const EvaluatedFilmtoneParameters& parameters,
+    const host::RenderContext& context,
+    const host::MetalRenderInvocation& invocation,
+    host::MetalPipelineCache& pipelineCache,
+    std::string& error) {
+    error.clear();
+    const host::RenderContext seededContext =
+        makeSeededContext(parameters, context);
+    if (seededContext.renderWindow.isEmpty()) {
+        return true;
+    }
+    // License gate: composite the trial watermark on the final output whenever
+    // the state is not a valid full/active-trial license. Evaluated once per
+    // render; a valid license leaves the module output bit-exact.
+    const bool applyWatermark =
+        license::LicenseStore::shared().evaluate().watermarked();
+    if (!encodeModulesGraph(
+            parameters, seededContext, invocation, pipelineCache, error)) {
+        return false;
+    }
+    if (!applyWatermark) {
+        return true;
+    }
+    return watermark::encodeMetalTrialWatermark(
+        seededContext, invocation, pipelineCache, error);
 }
 
 }  // namespace filmtone::resolve::integration

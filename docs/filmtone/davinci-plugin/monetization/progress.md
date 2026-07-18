@@ -421,3 +421,13 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   WatermarkPass、render-graph 最終段統合、License param status、TS↔C クロス検証
   (testing authorization gate)。詳細は [workstreams/progress/license.md]
   (workstreams/progress/license.md)。Git: 本 checkpoint を owner 承認で commit/push。
+- 2026-07-19 (改訂 19 / MON-2 watermark enforcement): `WatermarkPass.h/.mm`
+  (決定的 trial ウォーターマーク、in-place・alpha 不変・extended-range 安全・
+  output-bounds グローバル座標・埋め込み 5x7 font "FILMTONE TRIAL" 対角タイル)を
+  実装し、`FilmtoneRenderGraph.mm` の最終段で非ライセンス時のみ合成、
+  `FilmtonePlugin.cpp` の `isIdentity` を watermarked 時に false 化(host が必ず
+  render)。**licensed 時は挙動不変で bit-exact identity 維持**。`make` PASS
+  (symbol・埋め込み MSL 確認)。残る MON-2 コードは License param status 表示のみ。
+  owner ゲート: ウォーターマーク視覚確定(既定は placeholder・2-3 候補提示予定)、
+  TS↔C クロス検証の testing authorization、Resolve 実機確認。詳細は
+  [workstreams/progress/license.md](workstreams/progress/license.md)。Git: owner 承認で commit/push。

@@ -4,6 +4,7 @@
 
 #include "../Integration/FilmtoneParameters.h"
 #include "../Integration/FilmtoneRenderGraph.h"
+#include "../License/LicenseStore.h"
 #include "MetalPipelineCache.h"
 #include "RenderContext.h"
 #include "ofxsImageEffect.h"
@@ -112,6 +113,12 @@ public:
         const OFX::IsIdentityArguments& args,
         OFX::Clip*& identityClip,
         double& identityTime) override {
+        // A trial/unlicensed instance always composites a watermark on the final
+        // output, so the effect is never a pass-through — even with every module
+        // off. Report non-identity so the Host actually renders this frame.
+        if (license::LicenseStore::shared().evaluate().watermarked()) {
+            return false;
+        }
         const auto evaluated = parameters_.evaluate(args.time);
         if (integration::isFilmtoneConfiguredIdentity(evaluated)) {
             identityClip = sourceClip_;
