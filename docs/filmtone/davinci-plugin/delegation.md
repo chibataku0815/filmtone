@@ -123,17 +123,13 @@ The coordinator reviews the returned diff and writes the authoritative result
 into master `progress.md`. The worker progress record remains the detailed
 execution evidence.
 
-## Planning-Source Exception
+## Planning-Source Integration
 
-The initial planning documents currently exist only in the coordinator's
-detached dirty worktree. A worker launched from a clean worktree must treat the
-coordinator-provided absolute planning paths as read-only input and return its
-handoff in the task. It must not write back into that worktree.
-
-This exception ends after the planning documents are integrated into an
-owner-approved clean base. From that point, each worker updates only its own
-dedicated progress record in its own worktree. Plans remain immutable unless
-the coordinator explicitly changes scope.
+The initial detached-dirty-worktree exception is closed. The planning
+documents are integrated into the clean Foundation branch, and every feature
+worker reads them from its assigned worktree. Each worker updates only its own
+dedicated progress record. Plans remain immutable unless the coordinator
+explicitly changes scope.
 
 ## Launch Waves
 

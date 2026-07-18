@@ -6,22 +6,23 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Blocked on CONTRACT + ADAPTER + HOST acceptance`
+`Ready — Foundation source freeze accepted`
 
 ## Assignment
 
 - Task: not created
 - Repository: Filmtone
-- Worktree/base: Foundation Freeze SHA, not yet available
+- Worktree/base: assigned at dispatch from the Foundation readiness commit
 - Parallel peers: `WEAVE`, `DAMAGE`
 
 ## Current Loop
 
-Not started.
+Foundation dependencies and exclusive edit area are accepted. Worker not yet
+started.
 
 ## Checklist
 
-- [ ] Confirm accepted Film Breath C++ handoff and module interface.
+- [x] Confirm accepted Film Breath C++ handoff and module interface.
 - [ ] Confirm Foundation Freeze SHA and exclusive feature directory.
 - [ ] Implement deterministic mean-neutral photometric movement.
 - [ ] Preserve wide-gamut floats and alpha.
@@ -41,13 +42,12 @@ None.
 
 ## Blockers
 
-Foundation Freeze Record is incomplete.
+No dependency blocker. Builds/tests remain outside this worker authorization.
 
 ## Next Action
 
-Launch together with WEAVE and DAMAGE only after Foundation acceptance.
+Dispatch together with WEAVE and DAMAGE from the same readiness commit.
 
 ## Handoff
 
 Not started.
-

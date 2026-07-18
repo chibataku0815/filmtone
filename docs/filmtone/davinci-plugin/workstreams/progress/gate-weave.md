@@ -6,22 +6,23 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Blocked on CONTRACT + ADAPTER + HOST acceptance`
+`Ready — Foundation source freeze accepted`
 
 ## Assignment
 
 - Task: not created
 - Repository: Filmtone
-- Worktree/base: Foundation Freeze SHA, not yet available
+- Worktree/base: assigned at dispatch from the Foundation readiness commit
 - Parallel peers: `BREATH`, `DAMAGE`
 
 ## Current Loop
 
-Not started.
+Foundation dependencies and exclusive edit area are accepted. Worker not yet
+started.
 
 ## Checklist
 
-- [ ] Confirm accepted Gate Weave fields and module interface.
+- [x] Confirm accepted Gate Weave fields and module interface.
 - [ ] Confirm Foundation Freeze SHA and exclusive feature directory.
 - [ ] Implement inverse-coordinate subpixel X/Y translation and rotation.
 - [ ] Implement safe edge compensation without black-edge flashes.
@@ -41,13 +42,12 @@ None.
 
 ## Blockers
 
-Foundation Freeze Record is incomplete.
+No dependency blocker. Builds/tests remain outside this worker authorization.
 
 ## Next Action
 
-Launch together with BREATH and DAMAGE only after Foundation acceptance.
+Dispatch together with BREATH and DAMAGE from the same readiness commit.
 
 ## Handoff
 
 Not started.
-

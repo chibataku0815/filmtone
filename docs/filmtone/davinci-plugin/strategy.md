@@ -1,7 +1,7 @@
 # Filmtone DaVinci Resolve Plugin Strategy
 
 Date opened: 2026-07-18 JST
-Status: planning complete; Foundation tasks dispatched
+Status: Foundation source integrated; feature wave ready for dispatch
 
 This file is the long-term source of truth for the Filmtone DaVinci Resolve
 OpenFX lane. Current coordination state lives in `progress.md`. Each bounded
@@ -135,7 +135,7 @@ which CinePrint node to disable. No preset may silently stack both versions.
 |---|---|---|
 | Film Breath amount and temporal character | `packages/film-lab-core/src/film-breath.ts` | Reuse the Filmtone behavior through a generated/versioned C++ handoff; do not tune an unrelated OFX clone. |
 | Film Breath Swift parity evidence | `packages/film-lab-swift-core/.../FilmtoneFilmBreath.swift` | Read-only parity evidence for the OFX port. |
-| Generic Film Damage / Gate Weave recipe | `@forestone/visual-effect-core` Film Damage contract v2 / revision 2.1 | Extend in the owning repo if rotation or independent axes are required; never add a second Filmtone-local contract. |
+| Generic Film Damage / Gate Weave recipe | `@forestone/visual-effect-core` Film Damage contract v2 / revision 2.2 | Consume the frozen public handoff; never add a second Filmtone-local contract. |
 | Generic deterministic reference | `@forestone/visual-render-core` Film Damage reference | Use as the semantic and fixture authority for the Metal realization. |
 | Filmtone taste and compatibility mapping | `@forestone/filmtone-pack` | Add a finish-specific public mapping instead of hiding Dust/Scratch as lossy grade fields. |
 | OFX host wrapper, product IDs, UI groups, bundle | Filmtone `apps/filmtone-resolve-ofx/` | Product-specific only; no generic contract ownership. |
@@ -288,8 +288,9 @@ before acceptance.
 - Automated tests, test files, and test-like verification require an explicit
   owner request in the chat that performs them. Product-quality verification
   is intentionally last, after core behavior works.
-- No commits, pushes, releases, installs into `/Library/OFX/Plugins`, or
-  external-repo mutations occur from this planning task.
+- Foundation commits are coordinator-owned and were created only after owner
+  authorization. Feature workers still do not stage, commit, push, release,
+  install into `/Library/OFX/Plugins`, or mutate external repositories.
 
 ## Research Sources
 

@@ -6,7 +6,7 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Review — verification blocked`
+`Accepted — source integrated; verification debt retained`
 
 ## Assignment
 
@@ -14,6 +14,8 @@ Last synced: 2026-07-18 JST
 - Repository: Filmtone
 - Worktree: `/Users/chibatakumi/.codex/worktrees/a45d/filmtone`
 - Base: `a840634ac2a630df36b10d414ec1c4e53f27a6ce`
+- Result commit: `325488e2ab86e5c25459949702ea880a888ac12d`
+- Combined source commit: `fcb3e85`
 - Dependencies: planning accepted
 - Blocks: Foundation Freeze
 
@@ -65,16 +67,16 @@ an arm64 bundle build, which was not authorized in the worker task.
 
 ## Blockers
 
-Explicit build/verification authorization is required before final acceptance.
+Explicit build/verification authorization is required before compiled-host
+acceptance, but the reviewed source boundary is accepted for feature work.
 
 ## Next Action
 
-After authorization, run only the smallest arm64 bundle build and artifact
-inspection. Resolve installation/discovery remains a later, separately
-authorized step.
+Feature modules may implement against `RenderContext`, `ModuleProcessor`, and
+`MetalPipelineCache`. After authorization, run only the smallest arm64 bundle
+build and artifact inspection. Resolve installation/discovery remains later.
 
 ## Handoff
 
-The source scope is complete with no static blocking finding. Coordinator state
-remains `Review — verification blocked`; do not mark `Accepted` yet.
-
+The source scope is integrated with no static blocking finding. Compile,
+bundle, and Resolve verification remain explicit debt.

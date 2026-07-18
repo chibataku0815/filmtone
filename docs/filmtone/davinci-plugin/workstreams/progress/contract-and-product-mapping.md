@@ -6,7 +6,7 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Review — interface frozen for ADAPTER; verification blocked`
+`Accepted — source integrated; verification debt retained`
 
 ## Assignment
 
@@ -14,6 +14,7 @@ Last synced: 2026-07-18 JST
 - Repository: `visual-effect-core`
 - Worktree: `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core`
 - Base: `84efd1a8a5dae0edd3afb777a0428739f7c1e72b`
+- Result commit: `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f`
 - Dependencies: planning accepted
 - Blocks: `ADAPTER`
 
@@ -67,13 +68,14 @@ No Filmtone repository file is writable in this workstream.
 ## Blockers
 
 The existing Film Damage tests pin revision 2.1 and legacy hashes. Updating
-those tests and proving the generated ABI requires explicit authorization.
+those tests and proving the generated ABI requires explicit authorization,
+but this debt does not block feature source implementation against the frozen
+v2.2 handoff.
 
 ## Next Action
 
-ADAPTER may consume the frozen interface immediately. Keep CONTRACT in Review
-until its test/hash/build verification debt is explicitly authorized and
-completed.
+Feature workers consume only the generated Filmtone artifacts. Return to this
+owner repository later for explicitly authorized test/hash/build verification.
 
 ## Handoff
 

@@ -23,20 +23,21 @@ All dispatches follow `delegation.md`. Master states are:
 - CinePrint overlap: never stack Gate Weave or Dust by default.
 - Source ownership: Film Breath in Filmtone; generic Film Damage / Gate Weave
   in `visual-effect-core`; Filmtone mapping in `filmtone-pack`.
-- Foundation implementation: CONTRACT/HOST source scopes complete with
-  verification debt; ADAPTER running.
+- Foundation implementation: CONTRACT, HOST, and ADAPTER source handoffs are
+  accepted into one clean integration branch; verification debt is retained.
+- Feature wave: BREATH, WEAVE, and DAMAGE are ready for simultaneous dispatch.
 - Tests, installation, and release: not started.
 
 ## Workstream Status
 
 | ID | Plan | Progress | Repository | Depends on | State |
 |---|---|---|---|---|---|
-| `CONTRACT` | [Plan](workstreams/contract-and-product-mapping.md) | [Progress](workstreams/progress/contract-and-product-mapping.md) | visual-effect-core | planning | Review — interface frozen; verification blocked |
-| `HOST` | [Plan](workstreams/ofx-host-foundation.md) | [Progress](workstreams/progress/ofx-host-foundation.md) | Filmtone | planning | Review — verification blocked |
-| `ADAPTER` | [Plan](workstreams/filmtone-contract-adapter.md) | [Progress](workstreams/progress/filmtone-contract-adapter.md) | Filmtone | CONTRACT interface freeze | Running; clean-base gate passed |
-| `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Blocked |
-| `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Blocked |
-| `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Blocked |
+| `CONTRACT` | [Plan](workstreams/contract-and-product-mapping.md) | [Progress](workstreams/progress/contract-and-product-mapping.md) | visual-effect-core | planning | Accepted — source integrated; verification debt retained |
+| `HOST` | [Plan](workstreams/ofx-host-foundation.md) | [Progress](workstreams/progress/ofx-host-foundation.md) | Filmtone | planning | Accepted — source integrated; verification debt retained |
+| `ADAPTER` | [Plan](workstreams/filmtone-contract-adapter.md) | [Progress](workstreams/progress/filmtone-contract-adapter.md) | Filmtone | CONTRACT interface freeze | Accepted — source integrated; verification debt retained |
+| `BREATH` | [Plan](workstreams/film-breath.md) | [Progress](workstreams/progress/film-breath.md) | Filmtone | CONTRACT + ADAPTER + HOST | Ready |
+| `WEAVE` | [Plan](workstreams/gate-weave.md) | [Progress](workstreams/progress/gate-weave.md) | Filmtone | CONTRACT + ADAPTER + HOST | Ready |
+| `DAMAGE` | [Plan](workstreams/film-damage.md) | [Progress](workstreams/progress/film-damage.md) | Filmtone | CONTRACT + ADAPTER + HOST | Ready |
 | `INTEGRATION` | [Plan](workstreams/resolve-integration.md) | [Progress](workstreams/progress/resolve-integration.md) | Filmtone | BREATH + WEAVE + DAMAGE | Blocked |
 | `QUALITY` | [Plan](workstreams/visual-quality.md) | [Progress](workstreams/progress/visual-quality.md) | Filmtone + Resolve | INTEGRATION + explicit authorization | Blocked |
 
@@ -59,14 +60,22 @@ path, plugin interface, and clean integration base.
 
 | ID | Task | Worktree mode | Assigned base | State |
 |---|---|---|---|---|
-| CONTRACT | `019f7416-8ed4-7023-947d-8f5d0570f38c` | `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core` | `84efd1a8a5dae0edd3afb777a0428739f7c1e72b` | Review — interface frozen; verification blocked |
-| HOST | `019f7416-9bd1-7e12-a95e-cfee8eda1797` | `/Users/chibatakumi/.codex/worktrees/a45d/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Review — verification blocked |
-| ADAPTER | `019f7438-f67e-7c11-80fc-81839b706589` | `/Users/chibatakumi/.codex/worktrees/66f1/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Running; clean-base gate passed |
+| CONTRACT | `019f7416-8ed4-7023-947d-8f5d0570f38c` | `/Users/chibatakumi/.codex/worktrees/7057/visual-effect-core` | `84efd1a8a5dae0edd3afb777a0428739f7c1e72b` | Accepted as `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f` |
+| HOST | `019f7416-9bd1-7e12-a95e-cfee8eda1797` | `/Users/chibatakumi/.codex/worktrees/a45d/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Accepted as `325488e2ab86e5c25459949702ea880a888ac12d` |
+| ADAPTER | `019f7438-f67e-7c11-80fc-81839b706589` | `/Users/chibatakumi/.codex/worktrees/66f1/filmtone` | `a840634ac2a630df36b10d414ec1c4e53f27a6ce` | Accepted as `7e33462357a2532d16713c813fdd65ea04d70ebd` |
 
-The current planning source is detached and dirty. Until these documents are
-integrated, dispatched workers read the coordinator-provided absolute planning
-path read-only and return their structured handoff in-task. They never write
-to the planning worktree.
+## Foundation Integration Record
+
+- Planning commit: `a9410a6040164f29d02827cfce84b7fff04d2145`.
+- External CONTRACT commit: `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f`.
+- HOST source commit: `325488e2ab86e5c25459949702ea880a888ac12d`.
+- ADAPTER source commit: `7e33462357a2532d16713c813fdd65ea04d70ebd`.
+- Combined Filmtone source commit: `fcb3e85` on
+  `feature/davinci-ofx-foundation`.
+- Clean coordinator worktree:
+  `/Users/chibatakumi/.codex/worktrees/filmtone-davinci-foundation`.
+- Feature dispatch base: the readiness commit containing this record; its full
+  SHA and task IDs are recorded immediately after all three tasks are created.
 
 ## Proposed File Ownership
 
@@ -107,44 +116,56 @@ read-only evidence for this project:
 - `apps/capacitor-film-lab-ios/ios/App/App/Export/FilmtoneExportSession.swift`
 - `docs/filmtone/desktop/native-desktop-v2/strategy.md`
 
-Do not branch implementation work from this detached dirty worktree. Initial
-tasks must use clean project worktrees; they may read the absolute planning
-path under the exception in `delegation.md`. Record clean base commits before
-accepting work. Do not archive or rewrite
+Do not branch implementation work from the detached dirty owner worktree. The
+planning exception has ended; feature tasks use the clean Foundation branch
+and in-repository planning documents. Do not archive or rewrite
 `docs/filmtone/davinci-bridge/active.md` as part of this lane; it belongs to a
 separate completed Bridge task.
 
 ## Foundation Freeze Record
 
-Partially populated. Before `BREATH`, `WEAVE`, and `DAMAGE` start, the
-coordinator must complete this record:
+Source freeze complete; only the exact readiness-commit SHA awaits the
+post-creation dispatch record.
 
-- clean base commit;
-- external Film Damage contract: version 2, revision 2.2;
-- generic Gate Weave: amount, short-axis X/Y amplitude, clockwise rotation
-  amplitude, cycles/second cadence, deterministic jitter, travel axis;
-- deterministic render context: version 1; Resolve adapter must convert OFX
-  frame-time to seconds and pass explicit frame index/fps;
-- generated/public C++ handoff: frozen CONTRACT paths recorded in the CONTRACT
-  progress file; ADAPTER handoff pending;
-- Film Breath C++ handoff source;
-- OFX plugin identifier and parameter ID list;
-- render context fields for time, frame rate, seed, render scale, and bounds;
-- module interface and uniform ownership;
-- supported pixel format and Metal buffer assumptions;
-- build command and bundle output path;
-- explicit test authorization state.
+- Integrated Filmtone source commit: `fcb3e85`.
+- External owner commit: `6e7969a8a1ecff8519b7ef3dd0c6a0f24af1b61f`.
+- Film Damage contract: version 2, revision 2.2.
+- Generic Gate Weave: amount, short-axis X/Y amplitude, clockwise rotation
+  amplitude, cycles/second cadence, deterministic jitter, and travel axis.
+- Deterministic render context: version 1. Resolve conversion is
+  `hostTimeSeconds = ofxTimeFrames / resolvedFrameRate`, with explicit frame
+  index/fps and no generic 24 fps fallback.
+- Stable generated include:
+  `Sources/Generated/Contracts/filmtone_finish_contracts.hpp`.
+- Film Breath authority: `packages/film-lab-core/src/film-breath.ts`; generated
+  handoff: `Sources/Generated/Contracts/filmtone_film_breath.hpp`.
+- Plugin identifier: `com.chibatakumi.filmtone.finish`.
+- Parameter IDs/defaults/ranges: the 17-entry
+  `kFilmtoneFinishParameterDefinitions` array in
+  `forestone_filmtone_finish_mapping.hpp`.
+- Host context: time, source/timeline frame rates, optional explicit seed,
+  render scale, render window, source bounds, and output bounds.
+- Module boundary: `host::ModuleProcessor`; Film Breath offsets and Film
+  Damage/Gate Weave uniforms remain generated-contract values, while each
+  feature owns only its local processor and Metal resources.
+- Buffer contract: Metal-only float RGBA with explicit buffer, row bytes, and
+  bounds; alpha and extended-range RGB must be preserved.
+- Build command: `make -C apps/filmtone-resolve-ofx`.
+- Expected bundle: `apps/filmtone-resolve-ofx/build/FilmtoneFinish.ofx.bundle`.
+- Tests, builds, Resolve launch, installation, and test-file work: not
+  authorized in this feature wave.
 
 ## Verification State
 
 - Research: complete.
-- Planning documents: complete in this chat.
-- Source implementation: CONTRACT and HOST terminal source handoffs reviewed;
-  both retain explicit verification debt. ADAPTER is running.
+- Planning documents: integrated into the clean Foundation branch.
+- Source implementation: CONTRACT, HOST, and ADAPTER handoffs reviewed and
+  integrated; explicit build/test/Resolve verification debt remains.
 - Builds/tests/Resolve launch: not run.
 - Test files: not created or modified.
 - `/Library/OFX/Plugins`: not modified.
-- External repositories: read only in this chat.
+- External CONTRACT source was committed locally as the recorded owner commit;
+  feature workers treat the external repository as read-only.
 
 ## Coordinator Closeout Rules
 

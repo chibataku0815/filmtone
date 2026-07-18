@@ -6,22 +6,23 @@ Last synced: 2026-07-18 JST
 
 ## State
 
-`Blocked on CONTRACT + ADAPTER + HOST acceptance`
+`Ready — Foundation source freeze accepted`
 
 ## Assignment
 
 - Task: not created
 - Repository: Filmtone
-- Worktree/base: Foundation Freeze SHA, not yet available
+- Worktree/base: assigned at dispatch from the Foundation readiness commit
 - Parallel peers: `BREATH`, `WEAVE`
 
 ## Current Loop
 
-Not started.
+Foundation dependencies and exclusive edit area are accepted. Worker not yet
+started.
 
 ## Checklist
 
-- [ ] Confirm accepted Film Damage contract and module interface.
+- [x] Confirm accepted Film Damage contract and module interface.
 - [ ] Confirm Foundation Freeze SHA and exclusive feature directory.
 - [ ] Implement independent Dust, Fibers, Scratches, Stains, and Gate Wear.
 - [ ] Preserve Filmtone's dark debris and broken-scratch character.
@@ -41,13 +42,12 @@ None.
 
 ## Blockers
 
-Foundation Freeze Record is incomplete.
+No dependency blocker. Builds/tests remain outside this worker authorization.
 
 ## Next Action
 
-Launch together with BREATH and WEAVE only after Foundation acceptance.
+Dispatch together with BREATH and WEAVE from the same readiness commit.
 
 ## Handoff
 
 Not started.
-
