@@ -1,0 +1,24 @@
+name = "filmtone-license-worker"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# Created in the owner Cloudflare account on 2026-07-18.
+[[kv_namespaces]]
+binding = "TRIAL_KV"
+id = "7e939ca054614c57b31ed9503613c87a"
+
+[vars]
+FROM_EMAIL = "Filmtone <filmtone@fores-tone.co.jp>"
+# Public Filmtone family page. The Finish-specific page will share these origins.
+# The trial form widget must set data-action="filmtone_trial"; the Worker also
+# requires Siteverify hostname to match one of these origins.
+ALLOWED_ORIGIN = "https://chibatakumi.studio,https://www.chibatakumi.studio"
+TRIAL_DAYS = "14"
+PRODUCT_URL = "https://www.chibatakumi.studio/filmtone"
+
+# Secrets (never in this file) — all four are REQUIRED:
+#   wrangler secret put TRIAL_PRIVATE_KEY   # privateKeyPkcs8Hex from filmtone-trial.key.json
+#   wrangler secret put RESEND_API_KEY
+#   wrangler secret put TRIAL_HASH_SECRET   # long random string (e.g. `openssl rand -hex 32`)
+#   wrangler secret put TURNSTILE_SECRET    # REQUIRED (fail-closed). Pre-launch:
+#     use Cloudflare's official Turnstile test keys (always-pass) for curl checks.

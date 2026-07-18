@@ -2,6 +2,8 @@ SHELL := /bin/sh
 
 CXX := clang++
 
+include Resources/ProductVersion.mk
+
 OFX_SDK_ROOT ?= /Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/OpenFX
 
 BUILD_DIR := build
@@ -16,9 +18,13 @@ CPPFLAGS := -I"$(OFX_SDK_ROOT)/OpenFX-1.4/include" \
 	-ISources \
 	-ISources/Host
 CXXFLAGS := -std=c++17 -O2 -arch arm64 -fvisibility=hidden \
-	-fvisibility-inlines-hidden -Wall -Wextra -Wpedantic
+	-fvisibility-inlines-hidden -Wall -Wextra -Wpedantic \
+	-mmacosx-version-min=$(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET)
 LDFLAGS := -bundle -arch arm64 -fvisibility=hidden \
+	-mmacosx-version-min=$(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET) \
 	-framework AppKit -framework Foundation -framework Metal
+
+SIGN_IDENTITY ?=
 
 PLUGIN_CPP_SOURCES := Sources/Host/FilmtoneFinishPlugin.cpp \
 	Sources/Integration/FilmtoneFinishParameters.cpp \
@@ -39,7 +45,7 @@ SUPPORT_OBJECTS := $(addprefix $(OBJECT_DIR)/Support/,$(addsuffix .o,$(SUPPORT_U
 
 OBJECTS := $(PLUGIN_CPP_OBJECTS) $(PLUGIN_MM_OBJECTS) $(SUPPORT_OBJECTS)
 
-.PHONY: all clean
+.PHONY: all clean sign-bundle
 
 # Expected product: build/FilmtoneFinish.ofx.bundle
 all: $(BUNDLE_BINARY) $(BUNDLE_INFO)
@@ -48,25 +54,36 @@ $(BUNDLE_BINARY): $(OBJECTS)
 	@mkdir -p "$(@D)"
 	$(CXX) $(OBJECTS) -o "$@" $(LDFLAGS)
 
-$(BUNDLE_INFO): Resources/Info.plist
+$(BUNDLE_INFO): Resources/Info.plist Resources/ProductVersion.mk
 	@mkdir -p "$(@D)"
 	cp "$<" "$@"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(FILMTONE_FINISH_MARKETING_VERSION)" "$@"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(FILMTONE_FINISH_BUILD_VERSION)" "$@"
+	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $(FILMTONE_FINISH_MACOS_DEPLOYMENT_TARGET)" "$@"
 
-$(OBJECT_DIR)/%.o: Sources/%.cpp
+$(OBJECT_DIR)/%.o: Sources/%.cpp Resources/ProductVersion.mk
 	@mkdir -p "$(@D)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c "$<" -o "$@"
 
-$(OBJECT_DIR)/%.o: Sources/%.mm
+$(OBJECT_DIR)/%.o: Sources/%.mm Resources/ProductVersion.mk
 	@mkdir -p "$(@D)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c "$<" -o "$@"
 
 define compile_support_unit
-$(OBJECT_DIR)/Support/$(1).o:
+$(OBJECT_DIR)/Support/$(1).o: Resources/ProductVersion.mk
 	@mkdir -p "$$(@D)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c "$(OFX_SDK_ROOT)/Support/Library/$(1).cpp" -o "$$@"
 endef
 
 $(foreach unit,$(SUPPORT_UNITS),$(eval $(call compile_support_unit,$(unit))))
+
+sign-bundle: all
+	@if [ -z "$(SIGN_IDENTITY)" ]; then \
+		echo 'SIGN_IDENTITY must name a Developer ID Application identity' >&2; \
+		exit 2; \
+	fi
+	/usr/bin/codesign --force --options runtime --timestamp \
+		--sign "$(SIGN_IDENTITY)" "$(BUNDLE_ROOT)"
 
 clean:
 	rm -rf "$(BUILD_DIR)"

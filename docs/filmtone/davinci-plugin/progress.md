@@ -46,20 +46,22 @@ All dispatches follow `delegation.md`. Master states are:
   integrated](workstreams/progress/film-breath-quality.md): temperature/tint
   now use positive per-channel gains instead of additive RGB offsets. The
   revised combined bundle builds, installs, and is enumerated by Resolve;
-  product acceptance now waits only for the owner visual verdict.
+  the owner verdict is below pass, so the next independent iteration must begin
+  with a concrete owner-observed failure.
 - Film Damage detailed quality correction is [statically accepted and
   working-tree integrated](workstreams/progress/film-damage-quality.md): all
   five material families were rebuilt around richer procedural and temporal
   behavior. Coordinator follow-up removed hidden Scratch/Fiber length
   multipliers so the frozen recipe remains authoritative. The revised combined
-  bundle builds, installs, and is enumerated by Resolve; family-isolated and
-  combined owner viewing remain.
+  bundle builds, installs, and is enumerated by Resolve; the owner passed Film
+  Damage for the current internal cycle.
 - Gate Weave quality correction is [source-integrated through the canonical
   owner](workstreams/progress/gate-weave-quality.md): Film Damage contract
   revision 2.3 now owns the bounded correlated multi-band drift/scatter model,
   and Filmtone consumes its regenerated handoff with an exact motion envelope.
   The revised combined bundle builds, installs, and is enumerated by Resolve;
-  its owner motion/crop/softness verdict remains.
+  the owner verdict is below pass, so the next independent iteration must begin
+  with a concrete owner-observed failure.
 - Current-cycle disposition: **closed, not Internal Core Baseline Complete**.
   All three research-backed corrections build and install, but only Film Damage
   received owner pass. Breath/Weave detail capture and tuning become later
@@ -105,7 +107,7 @@ path, plugin interface, and clean integration base.
 | WEAVE | `019f7470-153f-7aa3-9797-77d4aa980bc6` | `/Users/chibatakumi/.codex/worktrees/3fb973be-7602-4dd3-bf4c-c0acd3049ea3/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `5aa5180a465cff1330b5f208a9aff24ed0c6e4fc` |
 | DAMAGE | `019f7470-635b-7770-a419-fe02051fbe74` | `/Users/chibatakumi/.codex/worktrees/751b9f41-bc21-4e13-b82d-1c94af7b9d62/filmtone` | `6130aae610de9f8c535f4e72d2078f2f1aabed66` | Accepted as `3ddc56cb95aeb093712a56d301358ff796f3d1f7` |
 | INTEGRATION | `019f74a1-81dc-7572-bf8c-3dea21472755` | `/Users/chibatakumi/.codex/worktrees/97f1/filmtone` | `eb860dfeea7a4d45fa159839ad5454a371afbab9` | Accepted as `57434fc1187df8a8175d74b69c18e63c94ee5a52`; integrated as `915012a` |
-| QUALITY | `019f74bc-834b-7ce0-9a22-0297ab4a84cc` | `/Users/chibatakumi/.codex/worktrees/1433/filmtone` | `f16aa4a6bdeaff740f59a60c5029af40c491e905` | Running — Resolve host gate passed; visual tuning continues |
+| QUALITY | `019f74bc-834b-7ce0-9a22-0297ab4a84cc` | `/Users/chibatakumi/.codex/worktrees/1433/filmtone` | `f16aa4a6bdeaff740f59a60c5029af40c491e905` | Closed with partial acceptance — Damage pass; Breath/Weave below pass and deferred |
 
 ## Foundation Integration Record
 

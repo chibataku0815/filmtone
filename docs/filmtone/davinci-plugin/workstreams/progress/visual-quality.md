@@ -322,11 +322,11 @@ stopped-frame timing. Real-time playback is not inferred.
 ## Copy / History Impact
 
 - No public copy/history impact: the result proves an internal arm64 evaluation
-  bundle, Resolve discovery, and direct accepted-processor execution only. It
-  does not prove Resolve-host rendering, compatibility, availability, or
-  distribution.
-- Article Opportunity: **Full article remains deferred** until Resolve-host
-  rendering, owner visual acceptance, and distribution are true.
+  bundle, Resolve discovery, Color-page instantiation/rendering, and the recorded
+  per-module/combined checks only. It does not prove compatibility, availability,
+  distribution, or public product acceptance.
+- Article Opportunity: **Full article remains deferred** until Breath/Weave and
+  combined/public product acceptance, compatibility, and distribution are true.
 - Change-History Opportunity: **No new direction**; the work follows the
   recorded one-Filter, Metal-only OpenFX decision.
 
