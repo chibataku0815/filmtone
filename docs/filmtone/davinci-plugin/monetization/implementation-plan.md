@@ -22,9 +22,11 @@ coordinator 所有物・Git 操作はオーナー)は課金作業にも適用す
 - 最新mainのQUALITYはpartial acceptanceでclosedした。Film Damageはpass、
   Film Breath / Gate Weaveはbelow passで、combined/public product acceptanceは
   未成立。残る視覚判断はwatermarkだけではない。
-- MON-2(プラグイン本体)は、Film Breath / Gate Weaveの独立品質iterationが
-  owner passを得てcombined/public acceptanceが明示された後にdispatchする。
-  それまでは`Blocked`。MON-3 / MON-4は品質回復と並行できる。
+- MON-2(プラグイン本体)の品質ゲートは **2026-07-19 に owner 判断で waived**
+  (progress 改訂 17)。Film Breath / Gate Weave の owner pass を待たず dispatch 可
+  (`Ready`)。トレードオフ(品質基準の引き下げ)は記録済みで、最終的な公開
+  module scope(all-three-as-is / Film-Damage-first)は MON-6 前に確定する。
+  MON-3 / MON-4 は MON-2 と並行できる。
 - 2026-07-19に`origin/main`を再取得し、現作業ブランチが最新
   `origin/main`をすでに含むことを確認済み。追加mergeは不要。名称同期の
   作業ツリー差分は、追加deployまたはMON-2 dispatch前にscopeを確認し、
@@ -130,10 +132,12 @@ Breath / Weaveを推測調整しない。
 
 ## 3. MON-2 LICENSE(プラグイン本体)
 
-Dispatch 条件: Film Breath / Gate Weaveの独立品質iterationがowner pass、
-combined/public product acceptance明示、本書レビュー、Source durability gate完了。
-Worker base: その時点で`origin/main`から取得できる最新review済み統合ref。
-ローカルのみの`main`や古いplan branchから切らない。
+Dispatch 条件(2026-07-19 改訂): 品質ゲート(Breath/Weave owner pass +
+combined/public acceptance)は owner 判断で **waived**(progress 改訂 17)。残る
+前提は本書レビュー、Source durability gate 完了、`workstreams/license.md` 起票。
+Worker base: その時点で`origin/main`から取得できる最新review済み統合ref
+(identity 移行を含む現ブランチ HEAD)。ローカルのみの`main`や古いplan branchから
+切らない。
 
 ### 編集領域(排他)
 
@@ -449,3 +453,10 @@ Stop(発生時は progress.md に記録して停止):
   combined/public acceptanceをMON-2前提に追加。local-only / untracked sourceの
   durability gate、Turnstile hostname/action binding、ProductVersion.mkによる
   macOS/version正本、内包OFXのDeveloper ID Application先行署名を発売条件化。
+- 2026-07-19 (改訂 6 / 品質ゲート waiver): identity 移行 landed(`6104168` +
+  `1f0959a`)の独立検証後、owner が「品質バー変更 / スコープ縮小で MON-2 へ」を
+  選択。§0 / §3 の MON-2 dispatch 条件から Breath/Weave owner pass +
+  combined/public acceptance を除外(progress 改訂 17)。MON-2 を Ready 化し
+  immutable workstream plan `workstreams/license.md` を起票。トレードオフ
+  (品質基準の引き下げ)と、最終 module scope を MON-6 前に確定する条件を記録。
+  §2 wire format・§3 実装仕様・§4 鍵運用は不変。

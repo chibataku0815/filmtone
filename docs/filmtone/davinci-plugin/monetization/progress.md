@@ -32,8 +32,8 @@ Coordinator-owned: yes
 - latest mainのQUALITYはResolve 21.0.2.4ホスト実描画までpassしたが、owner verdictは
   Damage pass / Breath・Weave below passでpartial acceptanceのままclosed。
   combined/public acceptanceは未成立。
-- **MON-2 Blocked**: Breath / Weave独立品質iterationのowner pass、quality matrix、
-  combined/public acceptance後にのみdispatch。MON-5はMON-2後。
+- **MON-2 Ready(2026-07-19・改訂 17)**: 品質ゲートは owner 判断で waived。
+  `workstreams/license.md` 起票済みで dispatch 可。MON-5 は MON-2 後。
 - **Source durability Completed (2026-07-19)**: 統合baseとmonetization sourceを
   commit `f8c4611`として
   `origin/claude/davinci-plugin-pricing-plan-4cb87b`へpush済み。別checkoutから
@@ -45,6 +45,37 @@ Coordinator-owned: yes
   配布物は `Filmtone.ofx.bundle` / `Filmtone-<version>.pkg`、OFX 識別子は
   `com.chibatakumi.filmtone.resolve`に統一。旧生成契約の内部識別子は互換性資料
   として隔離し、公開コピー・配布名・新規実装には使用しない。
+- **ローンチ実行の現在地 (2026-07-19)**: identity 移行は landed
+  (`6104168` + push tip `1f0959a`、origin へ push 済み)。独立検証で build 成果物
+  identity 一致・static consistency PASS・`git diff --check` clean・frozen 契約
+  境界保全を確認。以降の critical path と担当ゲートは次節。2026-07-19 に owner が
+  品質ゲートを **waived**(改訂 17): Breath/Weave の owner pass を待たず MON-2 へ進む。
+
+## ローンチ実行順序と担当ゲート(2026-07-19 現在地起点)
+
+計画正本は [implementation-plan.md](implementation-plan.md)(= 課金 対応計画書)、
+本書が進行書。ここでは現在地から発売までの critical path を担当ゲート付きで
+一覧化する(新規の重複 plan は作らない)。
+
+担当区分: **C**=Claude 自律可 / **C+auth**=owner の testing/実行 authorization
+後に Claude / **O**=owner のみ(署名 material・本番 endpoint・公開承認・Git 操作)。
+
+| # | ステップ | 担当 | ゲート / 前提 |
+|---|---|---|---|
+| G0a | Film Breath 独立品質 iteration | — | **2026-07-19 owner 判断で waived(改訂 17)**。MON-2 前提から除外し、将来の独立 iteration へ送る |
+| G0b | Gate Weave 独立品質 iteration | — | 同上 — **waived(改訂 17)**。将来の独立 iteration へ送る |
+| G0c | 公開 module scope 確定(all-three-as-is / Film-Damage-first) | O | MON-6 前に owner が確定(改訂 17 で MON-2 前提からは外れた) |
+| H | renamed `Filmtone.ofx.bundle` の Resolve 内再検証(discovery / identity / determinism) | O | Resolve 起動が必要(Claude は手順提供のみ) |
+| M2 | MON-2 LICENSE 実装(watermark + ed25519 + expires + status) | C+auth | **Ready**: `workstreams/license.md` 起票済み・実装可。テスト実行 / ウォーターマーク視覚 / ed25519 vendoring は owner authorization gate |
+| M4 | MON-4 発売ゲート残(Resend 実送達 / Turnstile 実 token 成功 / 購入者 bridge 例外文面) | C+auth / O | 本番 endpoint 呼出しは owner authorization |
+| M5 | MON-5 .pkg 署名 + notarization | O | Developer ID 署名 material(secret・Claude 非接触)。Claude は unsigned build + runbook のみ |
+| M6 | MON-6 launch(製品ページ / 記事 / 価格公開) | C(記事 draft)/ O(portfolio・価格公開承認) | release truth gate + owner 承認 |
+| W | Worker deploy 状態の reconcile | O | docs 改訂 15(`6104168` deploy 済みと記録)と本タスク brief(`f8c4611` が現行)の矛盾を owner が確定 |
+
+2026-07-19 owner 判断(改訂 17)で G0 品質ゲートを waived。**MON-2 は Ready**:
+`workstreams/license.md` を起票し実装可能。残る owner ゲートは MON-2 内の
+テスト実行・ウォーターマーク視覚確定・ed25519 vendoring 承認、および MON-5 署名 /
+Worker deploy / 公開 module scope(MON-6 前に確定)/ 価格公開。
 
 ## ワークストリーム一覧
 
@@ -53,7 +84,7 @@ Coordinator-owned: yes
 | ID | 内容 | 仕様 | 依存 | プラグイン本体に触るか | State |
 |---|---|---|---|---|---|
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
-| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質回復 + combined/public受入 | **是** | **Blocked** |
+| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質ゲート waived(2026-07-19 owner・改訂 17) | **是** | **Ready — [license.md](workstreams/license.md) 起票済み・dispatch 可** |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
 | MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — product identity同期版deploy・安全な失敗系・外部表示名sync完了。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
@@ -70,8 +101,9 @@ Breath / Weave品質回復 + combined/public受入 ──── MON-2 ─ MON-5 
 MON-7は発売後の実売で判断
 ```
 
-MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに触らない)。
-クリティカルパスは品質回復 -> MON-2 -> MON-5 -> MON-6。
+MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触らない)。
+クリティカルパスは MON-2 -> MON-5 -> MON-6(2026-07-19 に品質ゲートを waived・
+改訂 17。品質回復は発売前提から外れ、将来の独立 iteration へ)。
 
 ## 各ワークストリームの Done 条件
 
@@ -88,9 +120,9 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 
 ### MON-2 LICENSE 実装(プラグイン本体)
 
-- [ ] Film Breath / Gate Weaveの独立品質iterationで具体的owner failureを修正し、
-  両方owner pass
-- [ ] quality matrixとcombined/public product acceptance
+- [~] **2026-07-19 owner 判断で waived(改訂 17)**: Film Breath / Gate Weave の
+  owner pass と combined/public acceptance は MON-2 の前提から外す。公開 module
+  scope(all-three-as-is / Film-Damage-first)は MON-6 前に確定する
 - [x] source durability gate(remoteからbaseとmonetization sourceを再取得可能)
 - [ ] 未ライセンス時のみ deterministic watermark を最終パスで合成
 - [ ] ライセンスファイル(ed25519)のオフライン検証。ネットワークコード 0 行
@@ -354,3 +386,29 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   Copy / History Impact: 外部管理画面とWorker deployを確定済みproduct identityへ
   同期しただけで、公開release claimは追加していない。Article Opportunity:
   No story。Change-History Opportunity: No。
+- 2026-07-19 (改訂 16 / launch 実行ゲート整理): identity 移行の landed を独立検証
+  (build 成果物 identity 一致・static consistency PASS・`git diff --check` clean・
+  frozen 契約境界 `Sources/Generated/Contracts/` / param ID
+  `com.forestone.filmtone.finish.*` 保全)。発売までの critical path を担当ゲート
+  付きで整理(新規の重複 plan は作らず本進行書へ集約)。先頭 G0(Breath / Weave
+  品質)が owner-observed defect 待ちで、MON-2 は Blocked のまま。よってこのターンで
+  着手できる非ゲート実装作業は無く、次の一手は owner の Breath/Weave verdict。
+  Worker deploy 状態は改訂 15(`6104168` deploy 済み記録)と本タスク brief
+  (`f8c4611` 現行)が矛盾するため owner reconcile 事項として surface
+  (改訂 15 は日付・Version ID 付き coordinator 記録のため削除せず保持)。
+  Copy / History Impact: 進行状態の記録のみで公開 claim なし。Git commit/push は
+  未実施(owner 承認待ち)。
+- 2026-07-19 (改訂 17 / 品質ゲート waiver・MON-2 Ready 化): owner が
+  「品質バー変更 / スコープ縮小で MON-2 へ」を選択(AskUserQuestion)。これにより
+  MON-2 dispatch の前提だった「Film Breath / Gate Weave の owner pass +
+  combined/public acceptance」を **waived** し、MON-2 を Blocked -> Ready に更新。
+  immutable workstream plan [license.md](workstreams/license.md) を起票
+  (実行仕様は implementation-plan §2/§3)。**トレードオフ(明示)**: Breath/Weave は
+  以前 owner bar 未達で、これを発売前提から外すのは品質基準の引き下げ。最終的な
+  公開 module scope(all-three-as-is か Film-Damage-first か)は MON-6 前に確定し、
+  それまで公開 quality/parity claim はしない。MON-2 内には残る owner ゲート
+  (テスト実行・adversarial vector 検証の testing authorization / ウォーターマーク
+  視覚確定 / ed25519 vendoring 承認)。Git: owner 承認により本改訂と 改訂 16、
+  license.md を `docs(ofx): record launch gates and MON-2 license plan`
+  として commit/push。Copy / History Impact: 進行・計画記録のみで公開 claim なし。
+  Article Opportunity: No story。Change-History Opportunity: No。
