@@ -1,7 +1,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
+#include "../Generated/Contracts/filmtone_resolve_spatial.hpp"
 #include "../Integration/FilmtoneFinishParameters.h"
 #include "../Integration/FilmtoneFinishRenderGraph.h"
 #include "MetalPipelineCache.h"
@@ -12,14 +14,14 @@
 namespace filmtone::resolve::host {
 namespace {
 
-constexpr char kPluginName[] = "Filmtone Finish";
-constexpr char kPluginGrouping[] = "Filmtone";
-constexpr char kPluginIdentifier[] = "com.chibatakumi.filmtone.finish";
+constexpr std::string_view kPluginName =
+    ::filmtone::resolve::spatial::kFilmtonePublicDisplayName;
+constexpr std::string_view kPluginIdentifier =
+    ::filmtone::resolve::spatial::kFilmtoneCompatibilityPluginId;
 constexpr char kPluginDescription[] =
-    "Adds deterministic Film Breath, Gate Weave, and Film Damage. Apply "
-    "Filmtone Finish manually after CinePrint35 by default; the effect remains "
-    "movable. When using CinePrint35, keep only one Gate Weave treatment and "
-    "one Dust treatment enabled.";
+    "Combines Filmtone spatial optics with deterministic Film Breath, Gate "
+    "Weave, and Film Damage. Use Node Role to place Optics before CinePrint35 "
+    "and the three film modules after it, or use All in one node.";
 constexpr int kPluginVersionMajor = 0;
 constexpr int kPluginVersionMinor = 1;
 
@@ -30,6 +32,13 @@ RectI makeRect(const OfxRectI& rect) {
 bool isFloatRGBA(const OFX::Image& image) {
     return image.getPixelDepth() == OFX::eBitDepthFloat &&
            image.getPixelComponents() == OFX::ePixelComponentRGBA;
+}
+
+integration::SourceAlphaAssociation sourceAlphaAssociation(
+    const OFX::Image& image) noexcept {
+    return image.getPreMultiplication() == OFX::eImagePreMultiplied
+        ? integration::SourceAlphaAssociation::premultiplied
+        : integration::SourceAlphaAssociation::unassociatedOrOpaque;
 }
 
 class FilmtoneFinishEffect final : public OFX::ImageEffect {
@@ -61,7 +70,7 @@ public:
             sourceFrameRate,
             timelineFrameRate);
         if (!resolvedFrameRates.has_value() &&
-            !integration::isFilmtoneFinishConfiguredIdentity(evaluated)) {
+            integration::requiresFilmtoneFinishTemporalFrameRate(evaluated)) {
             OFX::throwSuiteStatusException(kOfxStatErrValue);
         }
         const FrameRates frameRates = resolvedFrameRates.has_value()
@@ -98,11 +107,13 @@ public:
                 evaluated,
                 context,
                 invocation,
+                source->getPixelAspectRatio(),
+                sourceAlphaAssociation(*source),
                 MetalPipelineCache::shared(),
                 error)) {
             OFX::Log::error(
                 true,
-                "Filmtone Finish render failed: %s",
+                "Filmtone render failed: %s",
                 error.c_str());
             OFX::throwSuiteStatusException(kOfxStatFailed);
         }
@@ -153,7 +164,7 @@ class FilmtoneFinishFactory final
 public:
     FilmtoneFinishFactory()
         : OFX::PluginFactoryHelper<FilmtoneFinishFactory>(
-              kPluginIdentifier,
+              kPluginIdentifier.data(),
               kPluginVersionMajor,
               kPluginVersionMinor) {}
 
@@ -161,8 +172,11 @@ public:
     void unload() override { MetalPipelineCache::shared().clear(); }
 
     void describe(OFX::ImageEffectDescriptor& descriptor) override {
-        descriptor.setLabels(kPluginName, kPluginName, kPluginName);
-        descriptor.setPluginGrouping(kPluginGrouping);
+        descriptor.setLabels(
+            kPluginName.data(),
+            kPluginName.data(),
+            kPluginName.data());
+        descriptor.setPluginGrouping(kPluginName.data());
         descriptor.setPluginDescription(kPluginDescription);
         descriptor.addSupportedContext(OFX::eContextFilter);
         descriptor.addSupportedBitDepth(OFX::eBitDepthFloat);

@@ -2,6 +2,7 @@
 
 #include "FilmtoneFinishRenderGraph.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -10,24 +11,31 @@
 #include <optional>
 #include <vector>
 
+#include "../Effects/DeepGlow/DeepGlowProcessor.h"
 #include "../Effects/FilmBreath/FilmBreathProcessor.h"
 #include "../Effects/FilmDamage/FilmDamageProcessor.h"
 #include "../Effects/GateWeave/GateWeaveProcessor.h"
+#include "../Effects/LensSoftness/LensSoftnessProcessor.h"
+#include "../Effects/PeripheralChromaticShift/PeripheralChromaticShiftProcessor.h"
+#include "../Effects/TextureSoftness/TextureSoftnessProcessor.h"
+#include "../Effects/Vignette/VignetteProcessor.h"
 #include "../Host/MetalIdentityBlit.h"
+#include "../Host/Spatial/SpatialMetalHost.h"
 
 namespace filmtone::resolve::integration {
 namespace {
 
 constexpr std::size_t kFloatRGBABytesPerPixel = sizeof(float) * 4u;
+constexpr std::size_t kMaximumTemporalIntermediates = 2u;
 
-enum class ModuleKind {
+enum class FilmModuleKind {
     filmBreath,
     gateWeave,
     filmDamage,
 };
 
-struct ActiveModule final {
-    ModuleKind kind = ModuleKind::filmBreath;
+struct ActiveFilmModule final {
+    FilmModuleKind kind = FilmModuleKind::filmBreath;
     const host::ModuleProcessor* processor = nullptr;
 };
 
@@ -38,6 +46,28 @@ bool rectsEqual(const host::RectI& left, const host::RectI& right) noexcept {
 
 bool isPositiveFinite(double value) noexcept {
     return std::isfinite(value) && value > 0.0;
+}
+
+bool checkedMultiply(
+    std::size_t left,
+    std::size_t right,
+    std::size_t& result) noexcept {
+    if (left != 0u && right > std::numeric_limits<std::size_t>::max() / left) {
+        return false;
+    }
+    result = left * right;
+    return true;
+}
+
+bool checkedAdd(
+    std::size_t left,
+    std::size_t right,
+    std::size_t& result) noexcept {
+    if (right > std::numeric_limits<std::size_t>::max() - left) {
+        return false;
+    }
+    result = left + right;
+    return true;
 }
 
 const host::RectI* selectFullBounds(
@@ -73,6 +103,19 @@ host::RenderContext makeSeededContext(
     };
 }
 
+host::RenderContext makeConfigurationOnlyContext(
+    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+    return host::RenderContext{
+        0.0,
+        host::FrameRates{0.0, 0.0},
+        static_cast<std::uint64_t>(parameters.finish().variation),
+        host::PointD{0.0, 0.0},
+        host::RectI{0, 0, 0, 0},
+        std::nullopt,
+        std::nullopt,
+    };
+}
+
 std::optional<contracts::ResolveRenderContextV1> makeDamageRenderContext(
     const host::RenderContext& context) noexcept {
     const host::RectI* bounds = selectFullBounds(context);
@@ -104,6 +147,28 @@ std::optional<contracts::ResolveRenderContextV1> makeDamageRenderContext(
         deterministic);
 }
 
+bool filmModulesIdentity(
+    const EvaluatedFilmtoneFinishParameters& parameters,
+    const host::RenderContext& context) noexcept {
+    const auto mapping = forestone::filmtone::mapFilmtoneFinish(
+        parameters.finish());
+    effects::film_breath::FilmBreathProcessor filmBreath(
+        parameters.filmBreath);
+    gate_weave::GateWeaveProcessor gateWeave(mapping);
+    forestone::visual_render::FilmDamageRenderUniformsV1 damageUniforms{};
+    damageUniforms.recipe = mapping.filmDamageRecipe;
+    damage::FilmDamageProcessor filmDamage(damageUniforms);
+    return filmBreath.isIdentity(context) &&
+           gateWeave.isIdentity(context) &&
+           filmDamage.isIdentity(context);
+}
+
+bool roleSchedulesActiveSpatial(
+    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+    return spatial::roleSchedulesSpatialV1(parameters.spatial.nodeRole) &&
+           !spatial::isSpatialConfiguredIdentityV1(parameters.spatial);
+}
+
 class OwnedIntermediateBuffers final {
 public:
     OwnedIntermediateBuffers() = default;
@@ -124,15 +189,19 @@ public:
         if (requestedBounds.empty()) {
             return true;
         }
+        if (requestedBounds.size() > kMaximumTemporalIntermediates) {
+            error = "Filmtone temporal graph exceeds its two-intermediate ceiling.";
+            return false;
+        }
         if (commandQueue == nullptr) {
-            error = "Filmtone Finish cannot allocate an intermediate without a Metal queue.";
+            error = "Filmtone cannot allocate an intermediate without a Metal queue.";
             return false;
         }
 
         id<MTLCommandQueue> queue =
             static_cast<id<MTLCommandQueue>>(commandQueue);
         if (queue == nil || queue.device == nil) {
-            error = "Filmtone Finish received an invalid Metal command queue for its pass graph.";
+            error = "Filmtone received an invalid Metal queue for its pass graph.";
             return false;
         }
 
@@ -140,36 +209,37 @@ public:
         views_.reserve(requestedBounds.size());
         for (const host::RectI& bounds : requestedBounds) {
             if (bounds.isEmpty()) {
-                error = "Filmtone Finish received empty full bounds for an active-pass intermediate.";
+                error = "Filmtone received empty full bounds for an intermediate.";
                 return false;
             }
-            const std::size_t width =
-                static_cast<std::size_t>(bounds.width());
-            const std::size_t height =
-                static_cast<std::size_t>(bounds.height());
-            if (width > std::numeric_limits<std::size_t>::max() /
-                            kFloatRGBABytesPerPixel) {
-                error = "Filmtone Finish intermediate row size is not representable.";
-                return false;
-            }
-            const std::size_t rowBytes = width * kFloatRGBABytesPerPixel;
-            if (rowBytes > static_cast<std::size_t>(
+            const std::size_t width = static_cast<std::size_t>(bounds.width());
+            const std::size_t height = static_cast<std::size_t>(bounds.height());
+            std::size_t rowBytes = 0u;
+            std::size_t length = 0u;
+            if (!checkedMultiply(
+                    width,
+                    kFloatRGBABytesPerPixel,
+                    rowBytes) ||
+                rowBytes > static_cast<std::size_t>(
                                std::numeric_limits<std::ptrdiff_t>::max()) ||
-                (height != 0u &&
-                 rowBytes > std::numeric_limits<std::size_t>::max() /
-                                height)) {
-                error = "Filmtone Finish intermediate buffer size is not representable.";
+                !checkedMultiply(rowBytes, height, length)) {
+                error = "Filmtone intermediate size is not representable.";
                 return false;
             }
-            const std::size_t length = rowBytes * height;
+            std::size_t nextTightBytes = 0u;
+            if (!checkedAdd(tightBytes_, length, nextTightBytes)) {
+                error = "Filmtone intermediate reservation is not representable.";
+                return false;
+            }
+
             id<MTLBuffer> buffer = [queue.device
                 newBufferWithLength:length
                              options:MTLResourceStorageModePrivate];
             if (buffer == nil) {
-                error = "Filmtone Finish could not allocate an active-pass Metal intermediate.";
+                error = "Filmtone could not allocate a bounded Metal intermediate.";
                 return false;
             }
-            buffer.label = @"Filmtone Finish Active Pass Intermediate";
+            buffer.label = @"Filmtone Temporal Ping-Pong Intermediate";
             buffers_.push_back(buffer);
             views_.push_back(host::MetalImageView{
                 static_cast<void*>(buffer),
@@ -177,10 +247,11 @@ public:
                 bounds,
                 host::PixelFormat::floatRGBA,
             });
+            tightBytes_ = nextTightBytes;
         }
-        // Each accepted processor commits on the same queue. Metal command
-        // buffers retain their referenced resources until execution finishes,
-        // so this owner's +1 references may be released at scope exit.
+        // All processors commit on one Host queue. Metal command buffers
+        // retain referenced resources, and queue ordering makes sequential
+        // ping-pong reuse safe without a wait or readback.
         return true;
     }
 
@@ -189,92 +260,107 @@ public:
         return views_[index];
     }
 
+    [[nodiscard]] std::size_t tightBytes() const noexcept {
+        return tightBytes_;
+    }
+
 private:
     std::vector<id<MTLBuffer>> buffers_;
     std::vector<host::MetalImageView> views_;
+    std::size_t tightBytes_ = 0u;
 };
 
-bool validateMultiPassLayout(
+bool validateTemporalLayout(
     const host::RenderContext& context,
     const host::MetalRenderInvocation& invocation,
-    const std::array<ActiveModule, 3>& active,
+    const std::array<ActiveFilmModule, 3>& active,
     std::size_t activeCount,
+    bool followsSpatial,
     std::string& error) {
     if (context.sourceBounds.has_value() &&
         !rectsEqual(*context.sourceBounds, invocation.source.bounds)) {
-        error = "Filmtone Finish source bounds disagree with the shared render context.";
+        error = "Filmtone source bounds disagree with the shared render context.";
         return false;
     }
     if (context.outputBounds.has_value() &&
         !rectsEqual(*context.outputBounds, invocation.output.bounds)) {
-        error = "Filmtone Finish output bounds disagree with the shared render context.";
+        error = "Filmtone output bounds disagree with the shared render context.";
         return false;
     }
 
-    for (std::size_t index = 1u; index < activeCount; ++index) {
-        if (active[index].kind == ModuleKind::gateWeave &&
+    for (std::size_t index = 0u; index < activeCount; ++index) {
+        const bool hasPriorStage = followsSpatial || index != 0u;
+        if (hasPriorStage && active[index].kind == FilmModuleKind::gateWeave &&
             !rectsEqual(context.renderWindow, invocation.source.bounds)) {
-            error = "Filmtone Finish requires a full-bounds host render when Gate Weave follows another active module.";
+            error = "Filmtone requires a full-bounds Host render when Gate Weave follows another active stage.";
             return false;
         }
     }
     return true;
 }
 
+bool makeDeepGlowAlphaAssociation(
+    SourceAlphaAssociation association,
+    effects::deep_glow::DeepGlowAlphaAssociationV1& result,
+    std::string& error) {
+    switch (association) {
+        case SourceAlphaAssociation::unassociatedOrOpaque:
+            result = effects::deep_glow::DeepGlowAlphaAssociationV1::
+                unassociatedOrOpaque;
+            return true;
+        case SourceAlphaAssociation::premultiplied:
+            result = effects::deep_glow::DeepGlowAlphaAssociationV1::
+                premultiplied;
+            return true;
+    }
+    error = "Filmtone received an unsupported OFX alpha association.";
+    return false;
+}
+
 }  // namespace
+
+bool requiresFilmtoneFinishTemporalFrameRate(
+    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+    if (!spatial::roleSchedulesFilmModulesV1(parameters.spatial.nodeRole)) {
+        return false;
+    }
+    return !filmModulesIdentity(
+        parameters,
+        makeConfigurationOnlyContext(parameters));
+}
 
 bool isFilmtoneFinishConfiguredIdentity(
     const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
-    const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finish());
-    const host::RenderContext configurationOnlyContext{
-        0.0,
-        host::FrameRates{0.0, 0.0},
-        static_cast<std::uint64_t>(parameters.finish().variation),
-        host::PointD{0.0, 0.0},
-        host::RectI{0, 0, 0, 0},
-        std::nullopt,
-        std::nullopt,
-    };
-
-    // Film Breath returns identity before consulting time/fps only when its
-    // mapped amount or every accepted local response is zero. Gate Weave and
-    // Film Damage configuration identity is already context-independent.
-    effects::film_breath::FilmBreathProcessor filmBreath(
-        parameters.filmBreath);
-    gate_weave::GateWeaveProcessor gateWeave(mapping);
-    forestone::visual_render::FilmDamageRenderUniformsV1 identityUniforms{};
-    identityUniforms.recipe = mapping.filmDamageRecipe;
-    damage::FilmDamageProcessor filmDamage(identityUniforms);
-
-    return filmBreath.isIdentity(configurationOnlyContext) &&
-           gateWeave.isIdentity(configurationOnlyContext) &&
-           filmDamage.isIdentity(configurationOnlyContext);
+    const bool spatialIdentity =
+        !spatial::roleSchedulesSpatialV1(parameters.spatial.nodeRole) ||
+        spatial::isSpatialConfiguredIdentityV1(parameters.spatial);
+    const bool filmIdentity =
+        !spatial::roleSchedulesFilmModulesV1(parameters.spatial.nodeRole) ||
+        filmModulesIdentity(
+            parameters,
+            makeConfigurationOnlyContext(parameters));
+    return spatialIdentity && filmIdentity;
 }
 
 bool isFilmtoneFinishIdentity(
     const EvaluatedFilmtoneFinishParameters& parameters,
     const host::RenderContext& context) noexcept {
     const host::RenderContext seededContext = makeSeededContext(parameters, context);
-    const auto mapping = forestone::filmtone::mapFilmtoneFinish(
-        parameters.finish());
-
-    effects::film_breath::FilmBreathProcessor filmBreath(
-        parameters.filmBreath);
-    gate_weave::GateWeaveProcessor gateWeave(mapping);
-    forestone::visual_render::FilmDamageRenderUniformsV1 identityUniforms{};
-    identityUniforms.recipe = mapping.filmDamageRecipe;
-    damage::FilmDamageProcessor filmDamage(identityUniforms);
-
-    return filmBreath.isIdentity(seededContext) &&
-           gateWeave.isIdentity(seededContext) &&
-           filmDamage.isIdentity(seededContext);
+    const bool spatialIdentity =
+        !spatial::roleSchedulesSpatialV1(parameters.spatial.nodeRole) ||
+        spatial::isSpatialConfiguredIdentityV1(parameters.spatial);
+    const bool filmIdentity =
+        !spatial::roleSchedulesFilmModulesV1(parameters.spatial.nodeRole) ||
+        filmModulesIdentity(parameters, seededContext);
+    return spatialIdentity && filmIdentity;
 }
 
 bool encodeFilmtoneFinishMetal(
     const EvaluatedFilmtoneFinishParameters& parameters,
     const host::RenderContext& context,
     const host::MetalRenderInvocation& invocation,
+    double pixelAspectRatio,
+    SourceAlphaAssociation alphaAssociation,
     host::MetalPipelineCache& pipelineCache,
     std::string& error) {
     error.clear();
@@ -283,6 +369,9 @@ bool encodeFilmtoneFinishMetal(
         return true;
     }
 
+    const bool spatialActive = roleSchedulesActiveSpatial(parameters);
+    const bool schedulesFilmModules =
+        spatial::roleSchedulesFilmModulesV1(parameters.spatial.nodeRole);
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
         parameters.finish());
     effects::film_breath::FilmBreathProcessor filmBreath(
@@ -293,112 +382,93 @@ bool encodeFilmtoneFinishMetal(
     identityUniforms.recipe = mapping.filmDamageRecipe;
     damage::FilmDamageProcessor filmDamageIdentityProbe(identityUniforms);
 
-    const bool filmBreathActive = !filmBreath.isIdentity(seededContext);
-    const bool gateWeaveActive = !gateWeave.isIdentity(seededContext);
-    const bool filmDamageActive =
+    const bool filmBreathActive = schedulesFilmModules &&
+        !filmBreath.isIdentity(seededContext);
+    const bool gateWeaveActive = schedulesFilmModules &&
+        !gateWeave.isIdentity(seededContext);
+    const bool filmDamageActive = schedulesFilmModules &&
         !filmDamageIdentityProbe.isIdentity(seededContext);
 
     std::optional<damage::FilmDamageProcessor> filmDamage;
     if (filmDamageActive) {
         const auto damageContext = makeDamageRenderContext(seededContext);
         if (!damageContext.has_value()) {
-            error = "Filmtone Finish could not resolve Film Damage time, frame rate, scale, seed, and bounds.";
+            error = "Filmtone could not resolve Film Damage time, frame rate, scale, seed, and bounds.";
             return false;
         }
         filmDamage.emplace(mapping, *damageContext);
     }
 
-    std::array<ActiveModule, 3> active{};
-    std::size_t activeCount = 0u;
+    std::array<ActiveFilmModule, 3> activeFilm{};
+    std::size_t activeFilmCount = 0u;
     if (filmBreathActive) {
-        active[activeCount++] = ActiveModule{
-            ModuleKind::filmBreath,
+        activeFilm[activeFilmCount++] = ActiveFilmModule{
+            FilmModuleKind::filmBreath,
             &filmBreath,
         };
     }
     if (gateWeaveActive) {
-        active[activeCount++] = ActiveModule{
-            ModuleKind::gateWeave,
+        activeFilm[activeFilmCount++] = ActiveFilmModule{
+            FilmModuleKind::gateWeave,
             &gateWeave,
         };
     }
     if (filmDamageActive) {
-        active[activeCount++] = ActiveModule{
-            ModuleKind::filmDamage,
+        activeFilm[activeFilmCount++] = ActiveFilmModule{
+            FilmModuleKind::filmDamage,
             &*filmDamage,
         };
     }
 
-    if (activeCount == 0u) {
+    if (!spatialActive && activeFilmCount == 0u) {
         return host::encodeMetalIdentityBlit(seededContext, invocation, error);
     }
-    if (activeCount == 1u) {
-        const bool gateWeaveNeedsDistinctOutput =
-            active[0].kind == ModuleKind::gateWeave &&
-            invocation.source.buffer == invocation.output.buffer;
-        if (gateWeaveNeedsDistinctOutput) {
-            OwnedIntermediateBuffers gateWeaveOutput;
-            std::vector<host::RectI> outputBounds;
-            outputBounds.push_back(invocation.output.bounds);
-            if (!gateWeaveOutput.allocate(
-                    invocation.commandQueue,
-                    outputBounds,
-                    error)) {
-                return false;
-            }
-
-            const host::MetalRenderInvocation warpInvocation{
-                invocation.commandQueue,
-                invocation.source,
-                gateWeaveOutput.view(0u),
-            };
-            if (!active[0].processor->encodeMetal(
-                    seededContext,
-                    warpInvocation,
-                    pipelineCache,
-                    error)) {
-                return false;
-            }
-
-            // Gate Weave and the exact windowed copy commit in this order on
-            // the same queue. The source is therefore fully sampled before
-            // the aliased Host output is overwritten.
-            const host::MetalRenderInvocation copyInvocation{
-                invocation.commandQueue,
-                gateWeaveOutput.view(0u),
-                invocation.output,
-            };
-            return host::encodeMetalIdentityBlit(
-                seededContext,
-                copyInvocation,
-                error);
-        }
-        return active[0].processor->encodeMetal(
+    if (!validateTemporalLayout(
             seededContext,
             invocation,
-            pipelineCache,
-            error);
-    }
-    if (!validateMultiPassLayout(
-            seededContext,
-            invocation,
-            active,
-            activeCount,
+            activeFilm,
+            activeFilmCount,
+            spatialActive,
             error)) {
         return false;
     }
 
-    OwnedIntermediateBuffers intermediates;
     std::vector<host::RectI> intermediateBounds;
-    intermediateBounds.reserve(activeCount - 1u);
-    for (std::size_t index = 0u; index + 1u < activeCount; ++index) {
-        const bool gateWeaveReadsThisBuffer =
-            active[index + 1u].kind == ModuleKind::gateWeave;
-        intermediateBounds.push_back(
-            gateWeaveReadsThisBuffer
-                ? invocation.source.bounds
-                : invocation.output.bounds);
+    const bool loneAliasedGateWeave = !spatialActive &&
+        activeFilmCount == 1u &&
+        activeFilm[0].kind == FilmModuleKind::gateWeave &&
+        invocation.source.buffer == invocation.output.buffer;
+    if (spatialActive && activeFilmCount != 0u) {
+        if (!rectsEqual(invocation.source.bounds, invocation.output.bounds)) {
+            error = "Filmtone Spatial ABI v1 requires identical source and output bounds.";
+            return false;
+        }
+        const std::size_t intermediateCount = std::min<std::size_t>(
+            kMaximumTemporalIntermediates,
+            activeFilmCount);
+        intermediateBounds.reserve(intermediateCount);
+        for (std::size_t index = 0u;
+             index < intermediateCount;
+             ++index) {
+            intermediateBounds.push_back(invocation.source.bounds);
+        }
+    } else if (loneAliasedGateWeave) {
+        intermediateBounds.push_back(invocation.output.bounds);
+    } else if (activeFilmCount > 1u) {
+        intermediateBounds.reserve(activeFilmCount - 1u);
+        for (std::size_t index = 0u;
+             index + 1u < activeFilmCount;
+             ++index) {
+            const bool gateWeaveReadsThisBuffer =
+                activeFilm[index + 1u].kind == FilmModuleKind::gateWeave;
+            intermediateBounds.push_back(
+                gateWeaveReadsThisBuffer
+                    ? invocation.source.bounds
+                    : invocation.output.bounds);
+        }
     }
+
+    OwnedIntermediateBuffers intermediates;
     if (!intermediates.allocate(
             invocation.commandQueue,
             intermediateBounds,
@@ -406,25 +476,106 @@ bool encodeFilmtoneFinishMetal(
         return false;
     }
 
-    const host::MetalImageView* currentSource = &invocation.source;
-    for (std::size_t index = 0u; index < activeCount; ++index) {
-        const bool isFinalPass = index + 1u == activeCount;
-        const host::MetalImageView* currentOutput = isFinalPass
-            ? &invocation.output
-            : &intermediates.view(index);
-        const host::MetalRenderInvocation passInvocation{
+    const host::MetalImageView* temporalSource = &invocation.source;
+    if (spatialActive) {
+        effects::deep_glow::DeepGlowAlphaAssociationV1 deepGlowAlpha{};
+        if (!makeDeepGlowAlphaAssociation(
+                alphaAssociation,
+                deepGlowAlpha,
+                error)) {
+            return false;
+        }
+
+        texture_softness::TextureSoftnessProcessor textureSoftness(
+            spatial::makeTextureSoftnessParameterViewV1(parameters.spatial));
+        effects::peripheral_chromatic_shift::PeripheralChromaticShiftProcessor
+            peripheralChromaticShift(parameters.spatial);
+        effects::lens_softness::LensSoftnessProcessor lensSoftness(
+            parameters.spatial);
+        effects::deep_glow::DeepGlowProcessor deepGlow(
+            spatial::makeDeepGlowParameterViewV1(parameters.spatial),
+            deepGlowAlpha);
+        effects::vignette::VignetteProcessor vignette(
+            spatial::makeVignetteParameterViewV1(parameters.spatial));
+        const std::array<const host::spatial::SpatialModuleProcessor*, 5u>
+            spatialModules{{
+                &textureSoftness,
+                &peripheralChromaticShift,
+                &lensSoftness,
+                &deepGlow,
+                &vignette,
+            }};
+
+        const host::MetalImageView& spatialOutput = activeFilmCount == 0u
+            ? invocation.output
+            : intermediates.view(0u);
+        const host::MetalRenderInvocation spatialInvocation{
             invocation.commandQueue,
-            *currentSource,
-            *currentOutput,
+            invocation.source,
+            spatialOutput,
         };
-        if (!active[index].processor->encodeMetal(
+        host::spatial::SpatialExecutionReport spatialReport{};
+        if (!host::spatial::encodeSpatialMetalSequence(
                 seededContext,
-                passInvocation,
+                spatialInvocation,
+                pixelAspectRatio,
+                intermediates.tightBytes(),
+                spatialModules.data(),
+                spatialModules.size(),
+                pipelineCache,
+                spatialReport,
+                error)) {
+            return false;
+        }
+        if (spatialReport.outcome !=
+            host::spatial::SpatialExecutionOutcome::encoded) {
+            error = "Filmtone active spatial graph returned without encoding.";
+            return false;
+        }
+        if (activeFilmCount == 0u) {
+            return true;
+        }
+        temporalSource = &intermediates.view(0u);
+    }
+
+    for (std::size_t index = 0u; index < activeFilmCount; ++index) {
+        const bool isFinalFilmPass = index + 1u == activeFilmCount;
+        const host::MetalImageView* temporalOutput = nullptr;
+        if (loneAliasedGateWeave) {
+            temporalOutput = &intermediates.view(0u);
+        } else if (isFinalFilmPass) {
+            temporalOutput = &invocation.output;
+        } else if (spatialActive) {
+            temporalOutput = &intermediates.view((index + 1u) % 2u);
+        } else {
+            temporalOutput = &intermediates.view(index);
+        }
+
+        const host::MetalRenderInvocation filmInvocation{
+            invocation.commandQueue,
+            *temporalSource,
+            *temporalOutput,
+        };
+        if (!activeFilm[index].processor->encodeMetal(
+                seededContext,
+                filmInvocation,
                 pipelineCache,
                 error)) {
             return false;
         }
-        currentSource = currentOutput;
+        temporalSource = temporalOutput;
+    }
+
+    if (loneAliasedGateWeave) {
+        const host::MetalRenderInvocation copyInvocation{
+            invocation.commandQueue,
+            *temporalSource,
+            invocation.output,
+        };
+        return host::encodeMetalIdentityBlit(
+            seededContext,
+            copyInvocation,
+            error);
     }
     return true;
 }

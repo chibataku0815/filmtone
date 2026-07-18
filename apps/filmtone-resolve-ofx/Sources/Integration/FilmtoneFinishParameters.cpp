@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace filmtone::resolve::integration {
 namespace {
@@ -12,6 +13,11 @@ namespace {
 using forestone::filmtone::FilmtoneFinishParameterDefinitionV1;
 using forestone::filmtone::FilmtoneFinishParameterKind;
 using forestone::filmtone::kFilmtoneFinishParameterDefinitions;
+using spatial::FilmtoneSpatialParameterDefinitionV1;
+using spatial::FilmtoneSpatialParameterKindV1;
+using spatial::kFilmtoneNodeRoleDefinitionsV1;
+using spatial::kFilmtoneSpatialFeatureDefinitionsV1;
+using spatial::kFilmtoneSpatialParameterDefinitionsV1;
 
 enum BaseParameterIndex : std::size_t {
     kVariation = 0u,
@@ -34,6 +40,45 @@ enum BaseParameterIndex : std::size_t {
 };
 
 static_assert(kFilmtoneFinishParameterDefinitions.size() == 17u);
+
+enum SpatialParameterIndex : std::size_t {
+    kNodeRole = 0u,
+    kDeepGlowEnabled = 1u,
+    kBloomStrength = 2u,
+    kBloomThreshold = 3u,
+    kBloomRadius = 4u,
+    kBloomSoftKnee = 5u,
+    kPeripheralChromaticShiftEnabled = 6u,
+    kRgbShift = 7u,
+    kLensSoftnessEnabled = 8u,
+    kLensSoftness = 9u,
+    kTextureSoftnessEnabled = 10u,
+    kDetailSoftness = 11u,
+    kVignetteEnabled = 12u,
+    kVignette = 13u,
+};
+
+static_assert(kFilmtoneSpatialParameterDefinitionsV1.size() == 14u);
+static_assert(kFilmtoneNodeRoleDefinitionsV1.size() == 3u);
+static_assert(kFilmtoneSpatialFeatureDefinitionsV1.size() == 5u);
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kNodeRole].memberName) ==
+    "nodeRole");
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kBloomStrength].memberName) ==
+    "bloomStrength");
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kRgbShift].memberName) ==
+    "rgbShift");
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kLensSoftness].memberName) ==
+    "lensSoftness");
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kDetailSoftness].memberName) ==
+    "detailSoftness");
+static_assert(std::string_view(
+    kFilmtoneSpatialParameterDefinitionsV1[kVignette].memberName) ==
+    "vignette");
 
 enum class ParameterGroup {
     root,
@@ -160,6 +205,40 @@ inline constexpr std::array<ParameterPresentation, 3>
          2},
     }};
 
+struct SpatialParameterPresentation final {
+    const char* hint;
+    double increment;
+    int digits;
+};
+
+inline constexpr std::array<SpatialParameterPresentation, 14>
+    kSpatialPresentations{{
+        {"Chooses whether this node runs the complete graph, spatial optics only, or the three film modules only.",
+         1.0,
+         0},
+        {"Enables Deep Glow without changing its stored settings.", 1.0, 0},
+        {"Sets highlight glow energy.", 0.01, 2},
+        {"Sets the highlight level where glow begins.", 0.01, 2},
+        {"Distributes glow from a tighter core toward broader scales.", 0.01, 2},
+        {"Softens the transition around the glow threshold.", 0.01, 2},
+        {"Enables Peripheral Chromatic Shift without changing its stored setting.",
+         1.0,
+         0},
+        {"Sets restrained radial red and blue separation toward the image perimeter.",
+         0.0001,
+         4},
+        {"Enables Lens Softness without changing its stored setting.", 1.0, 0},
+        {"Sets peripheral optical softness while keeping the image center coherent.",
+         0.01,
+         2},
+        {"Enables Texture Softness without changing its stored setting.", 1.0, 0},
+        {"Relaxes fine digital acutance without applying a lens blur.", 0.01, 2},
+        {"Enables Vignette without changing its stored setting.", 1.0, 0},
+        {"Sets smooth off-axis RGB attenuation while preserving source alpha.",
+         0.01,
+         2},
+    }};
+
 static_assert(
     kFilmBreathResponsePresentations.size() ==
     effects::film_breath::kFilmBreathParameterDescriptors.size());
@@ -182,9 +261,43 @@ struct ParameterGroups final {
     OFX::GroupParamDescriptor* filmDamageAdvanced;
 };
 
+struct SpatialParameterGroups final {
+    OFX::GroupParamDescriptor* deepGlow;
+    OFX::GroupParamDescriptor* peripheralChromaticShift;
+    OFX::GroupParamDescriptor* lensSoftness;
+    OFX::GroupParamDescriptor* textureSoftness;
+    OFX::GroupParamDescriptor* vignette;
+};
+
 const FilmtoneFinishParameterDefinitionV1& definition(
     std::size_t index) noexcept {
     return kFilmtoneFinishParameterDefinitions[index];
+}
+
+const FilmtoneSpatialParameterDefinitionV1& spatialDefinition(
+    std::size_t index) noexcept {
+    return kFilmtoneSpatialParameterDefinitionsV1[index];
+}
+
+OFX::GroupParamDescriptor* spatialGroupFor(
+    std::size_t index,
+    const SpatialParameterGroups& groups) noexcept {
+    if (index >= kDeepGlowEnabled && index <= kBloomSoftKnee) {
+        return groups.deepGlow;
+    }
+    if (index >= kPeripheralChromaticShiftEnabled && index <= kRgbShift) {
+        return groups.peripheralChromaticShift;
+    }
+    if (index >= kLensSoftnessEnabled && index <= kLensSoftness) {
+        return groups.lensSoftness;
+    }
+    if (index >= kTextureSoftnessEnabled && index <= kDetailSoftness) {
+        return groups.textureSoftness;
+    }
+    if (index >= kVignetteEnabled && index <= kVignette) {
+        return groups.vignette;
+    }
+    return nullptr;
 }
 
 OFX::GroupParamDescriptor* groupFor(
@@ -273,6 +386,76 @@ OFX::ParamDescriptor* defineBaseParameter(
     return nullptr;
 }
 
+void configureSpatialValueDescriptor(
+    OFX::ValueParamDescriptor& descriptor,
+    const FilmtoneSpatialParameterDefinitionV1& metadata,
+    const SpatialParameterPresentation& presentation,
+    OFX::GroupParamDescriptor* parent) {
+    descriptor.setLabels(metadata.label, metadata.label, metadata.label);
+    descriptor.setScriptName(metadata.id);
+    descriptor.setHint(presentation.hint);
+    descriptor.setAnimates(true);
+    descriptor.setIsPersistant(true);
+    descriptor.setEvaluateOnChange(true);
+    if (parent != nullptr) {
+        descriptor.setParent(*parent);
+    }
+}
+
+OFX::ParamDescriptor* defineSpatialParameter(
+    OFX::ImageEffectDescriptor& descriptor,
+    std::size_t index,
+    const SpatialParameterGroups& groups) {
+    const auto& metadata = spatialDefinition(index);
+    const auto& presentation = kSpatialPresentations[index];
+    OFX::GroupParamDescriptor* parent = spatialGroupFor(index, groups);
+
+    switch (metadata.kind) {
+        case FilmtoneSpatialParameterKindV1::boolean: {
+            OFX::BooleanParamDescriptor* parameter =
+                descriptor.defineBooleanParam(metadata.id);
+            parameter->setDefault(metadata.defaultValue != 0.0);
+            configureSpatialValueDescriptor(
+                *parameter,
+                metadata,
+                presentation,
+                parent);
+            return parameter;
+        }
+        case FilmtoneSpatialParameterKindV1::real: {
+            OFX::DoubleParamDescriptor* parameter =
+                descriptor.defineDoubleParam(metadata.id);
+            parameter->setDefault(metadata.defaultValue);
+            parameter->setRange(metadata.minValue, metadata.maxValue);
+            parameter->setDisplayRange(metadata.minValue, metadata.maxValue);
+            parameter->setIncrement(presentation.increment);
+            parameter->setDigits(presentation.digits);
+            parameter->setDoubleType(OFX::eDoubleTypePlain);
+            configureSpatialValueDescriptor(
+                *parameter,
+                metadata,
+                presentation,
+                parent);
+            return parameter;
+        }
+        case FilmtoneSpatialParameterKindV1::choice: {
+            OFX::ChoiceParamDescriptor* parameter =
+                descriptor.defineChoiceParam(metadata.id);
+            parameter->setDefault(static_cast<int>(metadata.defaultValue));
+            for (const auto& role : kFilmtoneNodeRoleDefinitionsV1) {
+                parameter->appendOption(role.label);
+            }
+            configureSpatialValueDescriptor(
+                *parameter,
+                metadata,
+                presentation,
+                parent);
+            return parameter;
+        }
+    }
+    return nullptr;
+}
+
 OFX::DoubleParamDescriptor* defineFilmBreathResponseParameter(
     OFX::ImageEffectDescriptor& descriptor,
     std::size_t index,
@@ -324,6 +507,30 @@ std::uint32_t readVariation(OFX::IntParam& parameter, double time) {
     return static_cast<std::uint32_t>(std::clamp(value, minimum, maximum));
 }
 
+std::uint32_t readSpatialChoice(
+    OFX::ChoiceParam& parameter,
+    const FilmtoneSpatialParameterDefinitionV1& metadata,
+    double time) {
+    int value = static_cast<int>(metadata.defaultValue);
+    parameter.getValueAtTime(time, value);
+    if (value < static_cast<int>(metadata.minValue) ||
+        value > static_cast<int>(metadata.maxValue)) {
+        value = static_cast<int>(metadata.defaultValue);
+    }
+    return static_cast<std::uint32_t>(value);
+}
+
+float readSpatialReal(
+    OFX::DoubleParam& parameter,
+    const FilmtoneSpatialParameterDefinitionV1& metadata,
+    double time) {
+    const double value = parameter.getValueAtTime(time);
+    const double normalized = std::isfinite(value)
+        ? std::clamp(value, metadata.minValue, metadata.maxValue)
+        : metadata.defaultValue;
+    return static_cast<float>(normalized);
+}
+
 bool isPositiveFinite(double value) noexcept {
     return std::isfinite(value) && value > 0.0;
 }
@@ -334,6 +541,48 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     OFX::PageParamDescriptor* page = descriptor.definePageParam(
         "com.chibatakumi.filmtone.finish.page.controls");
     page->setLabels("Controls", "Controls", "Controls");
+
+    const auto defineSpatialGroup = [&descriptor](
+        std::size_t featureIndex,
+        std::size_t firstParameterIndex,
+        const char* hint) {
+        const auto& feature = kFilmtoneSpatialFeatureDefinitionsV1[featureIndex];
+        OFX::GroupParamDescriptor* group = descriptor.defineGroupParam(
+            spatialDefinition(firstParameterIndex).groupId);
+        group->setLabels(feature.label, feature.label, feature.label);
+        group->setHint(hint);
+        group->setOpen(false);
+        return group;
+    };
+
+    OFX::GroupParamDescriptor* deepGlow = defineSpatialGroup(
+        0u,
+        kDeepGlowEnabled,
+        "Highlight-selective, multi-scale glow with controlled energy.");
+    OFX::GroupParamDescriptor* peripheralChromaticShift = defineSpatialGroup(
+        1u,
+        kPeripheralChromaticShiftEnabled,
+        "Restrained radial red and blue separation toward the image perimeter.");
+    OFX::GroupParamDescriptor* lensSoftness = defineSpatialGroup(
+        2u,
+        kLensSoftnessEnabled,
+        "Field-weighted optical softness that keeps the image center coherent.");
+    OFX::GroupParamDescriptor* textureSoftness = defineSpatialGroup(
+        3u,
+        kTextureSoftnessEnabled,
+        "Edge-aware attenuation of fine digital acutance across the frame.");
+    OFX::GroupParamDescriptor* vignette = defineSpatialGroup(
+        4u,
+        kVignetteEnabled,
+        "Smooth aspect-aware attenuation from the image center toward the perimeter.");
+
+    const SpatialParameterGroups spatialGroups{
+        deepGlow,
+        peripheralChromaticShift,
+        lensSoftness,
+        textureSoftness,
+        vignette,
+    };
 
     OFX::GroupParamDescriptor* filmBreath = descriptor.defineGroupParam(
         "com.chibatakumi.filmtone.finish.group.filmBreath");
@@ -392,6 +641,20 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
         filmDamageAdvanced,
     };
 
+    const auto addSpatialParameter = [&](std::size_t index) {
+        OFX::ParamDescriptor* parameter =
+            defineSpatialParameter(descriptor, index, spatialGroups);
+        if (parameter != nullptr) {
+            page->addChild(*parameter);
+        }
+    };
+
+    for (std::size_t index = kNodeRole;
+         index < kFilmtoneSpatialParameterDefinitionsV1.size();
+         ++index) {
+        addSpatialParameter(index);
+    }
+
     const auto addBaseParameter = [&](std::size_t index) {
         OFX::ParamDescriptor* parameter =
             defineBaseParameter(descriptor, index, groups);
@@ -426,7 +689,32 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
 FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
     OFX::ImageEffect& effect)
-    : variation_(effect.fetchIntParam(definition(kVariation).id)),
+    : nodeRole_(effect.fetchChoiceParam(spatialDefinition(kNodeRole).id)),
+      deepGlowEnabled_(effect.fetchBooleanParam(
+          spatialDefinition(kDeepGlowEnabled).id)),
+      bloomStrength_(effect.fetchDoubleParam(
+          spatialDefinition(kBloomStrength).id)),
+      bloomThreshold_(effect.fetchDoubleParam(
+          spatialDefinition(kBloomThreshold).id)),
+      bloomRadius_(effect.fetchDoubleParam(
+          spatialDefinition(kBloomRadius).id)),
+      bloomSoftKnee_(effect.fetchDoubleParam(
+          spatialDefinition(kBloomSoftKnee).id)),
+      peripheralChromaticShiftEnabled_(effect.fetchBooleanParam(
+          spatialDefinition(kPeripheralChromaticShiftEnabled).id)),
+      rgbShift_(effect.fetchDoubleParam(spatialDefinition(kRgbShift).id)),
+      lensSoftnessEnabled_(effect.fetchBooleanParam(
+          spatialDefinition(kLensSoftnessEnabled).id)),
+      lensSoftness_(effect.fetchDoubleParam(
+          spatialDefinition(kLensSoftness).id)),
+      textureSoftnessEnabled_(effect.fetchBooleanParam(
+          spatialDefinition(kTextureSoftnessEnabled).id)),
+      detailSoftness_(effect.fetchDoubleParam(
+          spatialDefinition(kDetailSoftness).id)),
+      vignetteEnabled_(effect.fetchBooleanParam(
+          spatialDefinition(kVignetteEnabled).id)),
+      vignette_(effect.fetchDoubleParam(spatialDefinition(kVignette).id)),
+      variation_(effect.fetchIntParam(definition(kVariation).id)),
       filmBreathEnabled_(
           effect.fetchBooleanParam(definition(kFilmBreathEnabled).id)),
       filmBreathAmount_(
@@ -464,6 +752,37 @@ FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
 EvaluatedFilmtoneFinishParameters FilmtoneFinishParameterSet::evaluate(
     double time) const {
     EvaluatedFilmtoneFinishParameters result{};
+    result.spatial.nodeRole = readSpatialChoice(
+        *nodeRole_,
+        spatialDefinition(kNodeRole),
+        time);
+    result.spatial.deepGlowEnabled =
+        deepGlowEnabled_->getValueAtTime(time) ? 1u : 0u;
+    result.spatial.bloomStrength = readSpatialReal(
+        *bloomStrength_, spatialDefinition(kBloomStrength), time);
+    result.spatial.bloomThreshold = readSpatialReal(
+        *bloomThreshold_, spatialDefinition(kBloomThreshold), time);
+    result.spatial.bloomRadius = readSpatialReal(
+        *bloomRadius_, spatialDefinition(kBloomRadius), time);
+    result.spatial.bloomSoftKnee = readSpatialReal(
+        *bloomSoftKnee_, spatialDefinition(kBloomSoftKnee), time);
+    result.spatial.peripheralChromaticShiftEnabled =
+        peripheralChromaticShiftEnabled_->getValueAtTime(time) ? 1u : 0u;
+    result.spatial.rgbShift = readSpatialReal(
+        *rgbShift_, spatialDefinition(kRgbShift), time);
+    result.spatial.lensSoftnessEnabled =
+        lensSoftnessEnabled_->getValueAtTime(time) ? 1u : 0u;
+    result.spatial.lensSoftness = readSpatialReal(
+        *lensSoftness_, spatialDefinition(kLensSoftness), time);
+    result.spatial.textureSoftnessEnabled =
+        textureSoftnessEnabled_->getValueAtTime(time) ? 1u : 0u;
+    result.spatial.detailSoftness = readSpatialReal(
+        *detailSoftness_, spatialDefinition(kDetailSoftness), time);
+    result.spatial.vignetteEnabled =
+        vignetteEnabled_->getValueAtTime(time) ? 1u : 0u;
+    result.spatial.vignette = readSpatialReal(
+        *vignette_, spatialDefinition(kVignette), time);
+
     auto& finish = result.filmBreath.finishParameters;
     finish.variation = readVariation(*variation_, time);
     finish.filmBreathEnabled =

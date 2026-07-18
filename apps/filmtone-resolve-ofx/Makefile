@@ -26,7 +26,13 @@ PLUGIN_CPP_SOURCES := Sources/Host/FilmtoneFinishPlugin.cpp \
 	Sources/Effects/GateWeave/GateWeaveTransform.cpp
 PLUGIN_MM_SOURCES := Sources/Host/MetalIdentityBlit.mm \
 	Sources/Host/MetalPipelineCache.mm \
+	Sources/Host/Spatial/SpatialMetalHost.mm \
 	Sources/Integration/FilmtoneFinishRenderGraph.mm \
+	Sources/Effects/TextureSoftness/TextureSoftnessProcessor.mm \
+	Sources/Effects/PeripheralChromaticShift/PeripheralChromaticShiftProcessor.mm \
+	Sources/Effects/LensSoftness/LensSoftnessProcessor.mm \
+	Sources/Effects/DeepGlow/DeepGlowProcessor.mm \
+	Sources/Effects/Vignette/VignetteProcessor.mm \
 	Sources/Effects/FilmBreath/FilmBreathProcessor.mm \
 	Sources/Effects/GateWeave/GateWeaveProcessor.mm \
 	Sources/Effects/FilmDamage/FilmDamageProcessor.mm

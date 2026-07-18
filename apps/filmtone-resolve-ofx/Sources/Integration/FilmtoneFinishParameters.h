@@ -3,12 +3,14 @@
 #include <optional>
 
 #include "../Effects/FilmBreath/FilmBreathParameters.h"
+#include "../Generated/Contracts/filmtone_resolve_spatial.hpp"
 #include "../Host/RenderContext.h"
 #include "ofxsImageEffect.h"
 
 namespace filmtone::resolve::integration {
 
 struct EvaluatedFilmtoneFinishParameters final {
+    spatial::FilmtoneSpatialParametersV1 spatial{};
     effects::film_breath::FilmBreathParameters filmBreath{};
 
     [[nodiscard]] const forestone::filmtone::FilmtoneFinishParametersV1&
@@ -17,9 +19,10 @@ struct EvaluatedFilmtoneFinishParameters final {
     }
 };
 
-// Registers the generated 17-entry base surface and the three accepted local
-// Film Breath response controls. The generated definitions remain the only
-// owner of base IDs, kinds, defaults, and ranges.
+// Registers the generated 17-entry accepted film surface, the generated
+// 14-entry spatial surface, and the three accepted local Film Breath response
+// controls. Generated definitions remain the only owner of persistent IDs,
+// kinds, defaults, and ranges.
 void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor);
 
 class FilmtoneFinishParameterSet final {
@@ -30,6 +33,26 @@ public:
         double time) const;
 
 private:
+    OFX::ChoiceParam* nodeRole_;
+
+    OFX::BooleanParam* deepGlowEnabled_;
+    OFX::DoubleParam* bloomStrength_;
+    OFX::DoubleParam* bloomThreshold_;
+    OFX::DoubleParam* bloomRadius_;
+    OFX::DoubleParam* bloomSoftKnee_;
+
+    OFX::BooleanParam* peripheralChromaticShiftEnabled_;
+    OFX::DoubleParam* rgbShift_;
+
+    OFX::BooleanParam* lensSoftnessEnabled_;
+    OFX::DoubleParam* lensSoftness_;
+
+    OFX::BooleanParam* textureSoftnessEnabled_;
+    OFX::DoubleParam* detailSoftness_;
+
+    OFX::BooleanParam* vignetteEnabled_;
+    OFX::DoubleParam* vignette_;
+
     OFX::IntParam* variation_;
 
     OFX::BooleanParam* filmBreathEnabled_;
