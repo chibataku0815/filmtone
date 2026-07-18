@@ -39,7 +39,7 @@ Progress source: [progress.md](progress.md)
 |---|---|---|
 | MON-1 価格・条件 | Accepted | $49 / ローンチ$39 / 買い切り / 14日trial |
 | MON-3 発行ツール | Review | TS実装・鍵生成・1Password保存済み。MON-2のCクロス検証待ち |
-| MON-4 Worker | Running | 外部本番設定済み。Turnstile context bindingはcode反映済みでcurrent source再deploy待ち。実送達、公開導線、法務ゲートも残る |
+| MON-4 Worker | Running | 外部本番設定とTurnstile context-binding版の再deploy済み。実送達、公開導線、法務ゲートが残る |
 | MON-2 プラグイン | Blocked | Breath / Weave品質回復、combined/public受入、source耐久化後にdispatch |
 | MON-5 `.pkg` | Queued | MON-2統合後 |
 | MON-6 発売 | Queued | MON-2〜5とrelease truth完了後 |
@@ -138,16 +138,14 @@ authorizationを与えた場合だけ行う。現タスクでは品質sourceを�
 
 ### Phase S — Source durability gate(オーナーGit操作)
 
-Status: Blocked on owner authorization
+Status: Completed (2026-07-19)
 
-2026-07-18 review時点でローカル`main` `cb9b465`は`origin/main`より18 commits
-先行し、`package.json`、monetization docs、`infra/`、`scripts/license/`には未commit
-変更がある。追加deploy、MON-2 dispatch、署名済み配布物作成より前に:
+2026-07-18 review時点ではローカル`main` `cb9b465`が`origin/main`より18 commits
+先行し、monetization sourceも未commitだった。2026-07-19に次を完了した:
 
-- 選択したbaseとmonetization sourceを同じreview済みcommit系列へ置く。
-- `origin/main`または明示されたremote branchから別checkoutで取得可能にする。
-- Worker deploy sourceのcommitを`progress.md`へ記録する。
-- stage / commit / pushはオーナーの明示指示後だけ行う。
+- 選択したbaseとmonetization sourceをcommit `f8c4611`へ統合。
+- `origin/claude/davinci-plugin-pricing-plan-4cb87b`へpushし、別checkoutから取得可能化。
+- 同commitのWorkerを再deployし、Version IDを`progress.md`へ記録。
 
 ### Phase B — MON-2 プラグインライセンス実装
 
@@ -198,9 +196,8 @@ Accepted risks:
 3. ローンチ用の$10固定額クーポンを作成する。
 4. [完了 2026-07-18] Resendで送信domainを検証し、送信専用・domain限定keyを
    発行する。現契約に送信量alert設定はないため、超過課金オフとUsage監視を維持する。
-5. [初回完了 2026-07-18 / current source再deploy待ち] Worker + KVを作成し、
-   4 secretsを登録する。hostname/action binding版はPhase S後にdeploy commitを
-   記録して再deployする。
+5. [完了 2026-07-19] Worker + KVを作成し、4 secretsを登録。hostname/action
+   binding版もsource commit `f8c4611`から再deployし、Version IDを記録済み。
 6. [完了 2026-07-18] Turnstile本番site/keyを設定する。
 7. [完了 2026-07-18] trial intakeはPolar $0 checkoutではなく、製品ページの
    Turnstile付きフォームからWorkerを直接呼ぶ方針にする。
@@ -307,7 +304,7 @@ Phase EはQ/SまたはMON-2〜5のどれかが未完なら開始しない。
 - [x] Phase A: full/trial keyの1Password保存
 - [ ] Phase Q: Film Breath / Gate Weave独立iterationのowner pass
 - [ ] Phase Q: quality matrixとcombined/public product acceptance
-- [ ] Phase S: review済みbaseとmonetization sourceのremote耐久化
+- [x] Phase S: review済みbaseとmonetization sourceのremote耐久化
 - [ ] Phase B: MON-2 license + watermark実装と受入
 - [ ] Phase B: TS/C fixture・adversarial parity完了、MON-3 Accepted
 - [ ] Phase C: Polar / Resend / Turnstile(hostname/action含む) / Worker実環境ゲート完了
@@ -329,9 +326,8 @@ Context:
 The TypeScript license tools and trial Worker exist. MON-3 is in Review and
 MON-4 is Running. The latest QUALITY task is closed with partial acceptance:
 Damage passed, Breath and Weave did not, and combined/public product acceptance
-was not granted. MON-2 is therefore Blocked, not Queued. The local source is also
-not durable yet: local main is ahead of origin/main and the monetization lane is
-uncommitted.
+was not granted. MON-2 is therefore Blocked, not Queued. The reviewed base and
+monetization source are durable on the recorded remote branch.
 
 Constraints:
 - Execute Phase A/C safely, then Q/S, B, D, and E in the dependency order defined

@@ -1,6 +1,6 @@
 # Filmtone Finish 課金 進行書 (Monetization Progress)
 
-Date: 2026-07-18 JST
+Date: 2026-07-19 JST
 Coordinator-owned: yes
 計画正本: [strategy.md](strategy.md)(戦略)+
 [implementation-plan.md](implementation-plan.md)(対応計画 = 実行仕様)/
@@ -24,7 +24,7 @@ Coordinator-owned: yes
 - Phase C外部基盤: Polar製品($49 / ¥8,000)と固定額クーポン($10 / ¥1,600)、
   Resend domain検証とdomain限定送信key、Cloudflare KV / Turnstile本番widget /
   initial Worker deploy / secret 4件まで完了。規約・SLA文面も候補を作成済み。
-  hostname/action bindingを含むcurrent sourceの再deployはsource耐久化後。
+  hostname/action bindingを含むcurrent sourceも2026-07-19に再deploy済み。
 - 残るMON-4発売ゲート: testing authorization後の実trial請求・メール送達・
   添付license検証・失敗系確認、MON-6でのtrialフォームと購入メール文面配置、
   法務文面のオーナー最終確認。
@@ -32,12 +32,11 @@ Coordinator-owned: yes
   Damage pass / Breath・Weave below passでpartial acceptanceのままclosed。
   combined/public acceptanceは未成立。
 - **MON-2 Blocked**: Breath / Weave独立品質iterationのowner pass、quality matrix、
-  combined/public acceptance、source durability gate完了後にのみdispatch。MON-5は
-  MON-2後。
-- **Source durability Blocked**: ローカル`main` `cb9b465`は`origin/main`より18
-  commits先行し、monetization docs / `infra/` / `scripts/license/` / `package.json`
-  は未commit。追加deploy/MON-2/署名より前にオーナーGit操作でremoteから再取得
-  可能にする。現タスクではstage / commit / pushしない。
+  combined/public acceptance後にのみdispatch。MON-5はMON-2後。
+- **Source durability Completed (2026-07-19)**: 統合baseとmonetization sourceを
+  commit `f8c4611`として
+  `origin/claude/davinci-plugin-pricing-plan-4cb87b`へpush済み。別checkoutから
+  review済みsourceを再取得できる。
 
 ## ワークストリーム一覧
 
@@ -46,9 +45,9 @@ Coordinator-owned: yes
 | ID | 内容 | 仕様 | 依存 | プラグイン本体に触るか | State |
 |---|---|---|---|---|---|
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
-| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質回復 + combined/public受入 + source耐久化 | **是** | **Blocked** |
+| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質回復 + combined/public受入 | **是** | **Blocked** |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
-| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | 登録/deployはオーナー操作、追加deploy前にsource耐久化 | 否 | **Running — hostname/action bindingはcode反映済み。deploy更新・実送達・公開導線・法務最終確認待ち** |
+| MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — hostname/action binding版deploy済み。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
 | MON-6 | ローンチ(製品ページ・記事・価格公開) | 対応計画 §7 | MON-2〜5 + release truth | 否 | Queued |
 | MON-7 | 外殻(実売後のみ): 購入側自動発行(Phase L2)、marketplace 展開、edu/bundle 価格、Windows 版検討 | 対応計画 §5 L2 注記 | MON-6 後の実売データ | 一部 | Queued(着手条件未成立) |
@@ -58,14 +57,13 @@ Coordinator-owned: yes
 ```text
 MON-3 Review ───────────────────────────────────────────────┐
 MON-4 Running ──────────────────────────────────────────────┼─ MON-6 launch
-Breath / Weave品質回復 + combined/public受入 ─┐             │
-source耐久化 ──────────────────────────────────┴─ MON-2 ─ MON-5 pkg ─┘
+Breath / Weave品質回復 + combined/public受入 ──── MON-2 ─ MON-5 pkg ─┘
 
 MON-7は発売後の実売で判断
 ```
 
 MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに触らない)。
-クリティカルパスは品質回復 + source耐久化 -> MON-2 -> MON-5 -> MON-6。
+クリティカルパスは品質回復 -> MON-2 -> MON-5 -> MON-6。
 
 ## 各ワークストリームの Done 条件
 
@@ -84,7 +82,7 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
 - [ ] Film Breath / Gate Weaveの独立品質iterationで具体的owner failureを修正し、
   両方owner pass
 - [ ] quality matrixとcombined/public product acceptance
-- [ ] source durability gate(remoteからbaseとmonetization sourceを再取得可能)
+- [x] source durability gate(remoteからbaseとmonetization sourceを再取得可能)
 - [ ] 未ライセンス時のみ deterministic watermark を最終パスで合成
 - [ ] ライセンスファイル(ed25519)のオフライン検証。ネットワークコード 0 行
 - [ ] `expiresAt` 対応(購入版 = 明示 null・永続 / trial = +14 日必須 + 未来日
@@ -150,8 +148,9 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   (必須)**] / deploy — README 参照)+ Resend domain検証・domain限定key発行・
   Turnstile本番widget設定。Worker URL:
   `https://filmtone-license-worker.chiba-4f9.workers.dev`
-- [ ] source durability完了後、hostname/action bindingを含む現在codeを再deployし、
-  deploy commitを記録
+- [x] hostname/action bindingとResend 409種別判定を含むsource commit `f8c4611`を
+  remoteへ保存して再deploy。Worker Version ID:
+  `627b6337-15d3-441c-a695-8accb47f9f9d`
 - [ ] **発売ゲート(未通過)**: Resend 実送達確認(実メール到達・添付検証)/
   正しいTurnstile hostname/action成功と欠落・不正・mismatch拒否 / trial使用済み
   購入者の優先発行例外を購入メールに明記
@@ -287,3 +286,8 @@ MON-3 / MON-4の未deploy作業は品質回復と並行可能(プラグインに
   WorkerへTurnstile hostname/action binding、OFX buildへProductVersion.mkと
   macOS 14.0 deployment target、Developer ID Application先行署名targetを追加。
   build/test/deploy/sign/notarizationは未実行。
+- 2026-07-19 (改訂 11 / source durability + Worker再deploy): review済み統合baseと
+  monetization sourceをcommit `f8c4611`としてremote branchへpush。Turnstile
+  hostname/action bindingとResend 409種別判定を含むWorkerを本番へ再deployし、
+  Version ID `627b6337-15d3-441c-a695-8accb47f9f9d`を記録。実trial請求・実送達・
+  添付検証は発売ゲートとして未実施。

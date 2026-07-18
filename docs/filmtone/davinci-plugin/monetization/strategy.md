@@ -14,13 +14,15 @@ Status: 価格($49 / ローンチ $39)・14 日体験は 2026-07-18 にオーナ
 ## 0. 前提となる開発状態 (2026-07-18 時点)
 
 - ソース実装: CONTRACT / HOST / ADAPTER / BREATH / WEAVE / DAMAGE / INTEGRATION
-  すべてaccepted・ローカル`main`へ統合済み。remote耐久化は未完了。
+  すべてaccepted。monetization sourceと統合baseはsource commit `f8c4611`を含む
+  remote branchから再取得可能。
 - QUALITY: arm64 bundleビルド、Resolve 21.0.2.4 discovery、Color-page実描画、
   default identity、各module、combined、same-frame determinismまでpass。オーナー
   判定はFilm Damageのみpass、Film Breath / Gate Weaveはbelow passで、現行
   QUALITY taskはpartial acceptanceのままclosed。公開製品受入は未成立。
 - monetization: MON-1 Accepted、MON-3 Review、MON-4 Running。販売外部基盤と
-  trial Workerは準備済みだが、実送達・公開導線・法務・runtime gateは未完了。
+  context-binding版trial Workerの本番deployは完了したが、実送達・公開導線・
+  法務・runtime gateは未完了。
   packaging / releaseは未着手。
 
 課金作業は品質回復を妨げない。プラグイン本体に触る作業(MON-2)は、Film Breath

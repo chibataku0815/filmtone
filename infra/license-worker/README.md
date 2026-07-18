@@ -27,12 +27,13 @@ Filmtone Finish の 14 日 trial ライセンスを自動発行する Cloudflare
 - 管理画面・DB・購読機能は持たない。Workers / KV は無料枠、メール送信は
   既存 Resend 契約を使うため、この Worker 導入による新規固定費は 0 円。
 
-## 発売前の本番設定(2026-07-18)
+## 発売前の本番設定(2026-07-19)
 
 - Worker: `https://filmtone-license-worker.chiba-4f9.workers.dev`
-- 上記は初回deploy済み。hostname/action bindingを含む現在のworking sourceは、
-  repository source durability完了後にcommitを記録して再deployするまで本番反映済み
-  と扱わない。
+- hostname/action bindingとResend 409種別判定を含むsource commit `f8c4611`を
+  remote branch `origin/claude/davinci-plugin-pricing-plan-4cb87b`へ保存し、
+  2026-07-19に再deploy済み。Cloudflare Worker Version ID:
+  `627b6337-15d3-441c-a695-8accb47f9f9d`。
 - KV binding: `TRIAL_KV` (`7e939ca054614c57b31ed9503613c87a`)
 - Resend: `fores-tone.co.jp` 検証済み。API key は Sending access かつ同 domain
   限定で、1Password と Worker secret に保存済み。
@@ -50,8 +51,8 @@ Filmtone Finish の 14 日 trial ライセンスを自動発行する Cloudflare
 - 現 Resend 契約は月 50,000 通・日次上限なし。送信量アラートの設定項目は
   現行 UI / API にない。超過課金はオフを維持し、Resend Usage と Worker の
   Turnstile・IP throttle・email単位制限で管理する。
-- このタスクでは testing authorization がないため、公開 endpoint へのtrial
-  請求、実メール送達、添付license検証は実行していない。
+- current sourceの再deployまでは完了。公開endpointへの実trial請求、実メール
+  送達、添付license検証は別の発売ゲートとして未実施。
 
 ## デプロイ(オーナー操作、初回のみ)
 

@@ -250,7 +250,7 @@ Ed25519 を実測確認して使用(署名ツールに外部 npm 依存を持ち
    Sending access + domain限定 API keyを発行。現契約は月50,000通・日次上限
    なしで、現行 UI / API に送信量アラート設定はないため、超過課金オフと
    Usage監視を安全弁にする。
-5. [初回完了 2026-07-18 / context-binding版の再deploy待ち] CloudflareでWorker +
+5. [完了 2026-07-19] CloudflareでWorker +
    KVを作成し、`wrangler secret`を4つ登録
    (TRIAL_PRIVATE_KEY / RESEND_API_KEY / TRIAL_HASH_SECRET / TURNSTILE_SECRET)。
    **Turnstile は発売ゲート(必須)**: Worker は secret 未設定だと 500 を返す
@@ -258,8 +258,8 @@ Ed25519 を実測確認して使用(署名ツールに外部 npm 依存を持ち
    Turnstile widgetも作成し、`chibatakumi.studio` と
    `www.chibatakumi.studio` に限定済み。Worker URLは
    `https://filmtone-license-worker.chiba-4f9.workers.dev`。
-   hostname/action bindingを追加した現sourceはSource durability gate後に再deployし、
-   deploy commitをprogressへ記録する。
+   hostname/action bindingとResend 409種別判定を含むsource commit `f8c4611`を
+   remoteへ保存して再deploy済み。Version IDとdeploy記録はprogressを正とする。
 6. [方針決定 2026-07-18] Polar $0 checkoutはWorkerへの自動bridgeを持たないため、
    trial受付は製品ページのTurnstile付きフォームからWorkerを直接呼ぶ。
 7. [文面作成済み / 公開配置はMON-6] 購入確認ページ / 受領メールに 2 行を載せる:
