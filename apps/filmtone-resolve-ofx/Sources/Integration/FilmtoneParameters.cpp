@@ -1,4 +1,4 @@
-#include "FilmtoneFinishParameters.h"
+#include "FilmtoneParameters.h"
 
 #include <algorithm>
 #include <array>
@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "FilmtoneResolveFactoryDefaults.h"
+#include "../License/LicenseStore.h"
 
 namespace filmtone::resolve::integration {
 namespace {
@@ -557,9 +558,9 @@ bool isPositiveFinite(double value) noexcept {
 
 }  // namespace
 
-void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
+void describeFilmtoneParameters(OFX::ImageEffectDescriptor& descriptor) {
     OFX::PageParamDescriptor* page = descriptor.definePageParam(
-        "com.chibatakumi.filmtone.finish.page.controls");
+        "com.chibatakumi.filmtone.resolve.page.controls");
     page->setLabels("Controls", "Controls", "Controls");
 
     const auto addSpatialParameter = [&](
@@ -590,7 +591,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     addSpatialParameter(kNodeRole, nullptr);
 
     OFX::GroupParamDescriptor* quickEnable = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.quickEnable");
+        "com.chibatakumi.filmtone.resolve.group.quickEnable");
     quickEnable->setLabels("Quick Enable", "Quick Enable", "Quick Enable");
     quickEnable->setHint(
         "Turns individual Filmtone modules on or off without changing their stored controls.");
@@ -654,7 +655,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     addSpatialParameter(kVignette, vignette);
 
     OFX::GroupParamDescriptor* filmBreath = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.filmBreath");
+        "com.chibatakumi.filmtone.resolve.group.filmBreath");
     filmBreath->setLabels("Film Breath", "Film Breath", "Film Breath");
     filmBreath->setHint(
         "Frame-correlated exposure, tonal contrast, and subtractive color variation with deterministic playback.");
@@ -663,7 +664,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* filmBreathAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.filmBreath.advanced");
+            "com.chibatakumi.filmtone.resolve.group.filmBreath.advanced");
     filmBreathAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     filmBreathAdvanced->setHint(
         "Sets Film Breath exposure, tonal contrast, subtractive color variation, and period.");
@@ -680,7 +681,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     }
 
     OFX::GroupParamDescriptor* gateWeave = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.gateWeave");
+        "com.chibatakumi.filmtone.resolve.group.gateWeave");
     gateWeave->setLabels("Gate Weave", "Gate Weave", "Gate Weave");
     gateWeave->setHint(
         "Frame-correlated mechanical registration movement with automatic edge safety. If CinePrint35 Gate Wv is active, leave one Gate Weave treatment off.");
@@ -689,7 +690,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* gateWeaveAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.gateWeave.advanced");
+            "com.chibatakumi.filmtone.resolve.group.gateWeave.advanced");
     gateWeaveAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     gateWeaveAdvanced->setHint(
         "Movement range, rotation, correlation cadence, and frame-to-frame instability.");
@@ -702,7 +703,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
     }
 
     OFX::GroupParamDescriptor* filmDamage = descriptor.defineGroupParam(
-        "com.chibatakumi.filmtone.finish.group.filmDamage");
+        "com.chibatakumi.filmtone.resolve.group.filmDamage");
     filmDamage->setLabels("Film Damage", "Film Damage", "Film Damage");
     filmDamage->setHint(
         "Dark-weighted dust, scratches, fibers, stains, and gate wear.");
@@ -711,7 +712,7 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
 
     OFX::GroupParamDescriptor* filmDamageAdvanced =
         descriptor.defineGroupParam(
-            "com.chibatakumi.filmtone.finish.group.filmDamage.advanced");
+            "com.chibatakumi.filmtone.resolve.group.filmDamage.advanced");
     filmDamageAdvanced->setLabels("Advanced", "Advanced", "Advanced");
     filmDamageAdvanced->setHint(
         "Independent Film Damage material-family strengths.");
@@ -722,11 +723,39 @@ void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor) {
          ++index) {
         addBaseParameter(index, filmDamageAdvanced);
     }
+
+    // Read-only License status, derived from the license file (not persisted).
+    OFX::GroupParamDescriptor* license = descriptor.defineGroupParam(
+        "com.chibatakumi.filmtone.resolve.group.license");
+    license->setLabels("License", "License", "License");
+    license->setHint(
+        "Current license state. Place Filmtone.license in "
+        "~/Library/Application Support/Filmtone/ to remove the trial watermark.");
+    license->setOpen(true);
+
+    OFX::StringParamDescriptor* licenseStatus =
+        descriptor.defineStringParam(kLicenseStatusParamId);
+    licenseStatus->setLabels("Status", "Status", "Status");
+    licenseStatus->setStringType(OFX::eStringTypeLabel);
+    licenseStatus->setDefault("Trial mode (watermarked)");
+    licenseStatus->setHint("Current Filmtone license state.");
+    licenseStatus->setEnabled(false);
+    licenseStatus->setIsPersistant(false);
+    licenseStatus->setAnimates(false);
+    licenseStatus->setEvaluateOnChange(false);
+    licenseStatus->setParent(*license);
+    page->addChild(*licenseStatus);
 }
 
-FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
+void FilmtoneParameterSet::updateLicenseStatus() const {
+    const license::LicenseState state = license::LicenseStore::shared().evaluate();
+    licenseStatus_->setValue(state.statusLine());
+}
+
+FilmtoneParameterSet::FilmtoneParameterSet(
     OFX::ImageEffect& effect)
-    : nodeRole_(effect.fetchChoiceParam(spatialDefinition(kNodeRole).id)),
+    : licenseStatus_(effect.fetchStringParam(kLicenseStatusParamId)),
+      nodeRole_(effect.fetchChoiceParam(spatialDefinition(kNodeRole).id)),
       deepGlowEnabled_(effect.fetchBooleanParam(
           spatialDefinition(kDeepGlowEnabled).id)),
       bloomStrength_(effect.fetchDoubleParam(
@@ -788,9 +817,9 @@ FilmtoneFinishParameterSet::FilmtoneFinishParameterSet(
       stainAmount_(effect.fetchDoubleParam(definition(kStainAmount).id)),
       gateWearAmount_(effect.fetchDoubleParam(definition(kGateWearAmount).id)) {}
 
-EvaluatedFilmtoneFinishParameters FilmtoneFinishParameterSet::evaluate(
+EvaluatedFilmtoneParameters FilmtoneParameterSet::evaluate(
     double time) const {
-    EvaluatedFilmtoneFinishParameters result{};
+    EvaluatedFilmtoneParameters result{};
     result.spatial.nodeRole = readSpatialChoice(
         *nodeRole_,
         spatialDefinition(kNodeRole),

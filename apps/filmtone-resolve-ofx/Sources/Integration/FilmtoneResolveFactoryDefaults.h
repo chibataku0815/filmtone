@@ -16,11 +16,11 @@ namespace filmtone::resolve::integration {
 // result.
 //
 // Both the OFX descriptor defaults and the non-finite runtime fallbacks in
-// FilmtoneFinishParameters.cpp resolve through this single table. Enabled,
+// FilmtoneParameters.cpp resolve through this single table. Enabled,
 // Node Role, and Variation intentionally have no entry, so they keep the
 // generated identity defaults (false / All / 0). Entries are validated
 // against the generated definitions at compile time in
-// FilmtoneFinishParameters.cpp: every ID must name an existing real-kind
+// FilmtoneParameters.cpp: every ID must name an existing real-kind
 // persistent parameter and every value must stay inside its accepted range.
 
 struct FilmtoneResolveFactoryDefault final {

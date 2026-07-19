@@ -398,7 +398,7 @@ bool FilmBreathProcessor::encodeMetal(
         error = "Film Breath could not create a Metal command buffer.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Film Breath";
+    commandBuffer.label = @"Filmtone Film Breath";
 
     id<MTLComputeCommandEncoder> encoder =
         [commandBuffer computeCommandEncoder];

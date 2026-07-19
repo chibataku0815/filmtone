@@ -487,7 +487,7 @@ bool GateWeaveProcessor::encodeMetal(
         error = "Gate Weave Metal command buffer creation failed.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Gate Weave";
+    commandBuffer.label = @"Filmtone Gate Weave";
     id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
     if (encoder == nil) {
         error = "Gate Weave Metal compute encoder creation failed.";

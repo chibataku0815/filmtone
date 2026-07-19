@@ -1,6 +1,6 @@
 #import <Metal/Metal.h>
 
-#include "FilmtoneFinishRenderGraph.h"
+#include "FilmtoneRenderGraph.h"
 
 #include <algorithm>
 #include <array>
@@ -21,6 +21,8 @@
 #include "../Effects/Vignette/VignetteProcessor.h"
 #include "../Host/MetalIdentityBlit.h"
 #include "../Host/Spatial/SpatialMetalHost.h"
+#include "../License/LicenseStore.h"
+#include "../License/WatermarkPass.h"
 
 namespace filmtone::resolve::integration {
 namespace {
@@ -87,7 +89,7 @@ const host::RectI* selectFullBounds(
 }
 
 host::RenderContext makeSeededContext(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept {
     const std::uint64_t seed = context.explicitSeed.has_value()
         ? *context.explicitSeed
@@ -104,7 +106,7 @@ host::RenderContext makeSeededContext(
 }
 
 host::RenderContext makeConfigurationOnlyContext(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+    const EvaluatedFilmtoneParameters& parameters) noexcept {
     return host::RenderContext{
         0.0,
         host::FrameRates{0.0, 0.0},
@@ -148,7 +150,7 @@ std::optional<contracts::ResolveRenderContextV1> makeDamageRenderContext(
 }
 
 bool filmModulesIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept {
     const auto mapping = forestone::filmtone::mapFilmtoneFinish(
         parameters.finish());
@@ -164,7 +166,7 @@ bool filmModulesIdentity(
 }
 
 bool roleSchedulesActiveSpatial(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+    const EvaluatedFilmtoneParameters& parameters) noexcept {
     return spatial::roleSchedulesSpatialV1(parameters.spatial.nodeRole) &&
            !spatial::isSpatialConfiguredIdentityV1(parameters.spatial);
 }
@@ -319,8 +321,8 @@ bool makeDeepGlowAlphaAssociation(
 
 }  // namespace
 
-bool requiresFilmtoneFinishTemporalFrameRate(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+bool requiresFilmtoneTemporalFrameRate(
+    const EvaluatedFilmtoneParameters& parameters) noexcept {
     if (!spatial::roleSchedulesFilmModulesV1(parameters.spatial.nodeRole)) {
         return false;
     }
@@ -329,8 +331,8 @@ bool requiresFilmtoneFinishTemporalFrameRate(
         makeConfigurationOnlyContext(parameters));
 }
 
-bool isFilmtoneFinishConfiguredIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept {
+bool isFilmtoneConfiguredIdentity(
+    const EvaluatedFilmtoneParameters& parameters) noexcept {
     const bool spatialIdentity =
         !spatial::roleSchedulesSpatialV1(parameters.spatial.nodeRole) ||
         spatial::isSpatialConfiguredIdentityV1(parameters.spatial);
@@ -342,8 +344,8 @@ bool isFilmtoneFinishConfiguredIdentity(
     return spatialIdentity && filmIdentity;
 }
 
-bool isFilmtoneFinishIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+bool isFilmtoneIdentity(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept {
     const host::RenderContext seededContext = makeSeededContext(parameters, context);
     const bool spatialIdentity =
@@ -355,8 +357,8 @@ bool isFilmtoneFinishIdentity(
     return spatialIdentity && filmIdentity;
 }
 
-bool encodeFilmtoneFinishMetal(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+static bool encodeFilmtoneModulesGraph(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context,
     const host::MetalRenderInvocation& invocation,
     double pixelAspectRatio,
@@ -578,6 +580,39 @@ bool encodeFilmtoneFinishMetal(
             error);
     }
     return true;
+}
+
+bool encodeFilmtoneMetal(
+    const EvaluatedFilmtoneParameters& parameters,
+    const host::RenderContext& context,
+    const host::MetalRenderInvocation& invocation,
+    double pixelAspectRatio,
+    SourceAlphaAssociation alphaAssociation,
+    host::MetalPipelineCache& pipelineCache,
+    std::string& error) {
+    if (!encodeFilmtoneModulesGraph(
+            parameters,
+            context,
+            invocation,
+            pixelAspectRatio,
+            alphaAssociation,
+            pipelineCache,
+            error)) {
+        return false;
+    }
+    // License gate: composite the trial watermark on the final output whenever
+    // the state is not a valid full/active-trial license. A valid license leaves
+    // the module output bit-exact (identity invariant preserved).
+    if (!license::LicenseStore::shared().evaluate().watermarked()) {
+        return true;
+    }
+    const host::RenderContext seededContext =
+        makeSeededContext(parameters, context);
+    if (seededContext.renderWindow.isEmpty()) {
+        return true;
+    }
+    return watermark::encodeMetalTrialWatermark(
+        seededContext, invocation, pipelineCache, error);
 }
 
 }  // namespace filmtone::resolve::integration

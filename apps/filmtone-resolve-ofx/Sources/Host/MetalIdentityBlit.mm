@@ -122,7 +122,7 @@ bool encodeMetalIdentityBlit(
         error = "Metal command buffer creation failed.";
         return false;
     }
-    commandBuffer.label = @"Filmtone Finish Identity";
+    commandBuffer.label = @"Filmtone Identity";
 
     id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
     if (encoder == nil) {

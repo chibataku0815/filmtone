@@ -9,7 +9,11 @@
 
 namespace filmtone::resolve::integration {
 
-struct EvaluatedFilmtoneFinishParameters final {
+// Read-only License status label (derived from the license file; not persisted).
+inline constexpr char kLicenseStatusParamId[] =
+    "com.chibatakumi.filmtone.resolve.license.status";
+
+struct EvaluatedFilmtoneParameters final {
     spatial::FilmtoneSpatialParametersV1 spatial{};
     effects::film_breath::FilmBreathParameters filmBreath{};
 
@@ -32,16 +36,21 @@ struct EvaluatedFilmtoneFinishParameters final {
 // FilmtoneResolveFactoryDefaults.h; Enabled, Node Role, and Variation keep
 // generated identity defaults so the effect stays exact identity at add time
 // and after reset.
-void describeFilmtoneFinishParameters(OFX::ImageEffectDescriptor& descriptor);
+void describeFilmtoneParameters(OFX::ImageEffectDescriptor& descriptor);
 
-class FilmtoneFinishParameterSet final {
+class FilmtoneParameterSet final {
 public:
-    explicit FilmtoneFinishParameterSet(OFX::ImageEffect& effect);
+    explicit FilmtoneParameterSet(OFX::ImageEffect& effect);
 
-    [[nodiscard]] EvaluatedFilmtoneFinishParameters evaluate(
+    [[nodiscard]] EvaluatedFilmtoneParameters evaluate(
         double time) const;
 
+    // Re-evaluates the license file and writes the read-only status label.
+    // Panel-refresh dependent: call at instance creation and on param changes.
+    void updateLicenseStatus() const;
+
 private:
+    OFX::StringParam* licenseStatus_;
     OFX::ChoiceParam* nodeRole_;
 
     OFX::BooleanParam* deepGlowEnabled_;

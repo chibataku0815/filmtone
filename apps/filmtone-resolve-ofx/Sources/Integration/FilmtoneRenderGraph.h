@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "FilmtoneFinishParameters.h"
+#include "FilmtoneParameters.h"
 #include "../Host/MetalPipelineCache.h"
 #include "../Host/RenderContext.h"
 
@@ -17,19 +17,19 @@ enum class SourceAlphaAssociation : std::uint32_t {
 // Temporal frame rate is needed only when the selected Node Role schedules a
 // configured-active Film Breath, Gate Weave, or Film Damage module. Static
 // Optics-only work never invents or requires a material clock.
-[[nodiscard]] bool requiresFilmtoneFinishTemporalFrameRate(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept;
+[[nodiscard]] bool requiresFilmtoneTemporalFrameRate(
+    const EvaluatedFilmtoneParameters& parameters) noexcept;
 
 // Configuration-only identity is independent of time and frame rate. It is
 // true only when every module scheduled by Node Role is neutral without a
 // valid temporal context. Role masking never changes the stored values.
-[[nodiscard]] bool isFilmtoneFinishConfiguredIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters) noexcept;
+[[nodiscard]] bool isFilmtoneConfiguredIdentity(
+    const EvaluatedFilmtoneParameters& parameters) noexcept;
 
 // Exact identity means every role-scheduled spatial and accepted film module
 // resolves to identity for the supplied host time/context.
-[[nodiscard]] bool isFilmtoneFinishIdentity(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+[[nodiscard]] bool isFilmtoneIdentity(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context) noexcept;
 
 // Encodes only role-scheduled active modules in exact order:
@@ -38,8 +38,8 @@ enum class SourceAlphaAssociation : std::uint32_t {
 // uses one coordinator-owned command buffer; accepted film processors commit
 // afterward on the same Host queue. At most two full-frame temporal buffers
 // are reused, independent of the active module count.
-bool encodeFilmtoneFinishMetal(
-    const EvaluatedFilmtoneFinishParameters& parameters,
+bool encodeFilmtoneMetal(
+    const EvaluatedFilmtoneParameters& parameters,
     const host::RenderContext& context,
     const host::MetalRenderInvocation& invocation,
     double pixelAspectRatio,
