@@ -17,8 +17,13 @@ namespace {
 
 constexpr std::string_view kPluginName =
     ::filmtone::resolve::spatial::kFilmtonePublicDisplayName;
+// Identity unification (2026-07-19): register under the Filmtone product id,
+// not the generated compatibility id. The plugin is unreleased, so no project
+// compatibility is broken. Display name stays kFilmtonePublicDisplayName
+// ("Filmtone"); the generated spatial group ids remain .finish.* (cosmetic —
+// clearing those needs a spatial-contract regeneration in visual-effect-core).
 constexpr std::string_view kPluginIdentifier =
-    ::filmtone::resolve::spatial::kFilmtoneCompatibilityPluginId;
+    "com.chibatakumi.filmtone.resolve";
 constexpr char kPluginDescription[] =
     "Combines Filmtone spatial optics with deterministic Film Breath, Gate "
     "Weave, and Film Damage. Use Node Role to place Optics before CinePrint35 "
