@@ -788,3 +788,19 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   に使用可能。Article Opportunity: No story(検証記録)。Change-History
   Opportunity: No。Git: 本改訂を `claude/davinci-plugin-pricing-plan-4cb87b`
   へ commit/push。
+- 2026-07-19 (改訂 30 / {trialDays} バグの診断訂正と解消確認): 改訂 29 に
+  書いた初回診断(`trial.title` / `trial.body` の values 欠落)は**誤り**だった。
+  該当 2 キーは placeholder を含まず、修正 commit `715a7174` は無害だが無効果。
+  build cache 無効の `--force` 再デプロイ後も現象が残ったことから再調査し、
+  実際の欠落箇所は **`trialRequest.title`**(page.tsx:317 — 兄弟の
+  `trialRequest.body` は当初から values 渡し済み)と特定。commit `272ed2d7` で
+  修正し本番デプロイ。**ライブ検証 PASS**: ja/en とも可視 HTML の未展開
+  placeholder 0 件、見出しは「ウォーターマークなしで 14 日試す」/
+  「Try 14 days watermark-free」を実測。調査過程の副次確認: alias は正しく
+  最新 production deployment を指しており(`data-dpl-id` で確認)、Vercel の
+  deployment 直 URL は SSO 保護ページを返すため content 検証には使えない
+  (誤検知の教訓として記録)。portfolio commits: `0ed86b3a`(ページ一式)、
+  `715a7174`(無効果 fix)、`272ed2d7`(実 fix)— いずれも push 未実施
+  (owner の先行未 push 5 commit と同時公開になるため owner 判断待ち)。
+  Copy / History Impact: 表示バグ解消のみ。Git: 本改訂を
+  `claude/davinci-plugin-pricing-plan-4cb87b` へ commit/push。
