@@ -739,3 +739,52 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   Change-History Opportunity: **Yes** — 初の直接課金プロダクトの購入導線が
   技術的に開通した転換点(実売は Polar activation 待ち)。Git: 本改訂を
   `claude/davinci-plugin-pricing-plan-4cb87b` へ commit/push。
+- 2026-07-19 (改訂 29 / **MON-4 Gate 2 PASS** — 実 trial 送達 + 有効 token 成功、
+  portfolio commit、Polar activation 前進): owner 承認の下で実行。
+  - **Gate 2 完全 PASS(実測)**: ライブフォーム
+    (`chibatakumi.studio/filmtone/resolve` #trial)から
+    `chiba+fttrial1@fores-tone.co.jp`(plus-alias、runbook 準拠)で 1 回だけ実請求。
+    **Turnstile は Managed 自動通過**(インタラクティブ challenge 非表示 = agent
+    の bot 検証突破なし)。メールはほぼ即時到達: From
+    `Filmtone <filmtone@fores-tone.co.jp>`、件名
+    `Filmtone — 14日無料体験ライセンス / 14-day trial license`、
+    2026-07-19T13:21:52Z、添付 `Filmtone.license`(547 bytes)。
+    `license:verify --trial-pub 39af05f5…` = **exit 0 / status trial / kind
+    trial / issued 2026-07-19T13:00:00Z(hour-truncated)/ expires
+    2026-08-02T13:00:00Z(正確に +14 日)**。`name` = email はフォームが氏名を
+    収集しない Worker 既定で想定内。**この成功により「正しい本番 Turnstile
+    token の hostname/action 成功」ゲートも同時に実証**(本番ページ実 solve →
+    siteverify 通過 → row 7 送達到達のため)。限界の記録: Worker POST の
+    wire-level status code は network 追跡開始タイミングの都合で未取得
+    (UI 成功分岐 + 新規署名 license の実到達が 200 経路の実証。1 リクエスト
+    厳守のため再送せず)。KV には alias の HMAC が約 13 ヶ月記録された(想定
+    どおり)。残る MON-4 検証: action/hostname mismatch の実 solve 拒否
+    (Gate 1b/1c)、テスト購入→手動発行(Gate 3、Polar activation 待ち)、
+    clock-forward 失効(Gate 4、owner の sudo 必要)。
+  - **portfolio commit `0ed86b3a`**(owner 承認): 製品ページ一式 + pkg(12
+    ファイル、+1,719 行)を portfolio `main` へ commit。owner の既存編集
+    `AGENTS.md` は除外・未接触。**push は未実施** — portfolio `main` には
+    owner の未 push commit 5 件(corona 記事系 + docs governance)が先行して
+    積まれており、push はそれらも同時公開になるため owner 判断待ち。
+  - **Polar activation 前進**: account review の正確な導線を実測特定 —
+    ダッシュボードに「test mode」文言は存在せず(checkout ページ専用表現)、
+    正本は **Finance → Account(`/dashboard/forestone/finance/account`)**。
+    チェックリストの「Add your product website」を Claude が実行
+    (`https://www.chibatakumi.studio/filmtone/resolve` 受理・緑チェック)。
+    残り必須 2 件は owner 専任: **Verify identity(身分証)/ Connect payout
+    account(口座)** — いずれも Claude の禁止事項(政府発行 ID・金融情報の
+    入力)のため代行不可。完了後に「Submit for review」→ Polar 手動審査。
+    **副作用(owner 判断待ち)**: org website 登録により「Add a support
+    email」行がドメイン照合警告(オレンジ/Review — support email が
+    fores-tone.co.jp 系で website が chibatakumi.studio のため)へ変化。
+  - **ライブページ表示バグ発見・修正**: trial 節見出しが `{trialDays}` の
+    まま未展開表示(page.tsx が `t("trial.title")` / `t("trial.body")` を
+    values なしで呼んでいた)。両呼び出しへ `{ trialDays }` を渡す修正を適用、
+    可視 HTML の未展開 placeholder 総当たり scan では該当 1 箇所のみを確認。
+    build 検証 → 再デプロイ → 再 scan(0 件化)は本改訂 commit 時点で進行中/
+    完了を次改訂に記録。
+  Copy / History Impact: 公開ページの表示バグ修正のみで新規 claim なし。
+  trial 導線は実測で end-to-end 動作確認済み — この事実は MON-6 release truth
+  に使用可能。Article Opportunity: No story(検証記録)。Change-History
+  Opportunity: No。Git: 本改訂を `claude/davinci-plugin-pricing-plan-4cb87b`
+  へ commit/push。
