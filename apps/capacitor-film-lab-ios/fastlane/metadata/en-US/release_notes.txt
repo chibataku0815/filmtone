@@ -1,5 +1,3 @@
-Built-in Stone, Urban, and Noir now apply with source-aware handling.
+The optical glow effect is now consistently named Deep Glow.
 
-On Rec.709, SDR BT.709, Display P3 SDR, and unknown display-referred sources, Filmtone uses a safer Look policy that reins in Look strength and the strongest contrast / compression pushes. This helps reduce clipping, harsh saturation, and lifted-looking shadows on footage that is already display-rendered.
-
-On camera-profile sources such as D-Log, the stronger creative Look behavior is preserved. Preview and export now resolve the same Built-in Look policy.
+Choose Subtle, Balanced, or Strong, with the same setting applied to preview and export. Existing edits remain compatible.

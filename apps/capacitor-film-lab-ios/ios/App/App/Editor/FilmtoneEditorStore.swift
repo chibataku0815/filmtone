@@ -91,6 +91,15 @@ final class FilmtoneEditorStore: ObservableObject {
     private var sourceAudioDebugTask: Task<Void, Never>?
     #endif
     @Published var highlightMarkers: FilmtoneHighlightMarkers?
+    @Published var highlightReelClipDurationSec: Double = FilmtoneHighlightReelOptions.defaultClipDurationSec {
+        didSet {
+            let normalized = FilmtoneHighlightReelOptions.normalizedClipDurationSec(highlightReelClipDurationSec)
+            if normalized != highlightReelClipDurationSec {
+                highlightReelClipDurationSec = normalized
+            }
+        }
+    }
+    @Published var highlightReelOutputMode: FilmtoneHighlightReelOutputMode = .combined
     @Published var sourceLoadState: FilmtoneSourceLoadState?
     @Published var isBusy = false
     @Published var notice: String?
@@ -438,7 +447,7 @@ final class FilmtoneEditorStore: ObservableObject {
               sourceViolations.isEmpty,
               !isBusy,
               !isSavingToPhotos,
-              let segments = exportHighlightMarkers?.highlightReelSegments() else {
+              let segments = exportHighlightMarkers?.highlightReelSegments(options: highlightReelOptions) else {
             return false
         }
         return !segments.isEmpty
@@ -1868,6 +1877,26 @@ final class FilmtoneEditorStore: ObservableObject {
             return nil
         }
         return highlightMarkers
+    }
+
+    var highlightReelOptions: FilmtoneHighlightReelOptions {
+        FilmtoneHighlightReelOptions(
+            clipDurationSec: highlightReelClipDurationSec,
+            outputMode: highlightReelOutputMode
+        )
+    }
+
+    func setHighlightReelClipDurationSec(_ durationSec: Double) {
+        let nextDuration = FilmtoneHighlightReelOptions.normalizedClipDurationSec(durationSec)
+        guard highlightReelClipDurationSec != nextDuration else { return }
+        highlightReelClipDurationSec = nextDuration
+        invalidateExportPackageState()
+    }
+
+    func setHighlightReelOutputMode(_ mode: FilmtoneHighlightReelOutputMode) {
+        guard highlightReelOutputMode != mode else { return }
+        highlightReelOutputMode = mode
+        invalidateExportPackageState()
     }
 
     private func currentMarkerSourceIdentity() -> FilmtoneMarkerSourceIdentity? {

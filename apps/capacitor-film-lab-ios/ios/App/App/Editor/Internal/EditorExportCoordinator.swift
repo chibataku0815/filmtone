@@ -486,7 +486,9 @@ final class EditorExportCoordinator: ObservableObject {
         }
 
         do {
-            try await facade.saveToPhotos(uri: result.outputUri)
+            for uri in photoSaveURIs(for: result) {
+                try await facade.saveToPhotos(uri: uri)
+            }
             saveToPhotosState = .saved
             // Keep the local export package available after Photos save so the
             // same result can still be shared or inspected from the app cache.
@@ -499,6 +501,15 @@ final class EditorExportCoordinator: ObservableObject {
             store.error = message
             store.presentToast(message, kind: .error)
         }
+    }
+
+    private func photoSaveURIs(for result: Phase0ExportResultDTO) -> [String] {
+        if result.sidecarUri == nil,
+           let packageFileUris = result.packageFileUris,
+           !packageFileUris.isEmpty {
+            return uniqueURIs(packageFileUris)
+        }
+        return [result.outputUri]
     }
 
     func shareOutput() async {
@@ -542,21 +553,29 @@ final class EditorExportCoordinator: ObservableObject {
             store.isBusy = true
             store.error = nil
             store.notice = nil
+            exportResult = nil
             exportProgress = nil
+            exportLocalAvailability = .none
+            saveToPhotosState = .notRun
             let cacheProtection = protectedCacheURIs
             let result = try await facade.runHighlightReel(
                 request: request,
                 protectedCacheURIs: cacheProtection,
                 appliedSavedLook: resolvedSavedLook,
                 cameraProfile: cameraProfileSelection,
-                highlightMarkers: store.exportHighlightMarkers
+                highlightMarkers: store.exportHighlightMarkers,
+                highlightReelOptions: store.highlightReelOptions,
+                highlightReelOutputMode: store.highlightReelOutputMode
             ) { [weak self] progress in
                 self?.exportProgress = progress
             }
 
             store.isBusy = false
             exportProgress = nil
-            _ = try await facade.shareOutput(mediaURI: result.outputUri)
+            exportResult = result
+            exportLocalAvailability = .available
+            reclaimCacheForCurrentState()
+            store.presentToast(strings.toastExportComplete, kind: .success)
         } catch {
             store.isBusy = false
             exportProgress = nil

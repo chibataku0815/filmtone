@@ -1,5 +1,3 @@
-Built-in Look の Stone / Urban / Noir を、素材の Source Profile に合わせて適用するようにしました。
+光のにじみ効果の名称を Deep Glow に統一しました。
 
-Rec.709、SDR BT.709、Display P3 SDR、profile 未確定の表示基準素材では、Look の強さと contrast / compression の押し出しを控えめにします。白飛び、彩度の破綻、黒浮きが出やすい素材で扱いやすくするための更新です。
-
-D-Log など camera profile を選んだ素材では、これまでの強い creative Look の方向を保ちます。preview と export でも同じ Built-in Look policy を使うようにしています。
+控えめ・標準・強めの3段階から選べ、プレビューと書き出しに同じ設定が反映されます。既存の編集内容との互換性は保たれます。

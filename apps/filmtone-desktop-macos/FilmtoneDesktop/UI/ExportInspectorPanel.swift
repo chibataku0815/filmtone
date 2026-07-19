@@ -54,6 +54,10 @@ struct ExportInspectorPanel: View {
                 videoTimingSelector
             }
 
+            if state.sourceKind == .video && state.exportHighlightMarkers != nil {
+                highlightOptionsSelector
+            }
+
             if state.exportFormat == .jpeg && state.sourceKind == .still {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -112,6 +116,84 @@ struct ExportInspectorPanel: View {
                 .filmtonePointingHandCursor()
             }
         }
+    }
+
+    private var highlightOptionsSelector: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Highlight")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.72))
+
+            HStack(spacing: 4) {
+                ForEach(FilmtoneHighlightReelOptions.supportedClipDurationsSec, id: \.self) { durationSec in
+                    highlightDurationButton(durationSec)
+                }
+            }
+            .padding(4)
+            .frame(width: 220)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.16))
+            )
+            .glassEffect(
+                .clear.tint(Color.white.opacity(0.07)),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+
+            HStack(spacing: 4) {
+                highlightOutputModeButton(.combined, label: "Reel")
+                highlightOutputModeButton(.separate, label: "Clips")
+            }
+            .padding(4)
+            .frame(width: 220)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.16))
+            )
+            .glassEffect(
+                .clear.tint(Color.white.opacity(0.07)),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+        }
+    }
+
+    private func highlightDurationButton(_ durationSec: Double) -> some View {
+        Button {
+            state.setHighlightReelClipDurationSec(durationSec)
+        } label: {
+            Text(FilmtoneFormatters.formattedSecondsShort(durationSec))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FilmtoneGlassSegmentButtonStyle(
+            isSelected: state.highlightReelClipDurationSec == durationSec
+        ))
+        .accessibilityIdentifier("filmtone.export.highlight.duration.\(Int(durationSec))")
+        .filmtonePointingHandCursor()
+    }
+
+    private func highlightOutputModeButton(
+        _ mode: FilmtoneHighlightReelOutputMode,
+        label: String
+    ) -> some View {
+        Button {
+            state.setHighlightReelOutputMode(mode)
+        } label: {
+            Text(label)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(FilmtoneGlassSegmentButtonStyle(
+            isSelected: state.highlightReelOutputMode == mode
+        ))
+        .accessibilityIdentifier("filmtone.export.highlight.mode.\(mode.rawValue)")
+        .filmtonePointingHandCursor()
     }
 
     private var formatSelector: some View {
@@ -329,8 +411,10 @@ struct ExportInspectorPanel: View {
                     value: FilmtoneFormatters.formattedFileSize(result.fileSizeBytes)
                 )
                 MetricRow(
-                    label: "File",
-                    value: result.outputURL.lastPathComponent
+                    label: result.shareURLs.isEmpty ? "File" : "Files",
+                    value: result.shareURLs.isEmpty
+                        ? result.outputURL.lastPathComponent
+                        : "\(result.shareURLs.count) clips"
                 )
                 if let sidecarURL = result.sidecarURL {
                     MetricRow(
@@ -342,7 +426,7 @@ struct ExportInspectorPanel: View {
 
             HStack(spacing: 8) {
                 Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([result.outputURL])
+                    NSWorkspace.shared.activateFileViewerSelecting(result.effectiveShareURLs)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "magnifyingglass")
@@ -353,7 +437,7 @@ struct ExportInspectorPanel: View {
                 .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
                 .filmtonePointingHandCursor()
 
-                ShareSourceButton(url: result.outputURL)
+                ShareSourceButton(urls: result.effectiveShareURLs)
             }
 
             Button {
@@ -407,7 +491,7 @@ struct ExportInspectorPanel: View {
 /// we want the popover to land below the button rather than under the
 /// cursor.
 private struct ShareSourceButton: View {
-    let url: URL
+    let urls: [URL]
     @State private var shareRequest = 0
 
     var body: some View {
@@ -422,12 +506,12 @@ private struct ShareSourceButton: View {
         }
         .buttonStyle(FilmtoneGlassSecondaryButtonStyle(compact: true))
         .filmtonePointingHandCursor()
-        .background(ShareAnchor(url: url, request: shareRequest))
+        .background(ShareAnchor(urls: urls, request: shareRequest))
     }
 }
 
 private struct ShareAnchor: NSViewRepresentable {
-    let url: URL
+    let urls: [URL]
     let request: Int
 
     func makeNSView(context: Context) -> NSView {
@@ -437,28 +521,28 @@ private struct ShareAnchor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.url = url
+        context.coordinator.urls = urls
         context.coordinator.anchorView = nsView
         context.coordinator.showIfNeeded(request: request)
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(url: url)
+        Coordinator(urls: urls)
     }
 
     final class Coordinator: NSObject {
-        var url: URL
+        var urls: [URL]
         weak var anchorView: NSView?
         private var lastRequest = 0
 
-        init(url: URL) { self.url = url }
+        init(urls: [URL]) { self.urls = urls }
 
         @MainActor
         func showIfNeeded(request: Int) {
             guard request != lastRequest else { return }
             lastRequest = request
             guard request > 0, let anchorView else { return }
-            let picker = NSSharingServicePicker(items: [url])
+            let picker = NSSharingServicePicker(items: urls)
             picker.show(relativeTo: anchorView.bounds, of: anchorView, preferredEdge: .minY)
         }
     }

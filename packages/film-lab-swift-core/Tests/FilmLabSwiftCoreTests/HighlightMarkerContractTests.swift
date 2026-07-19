@@ -257,6 +257,59 @@ final class HighlightMarkerContractTests: XCTestCase {
         XCTAssertEqual(unmerged.count, 2)
     }
 
+    func testHighlightReelOptionsSupportLongerDurationsAndSeparateOutput() {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "source.mov",
+                durationSec: 20,
+                fps: 30,
+                fileSizeBytes: 256
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "m1",
+                    sourceTimeSec: 5.0,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-06-02T01:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "m2",
+                    sourceTimeSec: 7.0,
+                    sourceFps: 30,
+                    createdOnPlatform: "ios",
+                    createdAtIso: "2026-06-02T01:00:01.000Z"
+                )
+            ]
+        )
+
+        XCTAssertEqual(FilmtoneHighlightReelOptions.supportedClipDurationsSec, [1.0, 3.0, 5.0, 10.0])
+        XCTAssertEqual(FilmtoneHighlightReelOptions(clipDurationSec: -1).clipDurationSec, 1.0)
+
+        let combined = markers.highlightReelSegments(
+            options: FilmtoneHighlightReelOptions(
+                clipDurationSec: 5.0,
+                outputMode: .combined
+            )
+        )
+        let separate = markers.highlightReelSegments(
+            options: FilmtoneHighlightReelOptions(
+                clipDurationSec: 5.0,
+                outputMode: .separate
+            )
+        )
+
+        XCTAssertEqual(combined.count, 1)
+        XCTAssertEqual(combined[0].markerIds, ["m1", "m2"])
+        XCTAssertEqual(combined[0].sourceStartSec, 2.5)
+        XCTAssertEqual(combined[0].sourceEndSec, 9.5)
+        XCTAssertEqual(separate.count, 2)
+        XCTAssertEqual(separate[0].markerIds, ["m1"])
+        XCTAssertEqual(separate[0].durationSec, 5.0)
+        XCTAssertEqual(separate[1].markerIds, ["m2"])
+        XCTAssertEqual(separate[1].durationSec, 5.0)
+    }
+
     func testHighlightReelSegmentsSkipInvalidMarkers() {
         let segments = FilmtoneHighlightClipSegment.segments(
             from: [

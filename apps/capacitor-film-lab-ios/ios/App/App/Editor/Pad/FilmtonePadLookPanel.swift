@@ -22,12 +22,12 @@ struct FilmtonePadLookPanel: View {
     let onSaveCurrentLook: () -> Void
 
     private static let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: FilmtonePadTouchMetrics.sectionSpacing) {
             activeLookSummary
 
             looksGrid
@@ -74,7 +74,11 @@ struct FilmtonePadLookPanel: View {
     }
 
     private var looksGrid: some View {
-        LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 8) {
+        LazyVGrid(
+            columns: Self.columns,
+            alignment: .leading,
+            spacing: FilmtonePadTouchMetrics.gridSpacing
+        ) {
             ForEach(store.library.looks) { entry in
                 lookChip(entry: entry)
             }
@@ -106,19 +110,17 @@ struct FilmtonePadLookPanel: View {
                         .foregroundStyle(isActive ? Color.black.opacity(0.78) : Color.filmtoneAmber.opacity(0.78))
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(isActive ? Color.filmtoneAmber.opacity(0.92) : Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(isActive ? 0 : 0.10), lineWidth: 0.5)
-            )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            FilmtonePadTouchButtonStyle(
+                isActive: isActive,
+                activeFill: Color.filmtoneAmber.opacity(0.92),
+                inactiveFill: Color.white.opacity(0.06),
+                inactiveStroke: Color.white.opacity(0.10),
+                minHeight: FilmtonePadTouchMetrics.minimumControlHeight
+            )
+        )
         .contextMenu {
             // M7 (WP4): chip context menu iterates the canonical
             // `FilmtoneLookOperation.contextMenuOperations` set so the
@@ -153,18 +155,8 @@ struct FilmtonePadLookPanel: View {
             )
             .font(.caption.weight(.semibold))
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
-            )
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white.opacity(0.84))
+        .buttonStyle(FilmtonePadTouchButtonStyle())
         .accessibilityIdentifier("filmtone.pad.inspector.look.importLut")
     }
 
@@ -239,18 +231,13 @@ struct FilmtonePadLookPanel: View {
             )
             .font(.caption.weight(.semibold))
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 9)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
-            )
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.white.opacity(0.78))
+        .buttonStyle(
+            FilmtonePadTouchButtonStyle(
+                inactiveFill: Color.white.opacity(0.05),
+                inactiveForeground: Color.white.opacity(0.78)
+            )
+        )
         .accessibilityIdentifier("filmtone.pad.inspector.look.clear")
     }
 
@@ -258,48 +245,38 @@ struct FilmtonePadLookPanel: View {
         let control = FilmtoneLookControlID.creativeLutIntensity
         let clamped = FilmtonePhase0Math.clampLutIntensity(store.project.creativeLut?.intensity ?? 1.0)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(store.strings.fullscreenLookIntensityLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.82))
-                Spacer()
-                Text(Self.percentLabel(clamped))
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .accessibilityIdentifier(control.iPadValueAccessibilityIdentifier)
-            }
-            Slider(
-                value: Binding(get: { clamped }, set: { store.setCreativeLutIntensity($0) }),
-                in: control.range
-            )
-            .tint(Color.filmtoneAmber)
-            .accessibilityIdentifier(control.iPadSliderAccessibilityIdentifier)
-        }
+        return FilmtonePadSliderControl(
+            title: store.strings.fullscreenLookIntensityLabel,
+            valueText: Self.percentLabel(clamped),
+            valueAccessibilityIdentifier: control.iPadValueAccessibilityIdentifier,
+            sliderAccessibilityIdentifier: control.iPadSliderAccessibilityIdentifier,
+            value: Binding(
+                get: {
+                    FilmtonePhase0Math.clampLutIntensity(store.project.creativeLut?.intensity ?? 1.0)
+                },
+                set: { store.setCreativeLutIntensity($0) }
+            ),
+            range: control.range,
+            isActive: true
+        )
     }
 
     private var strengthSlider: some View {
         let control = FilmtoneLookControlID.strength
         let clamped = FilmtonePhase0Math.clampStrength(store.project.strength)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(store.strings.fullscreenStrengthLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.82))
-                Spacer()
-                Text(Self.percentLabel(clamped))
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .accessibilityIdentifier(control.iPadValueAccessibilityIdentifier)
-            }
-            Slider(
-                value: Binding(get: { clamped }, set: { store.setStrength($0) }),
-                in: control.range
-            )
-            .tint(Color.filmtoneAmber)
-            .accessibilityIdentifier(control.iPadSliderAccessibilityIdentifier)
-        }
+        return FilmtonePadSliderControl(
+            title: store.strings.fullscreenStrengthLabel,
+            valueText: Self.percentLabel(clamped),
+            valueAccessibilityIdentifier: control.iPadValueAccessibilityIdentifier,
+            sliderAccessibilityIdentifier: control.iPadSliderAccessibilityIdentifier,
+            value: Binding(
+                get: { FilmtonePhase0Math.clampStrength(store.project.strength) },
+                set: { store.setStrength($0) }
+            ),
+            range: control.range,
+            isActive: true
+        )
     }
 
     private var saveCurrentLookButton: some View {
@@ -307,18 +284,15 @@ struct FilmtonePadLookPanel: View {
             Label("Save Current Look", systemImage: "bookmark")
                 .font(.caption.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.filmtoneAmber.opacity(0.20))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.filmtoneAmber.opacity(0.42), lineWidth: 0.5)
-                )
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(Color.filmtoneAmber)
+        .buttonStyle(
+            FilmtonePadTouchButtonStyle(
+                inactiveFill: Color.filmtoneAmber.opacity(0.20),
+                inactiveStroke: Color.filmtoneAmber.opacity(0.42),
+                inactiveForeground: Color.filmtoneAmber,
+                minHeight: FilmtonePadTouchMetrics.prominentControlHeight
+            )
+        )
         .accessibilityIdentifier("filmtone.pad.inspector.look.save")
     }
 

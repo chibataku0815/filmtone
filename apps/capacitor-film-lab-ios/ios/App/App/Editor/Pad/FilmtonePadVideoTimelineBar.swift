@@ -24,7 +24,7 @@ struct FilmtonePadVideoTimelineBar: View {
             timeLabel(controller.duration)
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 12)
+        .padding(.vertical, 16)
         .background(
             LinearGradient(
                 colors: [Color.black.opacity(0.0), Color.black.opacity(0.55)],
@@ -46,7 +46,10 @@ struct FilmtonePadVideoTimelineBar: View {
             )
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(
+                    width: FilmtonePadTouchMetrics.iconControlSize,
+                    height: FilmtonePadTouchMetrics.iconControlSize
+                )
                 .glassEffect(.regular.tint(Color.black.opacity(0.22)), in: Circle())
         }
         .buttonStyle(.plain)
@@ -79,6 +82,9 @@ struct FilmtonePadVideoTimelineBar: View {
             }
         )
         .tint(Color.filmtoneAmber)
+        .frame(minHeight: FilmtonePadTouchMetrics.sliderTouchHeight)
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
         .accessibilityIdentifier(FilmtoneEditorPreviewCommand.scrubTimeline.iPadAccessibilityIdentifier)
         .accessibilityLabel(FilmtoneEditorPreviewCommand.scrubTimeline.label)
     }

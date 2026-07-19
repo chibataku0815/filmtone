@@ -182,9 +182,17 @@ public struct FilmtoneHighlightMarkers: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+public enum FilmtoneHighlightReelOutputMode: String, Codable, CaseIterable, Equatable, Hashable, Sendable {
+    case combined
+    case separate
+}
+
 public struct FilmtoneHighlightReelOptions: Codable, Equatable, Hashable, Sendable {
+    public static let defaultClipDurationSec = 1.0
+    public static let supportedClipDurationsSec: [Double] = [1.0, 3.0, 5.0, 10.0]
+
     public static let standard = FilmtoneHighlightReelOptions(
-        clipDurationSec: 1.0,
+        clipDurationSec: defaultClipDurationSec,
         mergeOverlaps: true
     )
 
@@ -192,10 +200,22 @@ public struct FilmtoneHighlightReelOptions: Codable, Equatable, Hashable, Sendab
     public var mergeOverlaps: Bool
 
     public init(clipDurationSec: Double = 1.0, mergeOverlaps: Bool = true) {
-        self.clipDurationSec = clipDurationSec.isFinite && clipDurationSec > 0
-            ? clipDurationSec
-            : 1.0
+        self.clipDurationSec = Self.normalizedClipDurationSec(clipDurationSec)
         self.mergeOverlaps = mergeOverlaps
+    }
+
+    public init(
+        clipDurationSec: Double = defaultClipDurationSec,
+        outputMode: FilmtoneHighlightReelOutputMode
+    ) {
+        self.init(
+            clipDurationSec: clipDurationSec,
+            mergeOverlaps: outputMode == .combined
+        )
+    }
+
+    public static func normalizedClipDurationSec(_ value: Double) -> Double {
+        value.isFinite && value > 0 ? value : defaultClipDurationSec
     }
 }
 

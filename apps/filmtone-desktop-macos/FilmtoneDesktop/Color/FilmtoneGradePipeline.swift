@@ -491,7 +491,8 @@ enum FilmtoneGradePipeline {
                 radius: params.bloomRadius,
                 levelCount: bloomMipLevels,
                 spreadMultiplier: bloomSpreadBoost,
-                useTentResampling: true
+                useTentResampling: true,
+                normalizedBandEnergy: opticalScatter != nil
             )
         } else {
             bloomImage = black
@@ -529,6 +530,10 @@ enum FilmtoneGradePipeline {
             diffusionImage = black
         }
 
+        let bloomCompositeStrength = opticalScatter == nil
+            ? params.bloomStrength
+            : radianceExposureGain(params.bloomStrength)
+
         if let opticalScatter,
            let veilKernel = FilmtoneGradeKernels.glowCompositeBacklightVeil {
             return veilKernel.apply(extent: extent, arguments: [
@@ -536,7 +541,7 @@ enum FilmtoneGradePipeline {
                 bloomImage,
                 halationImage,
                 diffusionImage,
-                params.bloomStrength,
+                bloomCompositeStrength,
                 params.halationIntensity,
                 params.diffusion,
                 opticalScatter.directTransmission,
@@ -585,7 +590,8 @@ enum FilmtoneGradePipeline {
         radius: Double,
         levelCount: Int,
         spreadMultiplier: Double,
-        useTentResampling: Bool = false
+        useTentResampling: Bool = false,
+        normalizedBandEnergy: Bool = false
     ) -> CIImage {
         let extent = image.extent.integral
         guard levelCount > 0 else { return blackImage(for: extent) }
@@ -598,16 +604,37 @@ enum FilmtoneGradePipeline {
         )
         guard !mips.isEmpty else { return blackImage(for: extent) }
 
-        let weights = computeMipWeights(radius: clampValue(radius), levels: mips.count)
-        if mips.count > 1 {
+        if normalizedBandEnergy {
+            let weights = normalizedGlowBandWeights(
+                radius: clampValue(radius),
+                levels: mips.count
+            )
+            let deepestIndex = mips.count - 1
+            mips[deepestIndex] = weightedImage(
+                mips[deepestIndex],
+                weight: weights[deepestIndex]
+            )
+            if mips.count > 1 {
+                for index in stride(from: mips.count - 2, through: 0, by: -1) {
+                    let lowRes = mips[index + 1]
+                    let highRes = mips[index]
+                    let restored = useTentResampling
+                        ? tentUpsampledImage(lowRes, to: highRes.extent)
+                        : upsampledImage(lowRes, to: highRes.extent)
+                    let weightedHighRes = weightedImage(highRes, weight: weights[index])
+                    mips[index] = addImages(restored, weightedHighRes).cropped(to: highRes.extent)
+                }
+            }
+        } else if mips.count > 1 {
+            let weights = computeMipWeights(radius: clampValue(radius), levels: mips.count)
             for index in stride(from: mips.count - 2, through: 0, by: -1) {
                 let lowRes = mips[index + 1]
                 let highRes = mips[index]
                 let restored = useTentResampling
                     ? tentUpsampledImage(lowRes, to: highRes.extent)
                     : upsampledImage(lowRes, to: highRes.extent)
-                let weighted = weightedImage(restored, weight: weights[index + 1])
-                mips[index] = addImages(weighted, highRes).cropped(to: highRes.extent)
+                let weightedLowRes = weightedImage(restored, weight: weights[index + 1])
+                mips[index] = addImages(weightedLowRes, highRes).cropped(to: highRes.extent)
             }
         }
 
@@ -761,6 +788,29 @@ enum FilmtoneGradePipeline {
             let wide = exp(-0.5 * radius * (1.0 - t))
             return (base * (1.0 - radius)) + (wide * radius)
         }
+    }
+
+    private static func normalizedGlowBandWeights(radius: Double, levels: Int) -> [Double] {
+        guard levels > 0 else { return [] }
+        // Filmtone-owned regularized inverse-square falloff. The offset keeps
+        // the core readable while radius moves energy toward wider octaves;
+        // normalization leaves total energy to the exposure response.
+        let spreadBias = 0.74 + (clampValue(radius) * 0.62)
+        let rawWeights = (0..<levels).map { index -> Double in
+            let regularizedOctave = Double(index + 3)
+            let baseWeight = 1.0 / (regularizedOctave * regularizedOctave)
+            return baseWeight * pow(spreadBias, Double(index))
+        }
+        let total = rawWeights.reduce(0, +)
+        guard total > Double.ulpOfOne else {
+            return Array(repeating: 1.0 / Double(levels), count: levels)
+        }
+        return rawWeights.map { $0 / total }
+    }
+
+    private static func radianceExposureGain(_ strength: Double) -> Double {
+        let positiveStrength = Swift.max(strength, 0)
+        return Swift.max((exp(positiveStrength * 1.25) - 1.0) * 2.4, 0)
     }
 
     private static func halationColor(for hue: Double) -> CIColor {

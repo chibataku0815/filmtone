@@ -1,5 +1,6 @@
 import FilmLabSwiftCore
 import CoreImage
+import CoreGraphics
 import Foundation
 
 func registerCoreOpticalFilterTests() {
@@ -576,6 +577,82 @@ func registerCoreOpticalFilterTests() {
         }
         guard CIContext().createCGImage(output, from: extent) != nil else {
             throw AssertionError(description: "filmDamage CIColorKernel output failed to render")
+        }
+    }
+
+    runner.test("filmDamage dust produces dark debris on bright material") {
+        guard let kernel = FilmtoneGradeKernels.filmDamage else {
+            throw AssertionError(description: "filmDamage CIColorKernel failed to compile")
+        }
+        let width = 160
+        let height = 96
+        let extent = CGRect(x: 0, y: 0, width: width, height: height)
+        let baseRed = 0.72
+        let baseGreen = 0.78
+        let baseBlue = 0.82
+        let input = CIImage(color: CIColor(red: baseRed, green: baseGreen, blue: baseBlue, alpha: 1.0))
+            .cropped(to: extent)
+        guard let output = kernel.apply(
+            extent: extent,
+            arguments: [
+                input,
+                0.55,
+                0.0,
+                1.25,
+                0.43,
+                CIVector(x: extent.origin.x, y: extent.origin.y),
+                CIVector(x: extent.width, y: extent.height),
+            ]
+        ) else {
+            throw AssertionError(description: "filmDamage CIColorKernel failed to apply")
+        }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let context = CIContext(options: [.workingColorSpace: colorSpace])
+        guard let rendered = context.createCGImage(output, from: extent) else {
+            throw AssertionError(description: "filmDamage CIColorKernel output failed to render")
+        }
+
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue)
+        try pixels.withUnsafeMutableBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let drawContext = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: width * 4,
+                    space: colorSpace,
+                    bitmapInfo: bitmapInfo.rawValue
+                  )
+            else {
+                throw AssertionError(description: "failed to allocate filmDamage pixel buffer")
+            }
+            drawContext.draw(rendered, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+
+        let baseLuma = baseRed * 0.2126 + baseGreen * 0.7152 + baseBlue * 0.0722
+        var darkPixels = 0
+        var brightPixels = 0
+        for offset in stride(from: 0, to: pixels.count, by: 4) {
+            let red = Double(pixels[offset]) / 255.0
+            let green = Double(pixels[offset + 1]) / 255.0
+            let blue = Double(pixels[offset + 2]) / 255.0
+            let luma = red * 0.2126 + green * 0.7152 + blue * 0.0722
+            if luma < baseLuma - 0.045 {
+                darkPixels += 1
+            }
+            if luma > baseLuma + 0.045 {
+                brightPixels += 1
+            }
+        }
+
+        if darkPixels < 10 {
+            throw AssertionError(description: "filmDamage Dust should create visible dark debris on bright material, got \(darkPixels) dark pixels")
+        }
+        if darkPixels <= max(1, brightPixels * 2) {
+            throw AssertionError(description: "filmDamage Dust should not be white-sparkle dominated: dark=\(darkPixels), bright=\(brightPixels)")
         }
     }
 

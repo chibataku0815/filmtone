@@ -1,6 +1,6 @@
 # Filmtone Effect Terminology SSoT
 
-- Last reviewed: 2026-04-26 JST
+- Last reviewed: 2026-07-13 JST
 - Owner: `packages/film-lab-core` (this is the canonical place because the contract keys live in `src/presets.ts` and iOS Swift types are already generated from this package via `ios-swift-payload.ts`).
 - Consumers: `apps/desktop-film-lab-batch/messages/{en,ja}.json`, `apps/capacitor-film-lab-ios/ios/App/App/Localizable.xcstrings`, future surfaces.
 - Replaces: ad-hoc JP/EN labels scattered between Desktop messages and iOS xcstrings.
@@ -105,6 +105,27 @@ Notation:
 | `bloomThreshold` | Threshold | Bloom Threshold | しきい値 | 光のにじみ・しきい値 | Bloom | ✅ | **AUTO (iOS replaces "ブルームしきい値")** |
 | `bloomRadius` | Radius | Bloom Radius | 半径 | 光のにじみ・半径 | Bloom | ✅ | **AUTO (iOS replaces "ブルーム半径")** |
 | `bloomSoftKnee` | Soft knee | Bloom Soft Knee | ソフトニー | 光のにじみ・ソフトニー | Bloom | ✅ | AUTO |
+
+#### Deep Glow profile family
+
+`Deep Glow` is the canonical Filmtone feature name for the three optical
+profiles whose compatibility ids remain `backlightVeil-1-8`,
+`backlightVeil-1-4`, and `backlightVeil-1-2`. It is not a claim of parity with
+an AE or third-party plug-in.
+
+| Surface | EN | JP |
+|---|---|---|
+| Feature/group | Deep Glow | Deep Glow |
+| Grouped variant 1 | Subtle | 控えめ |
+| Grouped variant 2 | Balanced | 標準 |
+| Grouped variant 3 | Strong | 強め |
+| Standalone variant 1 | Deep Glow - Subtle | Deep Glow - 控えめ |
+| Standalone variant 2 | Deep Glow - Balanced | Deep Glow - 標準 |
+| Standalone variant 3 | Deep Glow - Strong | Deep Glow - 強め |
+
+The low-level Bloom parameter family remains an advanced adjustment contract.
+Do not expose `Backlight Veil`, density-only labels, `Light Bloom`, or
+`光のにじみ` as alternate names for the Deep Glow profile family.
 
 ### 3.4 Halation family
 

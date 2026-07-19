@@ -340,6 +340,48 @@ func registerCoreQuickSidecarStateTests() {
         try assertClose(segments[1].sourceEndSec, 8.0)
     }
 
+    runner.test("highlight reel selected options can produce separate longer clips") {
+        let markers = FilmtoneHighlightMarkers(
+            sourceIdentity: FilmtoneMarkerSourceIdentity(
+                filename: "clip.mov",
+                durationSec: 12,
+                fps: 24,
+                fileSizeBytes: 2048
+            ),
+            markers: [
+                FilmtoneHighlightMarker(
+                    id: "marker-a",
+                    sourceTimeSec: 4.0,
+                    sourceFps: 24,
+                    createdOnPlatform: "macos",
+                    createdAtIso: "2026-06-02T00:00:00.000Z"
+                ),
+                FilmtoneHighlightMarker(
+                    id: "marker-b",
+                    sourceTimeSec: 5.0,
+                    sourceFps: 24,
+                    createdOnPlatform: "macos",
+                    createdAtIso: "2026-06-02T00:00:01.000Z"
+                )
+            ]
+        )
+
+        let segments = markers.highlightReelSegments(
+            options: FilmtoneHighlightReelOptions(
+                clipDurationSec: 5.0,
+                outputMode: .separate
+            )
+        )
+
+        try assertEqual(segments.count, 2)
+        try assertEqual(segments[0].markerIds, ["marker-a"])
+        try assertClose(segments[0].sourceStartSec, 1.5)
+        try assertClose(segments[0].sourceEndSec, 6.5)
+        try assertEqual(segments[1].markerIds, ["marker-b"])
+        try assertClose(segments[1].sourceStartSec, 2.5)
+        try assertClose(segments[1].sourceEndSec, 7.5)
+    }
+
     runner.test("Backlight Veil catalog exposes shared profile ids + supported values") {
         try assertEqual(
             FilmtoneOpticalFilterCatalog.profiles.map(\.id),

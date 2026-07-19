@@ -219,6 +219,8 @@ final class FilmtoneEditorFacade {
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
         highlightMarkers: FilmtoneHighlightMarkers?,
+        highlightReelOptions: FilmtoneHighlightReelOptions = .standard,
+        highlightReelOutputMode: FilmtoneHighlightReelOutputMode = .combined,
         onProgress: @escaping @MainActor (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let protectedCacheURLs = protectedCacheURIs.compactMap { try? runtime.resolveFileURL($0) }
@@ -227,7 +229,9 @@ final class FilmtoneEditorFacade {
             protectedCacheURLs: protectedCacheURLs,
             appliedSavedLook: appliedSavedLook,
             cameraProfile: cameraProfile,
-            highlightMarkers: highlightMarkers
+            highlightMarkers: highlightMarkers,
+            highlightReelOptions: highlightReelOptions,
+            highlightReelOutputMode: highlightReelOutputMode
         ) { progress in
             DispatchQueue.main.async {
                 Task { @MainActor in

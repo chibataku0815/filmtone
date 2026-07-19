@@ -33,6 +33,8 @@
 		1D69E113018BC5AD45724B09 /* HdrPreparationPolicyDeriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000004 /* HdrPreparationPolicyDeriver.swift */; };
 		1DF31D45C5A35E34CB002132 /* FilmtoneCaptureTransformLutClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000010000000000000099 /* FilmtoneCaptureTransformLutClassifier.swift */; };
 		1EB6A7BCC9DE944FF467CA54 /* FilmtonePadVideoTimelineBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */; };
+		C7A000010000000000000002 /* FilmtonePadTouchControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A000010000000000000001 /* FilmtonePadTouchControls.swift */; };
+		C7A000010000000000000003 /* FilmtonePadTouchControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A000010000000000000001 /* FilmtonePadTouchControls.swift */; };
 		210298DEDED7573D37D52D75 /* CreativeLuts in Resources */ = {isa = PBXBuildFile; fileRef = D40000010000000000000001 /* CreativeLuts */; };
 		21779BAB64D1E845064E3FBA /* FilmtonePadStillCompareLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */; };
 		2387CB087F9C55289E8B88B6 /* EditorCaptureRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3000001000000000000000C /* EditorCaptureRelay.swift */; };
@@ -577,6 +579,7 @@
 		C200000100000000000000A2 /* FilmtoneCreativePack01Adaptation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilmtoneCreativePack01Adaptation.swift; sourceTree = "<group>"; };
 		C251B271BA66A31B9FDFFFF9 /* ExportSidecarDateFormatter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportSidecarDateFormatter.swift; sourceTree = "<group>"; };
 		C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadToolbar.swift; sourceTree = "<group>"; };
+		C7A000010000000000000001 /* FilmtonePadTouchControls.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FilmtonePadTouchControls.swift; sourceTree = "<group>"; };
 		C30000010000000000000002 /* EditorProjectController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorProjectController.swift; sourceTree = "<group>"; };
 		C30000010000000000000004 /* EditorLibraryController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorLibraryController.swift; sourceTree = "<group>"; };
 		C30000010000000000000006 /* EditorPreviewOrchestrator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditorPreviewOrchestrator.swift; sourceTree = "<group>"; };
@@ -931,6 +934,7 @@
 				7A5387260918A84CA30D21C5 /* FilmtonePadPreviewSurface.swift */,
 				4AC12515A7B45A995AB4ECA7 /* FilmtonePadStillCompareLayer.swift */,
 				C2B4BCF8E838C01F3C03C93E /* FilmtonePadToolbar.swift */,
+				C7A000010000000000000001 /* FilmtonePadTouchControls.swift */,
 				EF96EBBD0FAE724664442992 /* FilmtonePadVideoTimelineBar.swift */,
 				48CF7A21A471287CC8183B1D /* FilmtonePadWorkspaceView.swift */,
 			);
@@ -1406,6 +1410,7 @@
 				CE66FBAB14D40261F552C7C8 /* FilmtonePadPreviewSurface.swift in Sources */,
 				E709555961D75223DCD1C8C4 /* FilmtonePadStillCompareLayer.swift in Sources */,
 				E6857A31F6FCBB49AB9FE88B /* FilmtonePadToolbar.swift in Sources */,
+				C7A000010000000000000002 /* FilmtonePadTouchControls.swift in Sources */,
 				DD19FB84CAA6E466A3DD3967 /* FilmtonePadVideoTimelineBar.swift in Sources */,
 				EC6AF099A9D3AB9B4E94F405 /* FilmtonePadWorkspaceView.swift in Sources */,
 			);
@@ -1575,6 +1580,7 @@
 				628BE003DDA9514A827013A6 /* FilmtonePadPreviewSurface.swift in Sources */,
 				21779BAB64D1E845064E3FBA /* FilmtonePadStillCompareLayer.swift in Sources */,
 				55186630070289A99F8CBEE3 /* FilmtonePadToolbar.swift in Sources */,
+				C7A000010000000000000003 /* FilmtonePadTouchControls.swift in Sources */,
 				1EB6A7BCC9DE944FF467CA54 /* FilmtonePadVideoTimelineBar.swift in Sources */,
 				BA27E66639549C5D7A337198 /* FilmtonePadWorkspaceView.swift in Sources */,
 			);

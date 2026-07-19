@@ -120,6 +120,8 @@ final class FilmtoneMediaRuntime {
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
+        highlightReelOptions: FilmtoneHighlightReelOptions = .standard,
+        outputPreferredName: String? = nil,
         captureProvenance: SidecarCaptureProvenance? = nil
     ) throws -> FilmtoneExportSession {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
@@ -131,6 +133,8 @@ final class FilmtoneMediaRuntime {
             appliedSavedLook: appliedSavedLook,
             cameraProfile: cameraProfile,
             highlightMarkers: highlightMarkers,
+            highlightReelOptions: highlightReelOptions,
+            outputPreferredName: outputPreferredName,
             captureProvenance: captureProvenance
         )
     }
@@ -479,37 +483,158 @@ final class FilmtoneMediaRuntime {
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
         highlightMarkers: FilmtoneHighlightMarkers?,
+        highlightReelOptions: FilmtoneHighlightReelOptions = .standard,
+        highlightReelOutputMode: FilmtoneHighlightReelOutputMode = .combined,
         onProgress: @escaping (Phase0ExportProgressDTO) -> Void
     ) async throws -> Phase0ExportResultDTO {
         let resolvedSourceURL = try sourceURL ?? resolveFileURL(request.sourceUri)
         _ = try? cacheStore.pruneStandard(protecting: [resolvedSourceURL] + protectedCacheURLs)
-        let exportSession = try makeExportSession(
-            request: request,
-            sourceURL: resolvedSourceURL,
-            appliedSavedLook: appliedSavedLook,
-            cameraProfile: cameraProfile,
-            highlightMarkers: highlightMarkers
-        )
 
         await beginForegroundExportActivity()
-        await ExportCancelController.shared.attach(exportSession)
         defer {
             Task { @MainActor in
                 await ExportCancelController.shared.detach()
-                await endForegroundExportActivity()
+                endForegroundExportActivity()
             }
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        switch highlightReelOutputMode {
+        case .combined:
+            let exportSession = try makeExportSession(
+                request: request,
+                sourceURL: resolvedSourceURL,
+                appliedSavedLook: appliedSavedLook,
+                cameraProfile: cameraProfile,
+                highlightMarkers: highlightMarkers,
+                highlightReelOptions: highlightReelOptions,
+                outputPreferredName: Self.highlightReelOutputPreferredName(
+                    sourceURL: resolvedSourceURL,
+                    durationSec: highlightReelOptions.clipDurationSec
+                )
+            )
+            await ExportCancelController.shared.attach(exportSession)
+            return try await runHighlightReelSession(
+                exportSession,
+                progress: onProgress
+            )
+        case .separate:
+            guard let segments = highlightMarkers?.highlightReelSegments(options: highlightReelOptions),
+                  !segments.isEmpty else {
+                throw FilmtoneMediaError.exportFailed("Add at least one highlight marker before creating a Highlight.")
+            }
+            let startedAt = Date()
+            var outputUris: [String] = []
+            var totalFileSize = 0
+            var firstResult: Phase0ExportResultDTO?
+            for (index, segment) in segments.enumerated() {
+                try Task.checkCancellation()
+                let session = try makeExportSession(
+                    request: request,
+                    sourceURL: resolvedSourceURL,
+                    appliedSavedLook: appliedSavedLook,
+                    cameraProfile: cameraProfile,
+                    highlightMarkers: highlightMarkers,
+                    highlightReelOptions: highlightReelOptions,
+                    outputPreferredName: Self.highlightReelOutputPreferredName(
+                        sourceURL: resolvedSourceURL,
+                        durationSec: highlightReelOptions.clipDurationSec,
+                        index: index
+                    )
+                )
+                await ExportCancelController.shared.attach(session)
+                let total = max(1, segments.count)
+                let result = try await runHighlightReelSession(
+                    session,
+                    segments: [segment]
+                ) { progress in
+                    let scaledProgress = min(1.0, (Double(index) + progress.progress) / Double(total))
+                    onProgress(Phase0ExportProgressDTO(
+                        stage: progress.stage,
+                        progress: scaledProgress,
+                        currentFrame: progress.currentFrame,
+                        totalFrames: progress.totalFrames,
+                        message: progress.message ?? "Highlight \(index + 1)/\(total)"
+                    ))
+                }
+                await ExportCancelController.shared.detach()
+                outputUris.append(result.outputUri)
+                totalFileSize += result.fileSizeBytes ?? 0
+                if firstResult == nil {
+                    firstResult = result
+                }
+            }
+
+            guard let firstResult, let firstOutputUri = outputUris.first else {
+                throw FilmtoneMediaError.exportFailed("Add at least one highlight marker before creating a Highlight.")
+            }
+            let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000.0)
+            onProgress(Phase0ExportProgressDTO(
+                stage: .completed,
+                progress: 1.0,
+                currentFrame: nil,
+                totalFrames: nil,
+                message: "Highlight complete"
+            ))
+            return Phase0ExportResultDTO(
+                outputUri: firstOutputUri,
+                elapsedMs: elapsedMs,
+                outputWidth: firstResult.outputWidth,
+                outputHeight: firstResult.outputHeight,
+                outputFps: firstResult.outputFps,
+                fileSizeBytes: totalFileSize,
+                realtimeRatio: nil,
+                audioPreserved: false,
+                benchmarkRecord: nil,
+                sidecarUri: nil,
+                packageFileUris: outputUris
+            )
+        }
+    }
+
+    private func runHighlightReelSession(
+        _ exportSession: FilmtoneExportSession,
+        segments: [FilmtoneHighlightClipSegment]? = nil,
+        progress: @escaping (Phase0ExportProgressDTO) -> Void
+    ) async throws -> Phase0ExportResultDTO {
+        try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let result = try exportSession.runHighlightReel(progress: onProgress)
+                    let result = try exportSession.runHighlightReel(
+                        segments: segments,
+                        progress: progress
+                    )
                     continuation.resume(returning: result)
                 } catch {
                     continuation.resume(throwing: error)
                 }
             }
         }
+    }
+
+    private static func highlightReelOutputPreferredName(
+        sourceURL: URL,
+        durationSec: Double,
+        index: Int? = nil
+    ) -> String {
+        let sourceName = sourceURL.deletingPathExtension().lastPathComponent
+        let baseName = sourceName.isEmpty ? "filmtone" : sourceName
+        let durationLabel = highlightDurationLabel(durationSec)
+        let prefix = "\(baseName)-highlight-\(durationLabel)"
+        guard let index else {
+            return prefix
+        }
+        return "\(prefix)-\(String(format: "%02d", index + 1))"
+    }
+
+    private static func highlightDurationLabel(_ durationSec: Double) -> String {
+        guard durationSec.isFinite, durationSec > 0 else {
+            return "\(Int(FilmtoneHighlightReelOptions.defaultClipDurationSec))s"
+        }
+        let rounded = durationSec.rounded()
+        if abs(durationSec - rounded) < 0.0001 {
+            return "\(Int(rounded))s"
+        }
+        return String(format: "%.1fs", durationSec)
     }
 
     /// Stream 3 (W1-C) §6.5 — UI label for renderMode in the Live Activity.

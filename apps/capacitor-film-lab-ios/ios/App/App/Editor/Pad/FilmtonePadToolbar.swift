@@ -25,7 +25,7 @@ struct FilmtonePadToolbar: View {
     let onExport: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             commandButton(
                 .openSource,
                 action: onReplaceSource
@@ -47,6 +47,7 @@ struct FilmtonePadToolbar: View {
             Spacer(minLength: 12)
 
             sourceLabel
+                .layoutPriority(-1)
 
             Spacer(minLength: 12)
 
@@ -60,6 +61,11 @@ struct FilmtonePadToolbar: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 22, weight: .regular))
                     .foregroundStyle(.white.opacity(0.62))
+                    .frame(
+                        width: FilmtonePadTouchMetrics.iconControlSize,
+                        height: FilmtonePadTouchMetrics.iconControlSize
+                    )
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Close source")
@@ -116,6 +122,8 @@ struct FilmtonePadToolbar: View {
                 .foregroundStyle(.white.opacity(0.78))
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: 280, alignment: .center)
                 .accessibilityIdentifier("filmtone.pad.toolbar.sourceLabel")
         }
     }
@@ -140,8 +148,9 @@ struct FilmtonePadToolbar: View {
                     .font(.subheadline.weight(.medium))
             }
             .foregroundStyle(foregroundStyle(isDisabled: isDisabled, isActive: isActive))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .frame(minHeight: FilmtonePadTouchMetrics.minimumControlHeight)
+            .contentShape(Capsule())
             .glassEffect(
                 .regular.tint(tintColor(isActive: isActive)),
                 in: Capsule()

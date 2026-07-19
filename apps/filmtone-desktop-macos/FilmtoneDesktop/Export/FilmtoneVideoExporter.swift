@@ -190,13 +190,28 @@ enum FilmtoneVideoExportError: Error, LocalizedError {
 enum FilmtoneVideoExporter {
     static func exportHighlightReel(
         _ request: FilmtoneVideoExportRequest,
+        options: FilmtoneHighlightReelOptions = .standard,
         progress: (@Sendable (FilmtoneVideoExportProgress) -> Void)? = nil
     ) async throws -> FilmtoneVideoExportResult {
-        guard let segments = request.highlightMarkers?.highlightReelSegments(),
+        guard let segments = request.highlightMarkers?.highlightReelSegments(options: options),
               !segments.isEmpty else {
             throw FilmtoneVideoExportError.noHighlightMarkers
         }
+        return try await exportHighlightReel(
+            request,
+            segments: segments,
+            progress: progress
+        )
+    }
 
+    static func exportHighlightReel(
+        _ request: FilmtoneVideoExportRequest,
+        segments: [FilmtoneHighlightClipSegment],
+        progress: (@Sendable (FilmtoneVideoExportProgress) -> Void)? = nil
+    ) async throws -> FilmtoneVideoExportResult {
+        guard !segments.isEmpty else {
+            throw FilmtoneVideoExportError.noHighlightMarkers
+        }
         let probe = try await FilmtoneSourceProber.probeVideo(sourceURL: request.sourceURL)
         let contract = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: probe.metadata,

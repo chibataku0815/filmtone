@@ -1,1 +1,3 @@
-Updated the App Store screenshots to show the Filmtone Studio editing flow more clearly.
+The optical glow effect is now consistently named Deep Glow, with Subtle, Balanced and Strong choices.
+
+Video Highlights can use 1, 3, 5 or 10-second windows and export as one reel or as separate clips.

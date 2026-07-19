@@ -508,10 +508,10 @@ export const OPTICAL_FILTER_PROFILES = [
     id: "backlightVeil-1-8",
     family: "backlightVeil",
     density: "1/8",
-    displayName: "Backlight Veil 1/8",
-    shortLabel: "1/8",
+    displayName: "Deep Glow - Subtle",
+    shortLabel: "Subtle",
     description:
-      "Subtle source-reactive haze for outdoor backlight while protecting shadows.",
+      "A restrained highlight radiance with protected shadow separation.",
     params: {
       bloomThreshold: 0.66,
       bloomStrength: 0.2,
@@ -561,10 +561,10 @@ export const OPTICAL_FILTER_PROFILES = [
     id: "backlightVeil-1-4",
     family: "backlightVeil",
     density: "1/4",
-    displayName: "Backlight Veil 1/4",
-    shortLabel: "1/4",
+    displayName: "Deep Glow - Balanced",
+    shortLabel: "Balanced",
     description:
-      "Mid-strength veil for window and sun backlight with stable shadow retention.",
+      "A balanced bright-core glow with a clear, low-energy outer tail.",
     params: {
       bloomThreshold: 0.56,
       bloomStrength: 0.38,
@@ -614,10 +614,10 @@ export const OPTICAL_FILTER_PROFILES = [
     id: "backlightVeil-1-2",
     family: "backlightVeil",
     density: "1/2",
-    displayName: "Backlight Veil 1/2",
-    shortLabel: "1/2",
+    displayName: "Deep Glow - Strong",
+    shortLabel: "Strong",
     description:
-      "Strong but stable veiling glare for window and sun backlight.",
+      "A strong highlight radiance with deliberate haze and retained structure.",
     params: {
       bloomThreshold: 0.5,
       bloomStrength: 0.6,

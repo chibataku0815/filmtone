@@ -5,6 +5,8 @@ struct FilmtoneExportPanel: View {
     @ObservedObject var store: FilmtoneEditorStore
     var onDismiss: (() -> Void)? = nil
 
+    private static let optionButtonMinHeight: CGFloat = 44
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
@@ -107,6 +109,10 @@ struct FilmtoneExportPanel: View {
                     videoTimingSelector
                 }
 
+                if store.source?.kind == .video && store.exportHighlightMarkers != nil {
+                    highlightOptionsSelector
+                }
+
                 HStack(spacing: 12) {
                     MetricCard(label: store.strings.strengthLabel, value: percentLabel(store.project.strength))
                     MetricCard(label: store.strings.cameraLabel, value: store.cameraProfileLabel)
@@ -121,6 +127,78 @@ struct FilmtoneExportPanel: View {
         }
         .padding(.vertical, 16)
         .overlay(alignment: .top) { divider }
+    }
+
+    private var highlightOptionsSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(store.strings.usesJapaneseTypography ? "ハイライト" : "Highlight")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.68))
+
+            HStack(spacing: 6) {
+                ForEach(FilmtoneHighlightReelOptions.supportedClipDurationsSec, id: \.self) { durationSec in
+                    highlightDurationButton(durationSec)
+                }
+            }
+
+            HStack(spacing: 6) {
+                highlightOutputModeButton(
+                    .combined,
+                    label: store.strings.usesJapaneseTypography ? "リール" : "Reel"
+                )
+                highlightOutputModeButton(
+                    .separate,
+                    label: store.strings.usesJapaneseTypography ? "分割" : "Clips"
+                )
+            }
+        }
+    }
+
+    private func highlightDurationButton(_ durationSec: Double) -> some View {
+        let isSelected = store.highlightReelClipDurationSec == durationSec
+        return Button {
+            store.setHighlightReelClipDurationSec(durationSec)
+        } label: {
+            Text(highlightDurationLabel(durationSec))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.black : .white.opacity(0.82))
+                .frame(maxWidth: .infinity, minHeight: Self.optionButtonMinHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .fill(isSelected ? Color.filmtoneAmber : Color.white.opacity(0.06))
+                )
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("filmtone.export.highlight.duration.\(Int(durationSec))")
+    }
+
+    private func highlightOutputModeButton(
+        _ mode: FilmtoneHighlightReelOutputMode,
+        label: String
+    ) -> some View {
+        let isSelected = store.highlightReelOutputMode == mode
+        return Button {
+            store.setHighlightReelOutputMode(mode)
+        } label: {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSelected ? Color.black : .white.opacity(0.82))
+                .frame(maxWidth: .infinity, minHeight: Self.optionButtonMinHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: filmtoneControlCornerRadius, style: .continuous)
+                        .fill(isSelected ? Color.filmtoneAmber : Color.white.opacity(0.06))
+                )
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("filmtone.export.highlight.mode.\(mode.rawValue)")
+    }
+
+    private func highlightDurationLabel(_ durationSec: Double) -> String {
+        let rounded = durationSec.rounded()
+        let value = abs(durationSec - rounded) < 0.0001 ? "\(Int(rounded))" : String(format: "%.1f", durationSec)
+        return store.strings.usesJapaneseTypography ? "\(value)秒" : "\(value)s"
     }
 
     private var videoTimingSelector: some View {
@@ -247,7 +325,7 @@ struct FilmtoneExportPanel: View {
             }
 
             HStack(spacing: 12) {
-                Button(saveToPhotosButtonLabel) {
+                Button(saveToPhotosButtonLabel(for: result)) {
                     Task { await store.saveToPhotos() }
                 }
                 .buttonStyle(FilmtonePrimaryButtonStyle())
@@ -271,6 +349,12 @@ struct FilmtoneExportPanel: View {
                         fps: result.outputFps
                     )
                 )
+                if let clipCount = splitHighlightClipCount(for: result) {
+                    MetricCard(
+                        label: store.strings.usesJapaneseTypography ? "クリップ" : "Clips",
+                        value: splitHighlightClipValue(clipCount)
+                    )
+                }
                 MetricCard(label: store.strings.metricsFileSize, value: store.strings.byteLabel(result.fileSizeBytes))
                 if result.videoTimingMode == FilmtoneVideoTimingMode.slow24.rawValue {
                     MetricCard(
@@ -325,10 +409,31 @@ struct FilmtoneExportPanel: View {
         }
     }
 
-    private var saveToPhotosButtonLabel: String {
-        store.saveToPhotosState == .saved
-            ? store.strings.saveStateLabel(.saved)
-            : store.strings.saveToPhotos
+    private func saveToPhotosButtonLabel(for result: Phase0ExportResultDTO) -> String {
+        if store.saveToPhotosState == .saved {
+            return store.strings.saveStateLabel(.saved)
+        }
+        if let clipCount = splitHighlightClipCount(for: result) {
+            return store.strings.usesJapaneseTypography
+                ? "\(clipCount)本を保存"
+                : "Save \(clipCount) Clips"
+        }
+        return store.strings.saveToPhotos
+    }
+
+    private func splitHighlightClipCount(for result: Phase0ExportResultDTO) -> Int? {
+        guard result.sidecarUri == nil,
+              let packageFileUris = result.packageFileUris,
+              packageFileUris.count > 1 else {
+            return nil
+        }
+        return packageFileUris.count
+    }
+
+    private func splitHighlightClipValue(_ clipCount: Int) -> String {
+        store.strings.usesJapaneseTypography
+            ? "\(clipCount)本"
+            : "\(clipCount) clips"
     }
 
     private func progressLabel(progress: Phase0ExportProgressDTO) -> String {

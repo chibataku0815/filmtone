@@ -181,8 +181,15 @@ final class CacheStore {
         )
     }
 
-    func temporaryExportURL(pathExtension: String = "mp4") throws -> URL {
-        try uniqueURL(in: .exports, preferredName: "filmtone-export", pathExtension: pathExtension)
+    func temporaryExportURL(
+        preferredName: String = "filmtone-export",
+        pathExtension: String = "mp4"
+    ) throws -> URL {
+        try uniqueURL(
+            in: .exports,
+            preferredName: safePreferredName(preferredName, fallback: "filmtone-export"),
+            pathExtension: safePathExtension(pathExtension)
+        )
     }
 
     func temporaryPreviewURL(
@@ -386,6 +393,16 @@ final class CacheStore {
         }
         let ext = fallbackExtension.isEmpty ? "dat" : fallbackExtension
         return "\(safeName).\(ext)"
+    }
+
+    private func safePreferredName(_ preferredName: String, fallback: String) -> String {
+        let trimmed = preferredName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let withoutExtension = (trimmed as NSString).deletingPathExtension
+        let safe = withoutExtension
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return safe.isEmpty ? fallback : safe
     }
 
     private func safePathExtension(_ pathExtension: String) -> String {

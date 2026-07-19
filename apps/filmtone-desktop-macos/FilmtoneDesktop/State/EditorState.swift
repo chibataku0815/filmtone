@@ -46,6 +46,19 @@ final class EditorState {
     }
     /// Explicit video timing mode for preview + normal video export.
     var videoTimingMode: FilmtoneVideoTimingMode = .normal
+    /// Highlight Reel clip length. Default 1s preserves the original
+    /// one-second Highlight behavior until the user opts into longer clips.
+    var highlightReelClipDurationSec: Double = FilmtoneHighlightReelOptions.defaultClipDurationSec {
+        didSet {
+            let normalized = FilmtoneHighlightReelOptions.normalizedClipDurationSec(highlightReelClipDurationSec)
+            if normalized != highlightReelClipDurationSec {
+                highlightReelClipDurationSec = normalized
+            }
+        }
+    }
+    /// Combined keeps the existing single Highlight Reel. Separate writes one
+    /// output per marker segment.
+    var highlightReelOutputMode: FilmtoneHighlightReelOutputMode = .combined
     /// M5-I.2: mirrors `videoSession?.player.timeControlStatus == .playing`,
     /// pushed via the session's `onPlayingChange` callback so the
     /// Play/Pause button glyph stays in sync with the AVPlayer rather
@@ -601,11 +614,31 @@ final class EditorState {
               sourceURL != nil,
               !isExporting,
               sourceCapViolations.isEmpty,
-              let segments = exportHighlightMarkers?.highlightReelSegments(),
+              let segments = exportHighlightMarkers?.highlightReelSegments(options: highlightReelOptions),
               !segments.isEmpty else {
             return false
         }
         return true
+    }
+
+    var highlightReelOptions: FilmtoneHighlightReelOptions {
+        FilmtoneHighlightReelOptions(
+            clipDurationSec: highlightReelClipDurationSec,
+            outputMode: highlightReelOutputMode
+        )
+    }
+
+    func setHighlightReelClipDurationSec(_ durationSec: Double) {
+        let nextDuration = FilmtoneHighlightReelOptions.normalizedClipDurationSec(durationSec)
+        guard highlightReelClipDurationSec != nextDuration else { return }
+        highlightReelClipDurationSec = nextDuration
+        invalidateExportPackageState()
+    }
+
+    func setHighlightReelOutputMode(_ mode: FilmtoneHighlightReelOutputMode) {
+        guard highlightReelOutputMode != mode else { return }
+        highlightReelOutputMode = mode
+        invalidateExportPackageState()
     }
 
     func addHighlightMarker(at sourceTimeSec: Double) {

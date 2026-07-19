@@ -40,7 +40,7 @@ struct FilmtonePadWorkspaceView: View {
     @State private var compareSplitFraction: Double = 0.5
 
     private static let inspectorWidth: CGFloat = 340
-    private static let toolbarReservedHeight: CGFloat = 64
+    private static let toolbarReservedHeight: CGFloat = 72
 
     var body: some View {
         let compact = horizontalSizeClass == .compact

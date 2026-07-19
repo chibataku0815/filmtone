@@ -18,6 +18,7 @@ struct TestCacheStore {
         try runStandardBucketPolicyTest()
         try runSourceImportPruneTest()
         try runReusableSourceImportTest()
+        try runPreferredExportNameTest()
         try runGeneratedExportRemovalTest()
         print("CacheStore tests passed")
     }
@@ -165,6 +166,31 @@ struct TestCacheStore {
         try expect(!FileManager.default.fileExists(atPath: media.path), "export media should be removed")
         try expect(!FileManager.default.fileExists(atPath: sidecar.path), "export sidecar should be removed")
         try expect(FileManager.default.fileExists(atPath: outside.path), "outside file should not be removed")
+    }
+
+    static func runPreferredExportNameTest() throws {
+        let fixture = try CacheStoreFixture()
+        defer { fixture.cleanup() }
+
+        let highlightClip = try fixture.store.temporaryExportURL(
+            preferredName: "DJI Clip-highlight-5s-01",
+            pathExtension: "mp4"
+        )
+        try expect(
+            highlightClip.lastPathComponent.hasPrefix("DJI Clip-highlight-5s-01-"),
+            "preferred export name should remain readable before the unique suffix"
+        )
+        try expect(highlightClip.pathExtension == "mp4", "preferred export should keep the requested extension")
+
+        let sanitized = try fixture.store.temporaryExportURL(
+            preferredName: "bad/name:highlight",
+            pathExtension: "m/p:4"
+        )
+        try expect(
+            sanitized.lastPathComponent.hasPrefix("bad-name-highlight-"),
+            "preferred export name should strip path separators"
+        )
+        try expect(sanitized.pathExtension == "mp4", "preferred export extension should strip unsafe characters")
     }
 }
 

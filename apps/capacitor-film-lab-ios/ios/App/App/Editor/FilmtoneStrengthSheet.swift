@@ -23,7 +23,7 @@ struct FilmtoneStrengthSheet: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
                     strengthSection
-                    backlightVeilSection
+                    deepGlowSection
                     filmDamageSection
                     adjustmentsSection
                     advancedParamsSection
@@ -159,37 +159,56 @@ struct FilmtoneStrengthSheet: View {
         }
     }
 
-    /// Backlight Veil Phase 1c — segmented Picker for the optical filter
-    /// family. OFF / 1/8 / 1/4 / 1/2 (Desktop canonical curve, no
+    /// Deep Glow segmented picker backed by the legacy optical filter ids.
+    /// Off / Subtle / Balanced / Strong (Desktop canonical curve, no
     /// interpolation). Mutates `FilmtoneEditorStore.selectedOpticalFilterId`,
     /// which mirrors to the project/request so the composite kernel picks up
     /// the new branch on the next preview frame.
-    private var backlightVeilSection: some View {
+    private var deepGlowSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("Backlight Veil")
+                Text(FilmtoneOpticalFilterEditorCatalog.featureName)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white.opacity(0.92))
                 Spacer()
-                Text(backlightVeilDensityLabel)
+                Text(deepGlowStrengthLabel)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.64))
                     .accessibilityIdentifier("filmtone.sheet.backlightVeil.value")
             }
 
             Picker(
-                "Backlight Veil",
+                FilmtoneOpticalFilterEditorCatalog.featureName,
                 selection: Binding(
-                    get: { store.selectedOpticalFilterId ?? "off" },
+                    get: {
+                        store.selectedOpticalFilterId
+                            ?? FilmtoneOpticalFilterEditorCatalog.noneIdentifier
+                    },
                     set: { newValue in
-                        store.setOpticalFilterId(newValue == "off" ? nil : newValue)
+                        store.setOpticalFilterId(
+                            newValue == FilmtoneOpticalFilterEditorCatalog.noneIdentifier
+                                ? nil
+                                : newValue
+                        )
                     }
                 )
             ) {
-                Text("Off").tag("off")
-                Text("1/8").tag("backlightVeil-1-8")
-                Text("1/4").tag("backlightVeil-1-4")
-                Text("1/2").tag("backlightVeil-1-2")
+                Text(
+                    FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                        for: nil,
+                        prefersJapanese: store.strings.usesJapaneseTypography
+                    )
+                )
+                .tag(FilmtoneOpticalFilterEditorCatalog.noneIdentifier)
+                ForEach(FilmtoneOpticalFilterEditorCatalog.entries) { entry in
+                    Text(
+                        FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                            for: entry.id,
+                            prefersJapanese: store.strings.usesJapaneseTypography
+                        )
+                    )
+                    .tag(entry.id)
+                }
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier("filmtone.sheet.backlightVeil.picker")
@@ -197,13 +216,11 @@ struct FilmtoneStrengthSheet: View {
         .sectionDivider()
     }
 
-    private var backlightVeilDensityLabel: String {
-        switch store.selectedOpticalFilterId {
-        case "backlightVeil-1-8": return "Subtle"
-        case "backlightVeil-1-4": return "Mid"
-        case "backlightVeil-1-2": return "Max"
-        default: return "Off"
-        }
+    private var deepGlowStrengthLabel: String {
+        FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+            for: store.selectedOpticalFilterId,
+            prefersJapanese: store.strings.usesJapaneseTypography
+        )
     }
 
     private var adjustmentsSection: some View {

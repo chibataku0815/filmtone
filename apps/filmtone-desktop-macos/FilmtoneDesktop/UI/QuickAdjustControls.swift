@@ -3,7 +3,7 @@ import SwiftUI
 
 // M5 follow-up: direct Adjust surface for the right rail. The former Quick
 // axis sliders are intentionally not shown here; the rail now exposes the
-// real per-parameter `paramOverrides` controls inline, plus Backlight Veil.
+// real per-parameter `paramOverrides` controls inline, plus Deep Glow.
 struct AdjustControls: View {
     @Bindable var state: EditorState
 
@@ -12,7 +12,10 @@ struct AdjustControls: View {
     }
 
     private var selectedOpticalFilterLabel: String {
-        FilmtoneOpticalFilterCatalog.profile(for: state.opticalFilterProfileId)?.shortLabel ?? "None"
+        FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+            for: state.opticalFilterProfileId,
+            prefersJapanese: FilmtoneDesktopStrings.prefersJapanese()
+        )
     }
 
     var body: some View {
@@ -29,7 +32,7 @@ struct AdjustControls: View {
     private var opticalFilterSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Backlight Veil")
+                Text(FilmtoneOpticalFilterEditorCatalog.featureName)
                     .font(.callout)
                     .foregroundStyle(.white)
                 Spacer()
@@ -38,12 +41,12 @@ struct AdjustControls: View {
                     .foregroundStyle(.white.opacity(0.7))
             }
             HStack(spacing: 6) {
-                ForEach(Self.opticalFilterOptions, id: \.id) { option in
+                ForEach(opticalFilterOptions, id: \.id) { option in
                     opticalFilterChip(option)
                 }
             }
             // M5-M (CC-B) / M8 follow-up: continuous intensity cursor (0…1).
-            // Only mounted when a profile chip (1/8 / 1/4 / 1/2) is selected.
+            // Only mounted when a Deep Glow strength is selected.
             // Earlier behavior kept the row visible-but-disabled when None
             // was selected; the dim slider read as broken hardware (visible
             // 100% number with an unmovable track). Removing the row when
@@ -96,6 +99,7 @@ struct AdjustControls: View {
             Text(option.label)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
                 .foregroundStyle(active ? .black : .white.opacity(0.88))
@@ -120,14 +124,32 @@ struct AdjustControls: View {
         .filmtonePointingHandCursor()
     }
 
-    private static let opticalFilterOptions: [OpticalFilterOption] = [
-        .init(
-            id: FilmtoneOpticalFilterCatalog.noneIdentifier,
-            label: "None",
-            help: "Clear Backlight Veil"
-        ),
-    ] + FilmtoneOpticalFilterCatalog.profiles.map {
-        .init(id: $0.id, label: $0.shortLabel, help: "Apply \($0.displayName)")
+    private var opticalFilterOptions: [OpticalFilterOption] {
+        let prefersJapanese = FilmtoneDesktopStrings.prefersJapanese()
+        let noneHelp = prefersJapanese ? "Deep Glowをオフ" : "Turn off Deep Glow"
+        return [
+            .init(
+                id: FilmtoneOpticalFilterCatalog.noneIdentifier,
+                label: FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                    for: nil,
+                    prefersJapanese: prefersJapanese
+                ),
+                help: noneHelp
+            ),
+        ] + FilmtoneOpticalFilterCatalog.profiles.map { profile in
+            let displayName = FilmtoneOpticalFilterEditorCatalog.localizedDisplayName(
+                for: profile.id,
+                prefersJapanese: prefersJapanese
+            )
+            return .init(
+                id: profile.id,
+                label: FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                    for: profile.id,
+                    prefersJapanese: prefersJapanese
+                ),
+                help: prefersJapanese ? "\(displayName)を適用" : "Apply \(displayName)"
+            )
+        }
     }
 }
 

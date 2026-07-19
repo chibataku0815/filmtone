@@ -510,6 +510,10 @@ float damageSpot(vec2 pixel, vec2 cell, float cellSize, float amount, float fram
     radius *= 1.0 + transitionBlur * mix(0.12, 0.08, stain);
     float softness = mix(0.84, 2.20, stain) + transitionBlur * mix(0.55, 1.05, stain);
     vec2 delta = pixel - center;
+    float broadRadius = radius * (softness * 5.2 + mix(4.0, 8.5, stain)) + 3.0;
+    if (max(abs(delta.x), abs(delta.y)) > broadRadius) {
+        return 0.0;
+    }
     float angle = damageHash(eventId, seed + 57.0) * 6.2831853;
     angle += (damageHash(eventId, seed + 58.0) - 0.5) * 0.85 * transitionBlur;
     float ca = cos(angle);
@@ -538,6 +542,72 @@ float damageSpot(vec2 pixel, vec2 cell, float cellSize, float amount, float fram
     float ragged = mix(0.52, 1.0, smoothstep(0.12, 0.94, damageHash(floor(rotated * mix(0.16, 0.045, stain) + eventId * 0.13 + vec2(frame * 0.18, -frame * 0.11) * transitionBlur), seed + 73.0)));
     float mottled = mix(0.48, 1.0, damageHash(floor(pixel * mix(0.11, 0.038, stain) + cell), seed + 71.0));
     return shape * presence * fade * ragged * mottled * mottled;
+}
+
+float damageDebris(vec2 pixel, vec2 cell, float cellSize, float amount, float frame, float seed, float edgeBoost, float profileScale, float periodBase) {
+    float minLife = 10.0;
+    float maxLife = 118.0;
+    float fadeInFrames = 0.45;
+    float fadeOutFrames = 1.80;
+    float variation = 0.42;
+    float life = damageTemporalLife(cell, seed, minLife, maxLife);
+    float period = damageTemporalPeriod(cell, seed, life, variation, periodBase);
+    float offset = floor(damageHash(cell, seed + 23.0) * period * max(0.25, variation));
+    float eventClock = frame + offset;
+    float cycle = floor(eventClock / period);
+    vec2 eventId = cell + vec2(cycle * 19.0, cycle * 37.0);
+    float presence = step(1.0 - clamp(amount * 0.43 * edgeBoost, 0.0, 0.86), damageHash(eventId, seed + 181.0));
+    if (presence <= 0.0) {
+        return 0.0;
+    }
+    float age = mod(eventClock, period);
+    if (age >= life) {
+        return 0.0;
+    }
+    float fadeIn = smoothstep(0.0, max(1.0, min(life, fadeInFrames)), age + 1.0);
+    float fadeOutFramesResolved = min(life, fadeOutFrames) * mix(0.78, 1.18, damageHash(cell, seed + 29.0));
+    float fadeOutStart = max(fadeInFrames, life - fadeOutFramesResolved);
+    float fadeOut = 1.0 - smoothstep(fadeOutStart, life, age);
+    float fade = damageHeldVisibility(fadeIn * fadeOut, 0.36);
+    if (fade <= 0.0) {
+        return 0.0;
+    }
+    float transitionBlur = pow(damageTransitionPhase(cell, age, life, fadeInFrames, fadeOutFramesResolved, seed), 0.60);
+    vec2 center = (cell + vec2(damageHash(eventId, seed + 183.0), damageHash(eventId, seed + 185.0))) * cellSize;
+    center += vec2(damageHash(eventId, seed + 187.0) - 0.5, damageHash(eventId, seed + 189.0) - 0.5) * cellSize * mix(0.045, 0.018, amount);
+    if (transitionBlur > 0.001) {
+        center += vec2(
+            damageValueNoise(eventId * 0.29 + vec2(frame * 0.34, 0.0), seed + 191.0) - 0.5,
+            damageValueNoise(eventId * 0.31 + vec2(0.0, frame * 0.28), seed + 193.0) - 0.5
+        ) * cellSize * mix(0.20, 0.055, amount) * transitionBlur;
+    }
+    vec2 delta = pixel - center;
+    float lengthPx = mix(8.0, 38.0, damageHash(eventId, seed + 199.0)) * profileScale * mix(0.90, 1.30, amount);
+    float widthPx = mix(0.62, 1.58, amount) * mix(0.78, 1.42, damageHash(eventId, seed + 201.0)) * profileScale;
+    float broadReach = lengthPx * 0.86 + widthPx * 8.0 + 2.0;
+    if (max(abs(delta.x), abs(delta.y)) > broadReach) {
+        return 0.0;
+    }
+    float angle = damageHash(eventId, seed + 195.0) * 6.2831853;
+    angle += (damageHash(eventId, seed + 197.0) - 0.5) * 0.72 * transitionBlur;
+    float ca = cos(angle);
+    float sa = sin(angle);
+    vec2 rotated = vec2(delta.x * ca - delta.y * sa, delta.x * sa + delta.y * ca);
+    float curl = sin((rotated.x / max(1.0, lengthPx)) * 3.1415927 + damageHash(eventId, seed + 203.0) * 6.2831853);
+    curl *= lengthPx * mix(0.012, 0.080, damageHash(eventId, seed + 205.0)) * (1.0 + transitionBlur * 0.50);
+    float lineDistance = abs(rotated.y + curl);
+    float segment = 1.0 - smoothstep(lengthPx * 0.42, lengthPx * mix(0.54, 0.72, amount), abs(rotated.x));
+    float core = 1.0 - smoothstep(widthPx * 0.18, widthPx * mix(1.52, 2.36, amount), lineDistance);
+    float pore = mix(0.44, 1.0, damageHash(floor(vec2(rotated.x * 0.42, rotated.y * 2.1) + eventId * 0.17), seed + 207.0));
+    float gap = mix(0.38, 1.0, smoothstep(0.18, 0.86, damageHash(floor(vec2(rotated.x / max(3.0, widthPx * 4.2), eventId.y * 0.19)), seed + 209.0)));
+    vec2 chipDelta = rotated + vec2(
+        (damageHash(eventId, seed + 211.0) - 0.5) * lengthPx * 0.46,
+        (damageHash(eventId, seed + 213.0) - 0.5) * lengthPx * 0.18
+    );
+    float chipRadius = mix(widthPx * 1.2, widthPx * 3.8, damageHash(eventId, seed + 215.0));
+    float chip = 1.0 - smoothstep(chipRadius * 0.35, chipRadius * 1.65, length(chipDelta));
+    float debris = max(core * segment * pore * gap, chip * mix(0.18, 0.44, amount));
+    return debris * presence * fade;
 }
 
 float damageScratch(vec2 pixel, vec2 size, float amount, float frame, float seed, float fiber, float profileScale, float profileDensity, float periodBase) {
@@ -665,6 +735,7 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	    float defectFrame = frame;
 	    float edgeSoilBlend = 0.0;
 	    float dirtBlend = 0.0;
+	    float debrisBlend = 0.0;
 	    float darkDustBlend = 0.0;
 	    float sparkleBlend = 0.0;
 	    float stainBlend = 0.0;
@@ -712,12 +783,24 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 	    float dirtTexture = mix(0.62, 1.0, damageHash(floor(pixelCoord / mix(22.0, 9.0, dust) + vec2(seed * 0.013, 0.0)), seed + 337.0));
 	    float dirtLuma = clamp(luma * mix(0.50, 0.26, dust) - mix(0.035, 0.070, dust) * (0.70 + edge * 0.30), 0.0, 1.0);
 	    vec3 dirtTarget = vec3(dirtLuma);
-	    dirtBlend = dirtMask * dirtTexture * mix(0.10, 0.28, dust) * globalOpacity;
+	    dirtBlend = dirtMask * dirtTexture * mix(0.14, 0.34, dust) * globalOpacity;
 		    color.rgb = mix(color.rgb, dirtTarget, dirtBlend);
 
-		    float speckAmount = dust * mix(0.82, 1.05, dust) * profileDensity;
-		    vec2 dustCell = floor(pixelCoord / (mix(34.0, 13.5, dust) * profileScale));
-		    float dustCellSize = mix(34.0, 13.5, dust) * profileScale;
+		    vec2 debrisCell = floor(pixelCoord / (mix(96.0, 42.0, dust) * profileScale));
+		    float debrisCellSize = mix(96.0, 42.0, dust) * profileScale;
+		    float debrisAmount = clamp(dust * 1.05 + 0.18, 0.0, 1.0);
+		    float debrisEdgeBoost = 1.0 + edge * dust * 0.58 * globalEdgeBias;
+		    float debrisMask = 0.0;
+		    debrisMask = max(debrisMask, damageDebris(pixelCoord, debrisCell, debrisCellSize, debrisAmount, defectFrame, seed + 601.0, debrisEdgeBoost, profileScale, periodBase));
+		    float debrisTexture = mix(0.70, 1.0, damageHash(floor(pixelCoord / mix(5.5, 2.4, dust)) + debrisCell * 0.11, seed + 607.0));
+		    float debrisLuma = clamp(luma * mix(0.28, 0.10, dust) - mix(0.018, 0.050, dust), 0.0, 1.0);
+		    float brightPlateBoost = 1.0 + smoothstep(0.58, 0.93, sourceLuma) * 0.40;
+		    debrisBlend = debrisMask * debrisTexture * mix(0.48, 0.92, dust) * globalOpacity * brightPlateBoost;
+		    color.rgb = mix(color.rgb, vec3(debrisLuma), debrisBlend);
+
+		    float speckAmount = clamp(dust * mix(1.02, 1.24, dust) * profileDensity + dust * 0.035, 0.0, 1.0);
+		    vec2 dustCell = floor(pixelCoord / (mix(28.0, 10.5, dust) * profileScale));
+		    float dustCellSize = mix(28.0, 10.5, dust) * profileScale;
 		    float dustEdgeBoost = 1.0 + edge * dust * 0.34 * globalEdgeBias;
     float dustMask = 0.0;
     dustMask = max(dustMask, damageSpot(pixelCoord, dustCell, dustCellSize, speckAmount, defectFrame, seed + 1.0, dustEdgeBoost, 0.0, profileScale, periodBase));
@@ -725,18 +808,18 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
     dustMask = max(dustMask, damageSpot(pixelCoord, dustCell + vec2(-1.0, 0.0), dustCellSize, speckAmount, defectFrame, seed + 1.0, dustEdgeBoost, 0.0, profileScale, periodBase));
 	    dustMask = max(dustMask, damageSpot(pixelCoord, dustCell + vec2(0.0, 1.0), dustCellSize, speckAmount, defectFrame, seed + 1.0, dustEdgeBoost, 0.0, profileScale, periodBase));
 	    dustMask = max(dustMask, damageSpot(pixelCoord, dustCell + vec2(0.0, -1.0), dustCellSize, speckAmount, defectFrame, seed + 1.0, dustEdgeBoost, 0.0, profileScale, periodBase));
-	    dustMask = smoothstep(0.07, 0.42, dustMask);
+	    dustMask = smoothstep(0.045, 0.34, dustMask);
 	    float dustPolarity = damageHash(dustCell, seed + 79.0);
-		    float sparkleGate = step(1.0 - mix(0.055, 0.13, dust), dustPolarity);
+		    float sparkleGate = step(1.0 - mix(0.018, 0.060, dust), dustPolarity);
 		    float sparkleDust = dustMask * sparkleGate;
 		    float darkDust = dustMask * (1.0 - sparkleGate);
 		    float speckTexture = mix(0.78, 1.0, damageHash(floor(pixelCoord / mix(4.0, 1.8, dust)), seed + 83.0));
 		    float darkDustLuma = clamp(luma * mix(0.34, 0.12, dust) - mix(0.020, 0.055, dust), 0.0, 1.0);
-	    darkDustBlend = darkDust * speckTexture * mix(0.52, 1.00, dust) * globalOpacity;
+	    darkDustBlend = darkDust * speckTexture * mix(0.66, 1.14, dust) * globalOpacity;
 		    color.rgb = mix(color.rgb, vec3(darkDustLuma), darkDustBlend);
 		    float sparkleGuard = 1.0 - smoothstep(0.70, 0.98, luma);
 		    vec3 sparkleTarget = vec3(mix(0.84, 0.96, damageHash(dustCell, seed + 86.0)));
-	    sparkleBlend = sparkleDust * mix(0.42, 0.82, dust) * sparkleGuard * globalOpacity;
+	    sparkleBlend = sparkleDust * mix(0.30, 0.56, dust) * sparkleGuard * globalOpacity;
 		    color.rgb = mix(color.rgb, sparkleTarget, sparkleBlend);
 
     vec2 stainCell = floor(pixelCoord / (mix(180.0, 86.0, dust) * profileScale));
@@ -750,7 +833,7 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
     stainMask = max(stainMask, damageSpot(pixelCoord, stainCell + vec2(0.0, -1.0), stainCellSize, dust, defectFrame, seed + 503.0, stainEdgeBoost, 1.0, profileScale, periodBase));
 		    float stainDarkLuma = clamp(luma * mix(0.58, 0.34, dust) - mix(0.030, 0.070, dust), 0.0, 1.0);
 		    vec3 stainDarkTarget = vec3(stainDarkLuma);
-	    stainBlend = stainMask * mix(0.04, 0.12, dust) * globalOpacity;
+	    stainBlend = stainMask * mix(0.055, 0.145, dust) * globalOpacity;
 		    color.rgb = mix(color.rgb, stainDarkTarget, stainBlend);
 	    }
 
@@ -784,7 +867,7 @@ kernel vec4 filmDamage(__sample image, float dustAmount, float scratchAmount, fl
 		    color.rgb = mix(color.rgb, vec3(clamp(luma * 0.24 - 0.020, 0.0, 1.0)), fiberBlend);
 	    }
 
-	    float materialMask = max(max(max(gateBlend, edgeSoilBlend), max(dirtBlend, stainBlend)), max(max(darkDustBlend, sparkleBlend), max(scratchBlend, fiberBlend)));
+	    float materialMask = max(max(max(gateBlend, edgeSoilBlend), max(dirtBlend, max(debrisBlend, stainBlend))), max(max(darkDustBlend, sparkleBlend), max(scratchBlend, fiberBlend)));
 	    materialMask = clamp(materialMask, 0.0, 1.0);
 	    if (materialMask > 0.003) {
 	        float materialFeather = smoothstep(0.018, 0.50, materialMask);

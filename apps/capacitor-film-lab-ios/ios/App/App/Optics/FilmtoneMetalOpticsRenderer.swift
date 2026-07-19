@@ -346,7 +346,8 @@ final class FilmtoneMetalOpticsRenderer {
                     mipsDown: bloomMipsDown,
                     mipsAccum: bloomMipsAccum,
                     final: bloomFinal,
-                    radius: glow.bloomRadius
+                    radius: glow.bloomRadius,
+                    normalizedBandEnergy: glow.opticalScatter != nil
                 )
             } else {
                 encodeClear(enc: enc, target: bloomFinal)
@@ -368,7 +369,8 @@ final class FilmtoneMetalOpticsRenderer {
                     mipsDown: halationMipsDown,
                     mipsAccum: halationMipsAccum,
                     final: halationFinal,
-                    radius: glow.halationRadius
+                    radius: glow.halationRadius,
+                    normalizedBandEnergy: false
                 )
             } else {
                 encodeClear(enc: enc, target: halationFinal)
@@ -381,7 +383,8 @@ final class FilmtoneMetalOpticsRenderer {
                     mipsDown: diffusionMipsDown,
                     mipsAccum: diffusionMipsAccum,
                     final: diffusionFinal,
-                    radius: 0.9
+                    radius: 0.9,
+                    normalizedBandEnergy: false
                 )
             } else {
                 encodeClear(enc: enc, target: diffusionFinal)
@@ -395,7 +398,9 @@ final class FilmtoneMetalOpticsRenderer {
                     halation: halationFinal,
                     diffusion: diffusionFinal,
                     output: outputTexture,
-                    bloomStrength: Float(glow.bloomStrength),
+                    bloomStrength: Float(
+                        OpticsResampling.radianceExposureGain(glow.bloomStrength)
+                    ),
                     halationIntensity: Float(glow.halationIntensity),
                     diffusionAmount: Float(glow.diffusion),
                     optical: optical
@@ -492,7 +497,8 @@ final class FilmtoneMetalOpticsRenderer {
         mipsDown: [MTLTexture],
         mipsAccum: [MTLTexture],
         final: MTLTexture,
-        radius: Double
+        radius: Double,
+        normalizedBandEnergy: Bool
     ) {
         let levels = mipsDown.count
         guard levels >= 1, mipsAccum.count == levels else { return }
@@ -503,8 +509,36 @@ final class FilmtoneMetalOpticsRenderer {
             encodeTentDownsample(enc: enc, source: mipsDown[i - 1], destination: mipsDown[i])
         }
 
-        // Up + accumulate: deepest accum is just a copy of deepest down.
-        if levels == 1 {
+        // Deep Glow weights each octave once before coarse-to-fine tent
+        // reconstruction. The legacy path retains its recursive low-band
+        // weighting so unrelated glow families remain unchanged.
+        if normalizedBandEnergy {
+            let weights = OpticsResampling.normalizedGlowBandWeights(
+                radius: clampUnit(radius),
+                levels: levels
+            )
+            let deepestIndex = levels - 1
+            encodeUpsampleAccumulate(
+                enc: enc,
+                lowRes: mipsDown[deepestIndex],
+                highRes: mipsDown[deepestIndex],
+                output: mipsAccum[deepestIndex],
+                lowWeight: 0,
+                highWeight: Float(weights[deepestIndex])
+            )
+            if levels > 1 {
+                for index in stride(from: levels - 2, through: 0, by: -1) {
+                    encodeUpsampleAccumulate(
+                        enc: enc,
+                        lowRes: mipsAccum[index + 1],
+                        highRes: mipsDown[index],
+                        output: mipsAccum[index],
+                        lowWeight: 1,
+                        highWeight: Float(weights[index])
+                    )
+                }
+            }
+        } else if levels == 1 {
             encodeCopy(enc: enc, source: mipsDown[0], destination: mipsAccum[0])
         } else {
             encodeCopy(enc: enc, source: mipsDown[levels - 1], destination: mipsAccum[levels - 1])
@@ -515,7 +549,8 @@ final class FilmtoneMetalOpticsRenderer {
                     lowRes: mipsAccum[index + 1],
                     highRes: mipsDown[index],
                     output: mipsAccum[index],
-                    weight: Float(weights[index + 1])
+                    lowWeight: Float(weights[index + 1]),
+                    highWeight: 1
                 )
             }
         }
@@ -559,7 +594,8 @@ final class FilmtoneMetalOpticsRenderer {
         lowRes: MTLTexture,
         highRes: MTLTexture,
         output: MTLTexture,
-        weight: Float
+        lowWeight: Float,
+        highWeight: Float
     ) {
         enc.setComputePipelineState(upsampleAccumulatePS)
         enc.setTexture(lowRes, index: 0)
@@ -567,10 +603,12 @@ final class FilmtoneMetalOpticsRenderer {
         enc.setTexture(output, index: 2)
         var lowSize = SIMD2<UInt32>(UInt32(lowRes.width), UInt32(lowRes.height))
         var outSize = SIMD2<UInt32>(UInt32(output.width), UInt32(output.height))
-        var w = weight
+        var lw = lowWeight
+        var hw = highWeight
         enc.setBytes(&lowSize, length: MemoryLayout<SIMD2<UInt32>>.size, index: 0)
         enc.setBytes(&outSize, length: MemoryLayout<SIMD2<UInt32>>.size, index: 1)
-        enc.setBytes(&w, length: MemoryLayout<Float>.size, index: 2)
+        enc.setBytes(&lw, length: MemoryLayout<Float>.size, index: 2)
+        enc.setBytes(&hw, length: MemoryLayout<Float>.size, index: 3)
         dispatch(enc: enc, pipeline: upsampleAccumulatePS, width: output.width, height: output.height)
     }
 
@@ -978,18 +1016,19 @@ final class FilmtoneMetalOpticsRenderer {
         outTex.write(sum / half(16.0), gid);
     }
 
-    // Tent upsample of low-res, multiply by `weight`, add to high-res, write
-    // to output. Equivalent to the CI sequence:
+    // Tent upsample of low-res, apply independent low/high weights, and add.
+    // This preserves the legacy sequence and supports the normalized
+    // Deep Glow sequence without another shader:
     //   restored = tentUpsample(low, to: high.extent)
-    //   weighted = restored * weight
-    //   output = weighted + high
+    //   output = restored * lowWeight + high * highWeight
     kernel void filmtoneTentUpsampleAccumulate(
         texture2d<half, access::read>  lowRes   [[ texture(0) ]],
         texture2d<half, access::read>  highRes  [[ texture(1) ]],
         texture2d<half, access::write> outTex   [[ texture(2) ]],
         constant uint2 &lowSize [[ buffer(0) ]],
         constant uint2 &outSize [[ buffer(1) ]],
-        constant float &weight  [[ buffer(2) ]],
+        constant float &lowWeight  [[ buffer(2) ]],
+        constant float &highWeight [[ buffer(3) ]],
         uint2 gid [[ thread_position_in_grid ]]
     ) {
         if (gid.x >= outSize.x || gid.y >= outSize.y) return;
@@ -1010,9 +1049,11 @@ final class FilmtoneMetalOpticsRenderer {
                   + ((s1 + s3 + s4 + s6) * half(2.0))
                   + (s0 + s2 + s5 + s7);
         half4 restored = sum / half(16.0);
-        half4 weighted = restored * half(weight);
         half4 highVal = highRes.read(gid);
-        outTex.write(weighted + highVal, gid);
+        outTex.write(
+            restored * half(lowWeight) + highVal * half(highWeight),
+            gid
+        );
     }
 
     static float3 fmtGlowShoulder(float3 energy) {

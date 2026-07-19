@@ -1,7 +1,7 @@
 # Filmtone Native Desktop v2 Strategy
 
 Date opened: 2026-05-04 JST
-Last updated: 2026-05-17 JST
+Last updated: 2026-07-13 JST
 
 This file is the compact source of truth for the Native Desktop v2 lane.
 Implementation logs, chat handoffs, and detailed verification records belong in
@@ -68,14 +68,22 @@ content layer stays glass-free so color judgment is not compromised.
 - Integration base before M5-K1/K2/K3/K4: `0b79861f`
 - No M5-K product `active.md` should remain open. If `active.md` exists during
   DHM / release-cutover interrupts, do not treat it as current M5-K state.
-- Public Desktop latest from truth script: `1.12` via update metadata.
-- iOS truth script reports separate public and local axes: public App Store
-  version `1.9`; local Xcode candidate `1.10` build `10`.
-- Native Desktop v2 public release is Desktop v1.12. Desktop release truth and
-  iOS App Store truth are separate public axes; rerun truth scripts before
+- Public Desktop latest from truth script: `1.16` via update metadata.
+- iOS/iPad truth remains split by rail. The iPhone public App Store version is
+  reported by the iOS truth script; Apple lookup for the iPad bundle
+  `com.chibatakumi.film.lab.ipad` reports public `1.4` released on
+  `2026-06-07T15:50:15Z`.
+- Native Desktop v2 public release is Desktop v1.16. Desktop release truth and
+  iOS/iPad App Store truth are separate public axes; rerun truth scripts before
   making release/version claims.
-- No Native Desktop release `active.md` remains open after the v1.12 public
-  release.
+- No Native Desktop release `active.md` remains open after the v1.16 public
+  release and iPad v1.4 review submission.
+- Native Desktop and Native iPad performance-led export quality reset completed
+  on 2026-07-07 and archived at
+  `archive/2026-07-07-native-desktop-ipad-export-quality-reset.md`. Decisions:
+  keep the current CoreImage FHD-default / explicit-4K Film Damage path, adopt
+  Highlight 1 / 3 / 5 / 10 plus combined/separate output on Desktop/iPad, and
+  keep iPhone as a selective downstream rail.
 
 ## Interrupt / Decision Log
 
@@ -221,15 +229,15 @@ release run completed from code HEAD `4f2e5eba`.
 
 Current public state:
 
-- update metadata reports `latestVersion: "1.12"`
+- update metadata reports `latestVersion: "1.16"`
 - fixed download page:
   `https://www.chibatakumi.studio/film-lab/download`
 - active DMG:
-  `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.4.dmg`
+  `https://ehi6m41cp33jiopb.public.blob.vercel-storage.com/filmtone/desktop/Filmtone-1.16.dmg`
 - DMG sha256:
-  `40d2b2fd745c648849d310856e2bcd5d0db0afd948b3842fd83800f68e705cb8`
+  `9df8b1d51350fe40d7338aa8f3527f815b1097301db878886dc2d5d2e91dc1d9`
 - production Vercel deployment:
-  `chibatakumi-portfolio-1bttmm5np-forestones-projects.vercel.app`
+  `chibatakumi-portfolio-edvob0vpa-forestones-projects.vercel.app`
 
 Release gates passed:
 
@@ -668,10 +676,55 @@ export now defaults to FHD in the app UI, exposes 4K only for 4K-capable
 sources, and warns that 4K output takes longer. Archive
 `archive/2026-06-02-desktop-fhd-4k-export-choice.md`.
 
+2026-06-06: Film Damage visibility tuning completed. Native Desktop/iOS Dust
+now adds dark debris/flecks and lowers white sparkle dominance without schema or
+copy changes. Archive `archive/2026-06-06-film-damage-visibility-tuning.md`.
+
+2026-06-06: Film Damage render speed recovery completed. Native Desktop/iOS
+kernels now skip out-of-reach damage pixels and avoid unconditional debris
+neighbor evaluation, bringing the 3840 strong probe render avg from ~21.0ms to
+~17.0ms/frame while preserving the accepted dark debris read. Archive
+`archive/2026-06-06-film-damage-render-speed-recovery.md`.
+
+2026-06-07: Desktop v1.16 public release and iPad v1.4 review submission
+completed. Desktop update metadata reports `latestVersion: "1.16"` and the
+fixed download page returns `Filmtone-1.16.dmg`; iPad `App-iPad` build 16 was
+submitted to App Review with automatic release enabled. Archive
+`archive/2026-06-07-desktop-v1-16-ipad-v1-4-release.md`.
+
 2026-06-02: Desktop 4K export warning UX follow-up completed. Selecting 4K now
 shows an amber time-cost callout, and the action button changes to `Export 4K
 Video…` so the slow path is explicit before export. Archive
 `archive/2026-06-02-desktop-4k-export-warning-ux.md`.
+
+2026-06-02: Native Desktop v1.15 public release completed for the Film Damage
+export integration and explicit FHD/4K export choice. Public update metadata
+reports `latestVersion: "1.15"` and the fixed download page returns
+`Filmtone-1.15.dmg`. Archive
+`archive/2026-06-02-native-desktop-v1-15-release.md`.
+
+2026-06-02: Highlight Reel duration and split output completed for Native
+Desktop and iPad. Users can choose 1, 3, 5, or 10 seconds and output either one
+combined reel or separate clips; the default remains one-second combined.
+Archive `archive/2026-06-02-highlight-reel-duration-split-output.md`.
+
+2026-06-02: Highlight Reel split-output hardening completed. iPad export cache
+files now carry readable Highlight prefixes, and split Highlight save-to-Photos
+saves every generated clip instead of only the first. Archive
+`archive/2026-06-02-highlight-reel-split-output-hardening.md`.
+
+2026-06-02: Highlight split-output finished-state UX polish completed. iPad
+Highlight exports now land in the finished state, show clip count for split
+results, and label multi-clip save-to-Photos as `N本を保存` / `Save N Clips`.
+Archive `archive/2026-06-02-highlight-split-finished-state-ux-polish.md`.
+
+2026-07-13: Deep Glow optical finish completed across Native Desktop and
+iPhone/iPad; visible Backlight Veil densities became semantic strengths while
+compatibility ids stayed stable. Archive `archive/2026-07-13-deep-glow-optical-finish.md`.
+
+2026-07-13: Coordinated Deep Glow release completed: Desktop 1.17 is public;
+iPhone 1.14 (21) and iPad 1.5 (17) are waiting for review with automatic release.
+Archive `archive/2026-07-13-coordinated-desktop-iphone-ipad-release.md`.
 
 ## Constraints
 

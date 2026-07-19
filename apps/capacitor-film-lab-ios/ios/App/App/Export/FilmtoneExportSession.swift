@@ -36,6 +36,7 @@ final class FilmtoneExportSession {
     /// session only writes it into the sidecar; media pixels and Photos save
     /// remain unchanged.
     private let highlightMarkers: FilmtoneHighlightMarkers?
+    private let highlightReelOptions: FilmtoneHighlightReelOptions
     /// M14-C (2026-05-09): capture-package master/proxy provenance,
     /// resolved by the caller (typically `FilmtoneEditorStore.export`)
     /// from the M14-A `ExportSourceDecision`. Photos / Files non-
@@ -243,6 +244,8 @@ final class FilmtoneExportSession {
         appliedSavedLook: SavedLookEntry? = nil,
         cameraProfile: CameraProfileSelection? = nil,
         highlightMarkers: FilmtoneHighlightMarkers? = nil,
+        highlightReelOptions: FilmtoneHighlightReelOptions = .standard,
+        outputPreferredName: String? = nil,
         captureProvenance: SidecarCaptureProvenance? = nil
     ) throws {
         self.request = request
@@ -252,10 +255,14 @@ final class FilmtoneExportSession {
         self.appliedSavedLook = appliedSavedLook
         self.cameraProfileSelection = cameraProfile
         self.highlightMarkers = highlightMarkers?.isEmpty == false ? highlightMarkers : nil
+        self.highlightReelOptions = highlightReelOptions
         self.captureProvenance = captureProvenance
         let disableGlowFamilyForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_DISABLE_GLOW_FAMILY")
         let useMetalOpticsForExport = Self.environmentFlagEnabled("FILMTONE_EXPORT_METAL_OPTICS")
-        let outputURL = try cacheStore.temporaryExportURL(pathExtension: request.output.container)
+        let outputURL = try cacheStore.temporaryExportURL(
+            preferredName: outputPreferredName ?? "filmtone-export",
+            pathExtension: request.output.container
+        )
         self.outputURL = outputURL
         let colorPipeline = FilmtoneColorPipeline.defaultOutputContract(
             sourceMetadata: request.sourceProbe?.sourceVideoMetadata?.color,
@@ -558,6 +565,7 @@ final class FilmtoneExportSession {
     }
 
     func runHighlightReel(
+        segments overrideSegments: [FilmtoneHighlightClipSegment]? = nil,
         progress: @escaping (Phase0ExportProgressDTO) -> Void
     ) throws -> Phase0ExportResultDTO {
         defer {
@@ -566,7 +574,8 @@ final class FilmtoneExportSession {
         guard request.sourceKind == .video else {
             throw FilmtoneMediaError.exportFailed("Highlight is available for video sources only.")
         }
-        guard let segments = highlightMarkers?.highlightReelSegments(), !segments.isEmpty else {
+        guard let segments = overrideSegments ?? highlightMarkers?.highlightReelSegments(options: highlightReelOptions),
+              !segments.isEmpty else {
             throw FilmtoneMediaError.exportFailed("Add at least one highlight marker before creating a Highlight.")
         }
 

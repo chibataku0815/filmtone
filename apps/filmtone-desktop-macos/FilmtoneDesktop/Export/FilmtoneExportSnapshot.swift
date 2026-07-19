@@ -22,6 +22,11 @@ struct ExportResultSnapshot: Equatable {
     let sourceKind: FilmtoneSourceKind
     let videoTimingMode: FilmtoneVideoTimingMode?
     let outputFrameRate: Int?
+    var shareURLs: [URL] = []
+
+    var effectiveShareURLs: [URL] {
+        shareURLs.isEmpty ? [outputURL] : shareURLs
+    }
 }
 
 enum FilmtoneFormatters {
@@ -57,6 +62,15 @@ enum FilmtoneFormatters {
             return String(format: "%dh %02dm %02ds", hours, minutes, secs)
         }
         return String(format: "%dm %02ds", minutes, secs)
+    }
+
+    static func formattedSecondsShort(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "1s" }
+        let rounded = seconds.rounded()
+        if abs(seconds - rounded) < 0.0001 {
+            return "\(Int(rounded))s"
+        }
+        return String(format: "%.1fs", seconds)
     }
 
     /// JPEG quality clamp. Mirrors `EditorState.jpegQuality`'s didSet so

@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Mirrors the iPhone strength-sheet control surface so adjust
 /// work happens inside the inspector instead of behind a modal. Strength,
-/// Advanced Adjust groups, Film Damage, and Backlight Veil all live inline.
+/// Advanced Adjust groups, Film Damage, and Deep Glow all live inline.
 ///
 /// Help icons stay in the iPhone sheet for now, but the iPad rail no
 /// longer uses the iPhone quick-only subset as its normal Adjust body.
@@ -14,13 +14,20 @@ struct FilmtonePadAdjustPanel: View {
 
     @State private var advancedExpandedGroupIds: Set<FilmtoneAdvancedAdjustGroupID> = [.basic]
 
+    private static let deepGlowColumns: [GridItem] = [
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
+        GridItem(.flexible(), spacing: FilmtonePadTouchMetrics.gridSpacing),
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: FilmtonePadTouchMetrics.sectionSpacing) {
             strengthRow
 
             advancedAdjustRows
 
-            backlightVeilRow
+            deepGlowRow
         }
     }
 
@@ -29,76 +36,113 @@ struct FilmtonePadAdjustPanel: View {
     private var strengthRow: some View {
         let clamped = FilmtonePhase0Math.clampStrength(store.project.strength)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(store.strings.strengthLabel)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.92))
-                Spacer()
-                Text(Self.percentLabel(clamped))
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.66))
-                    .accessibilityIdentifier("filmtone.pad.inspector.adjust.strength.value")
-            }
-            Slider(
-                value: Binding(get: { clamped }, set: { store.setStrength($0) }),
-                in: 0...1
-            )
-            .tint(Color.filmtoneAmber)
-            .accessibilityIdentifier("filmtone.pad.inspector.adjust.strength.slider")
-        }
+        return FilmtonePadSliderControl(
+            title: store.strings.strengthLabel,
+            valueText: Self.percentLabel(clamped),
+            valueAccessibilityIdentifier: "filmtone.pad.inspector.adjust.strength.value",
+            sliderAccessibilityIdentifier: "filmtone.pad.inspector.adjust.strength.slider",
+            value: Binding(
+                get: { FilmtonePhase0Math.clampStrength(store.project.strength) },
+                set: { store.setStrength($0) }
+            ),
+            range: 0...1,
+            isActive: clamped < 0.995
+        )
     }
 
-    // MARK: Backlight Veil
+    // MARK: Deep Glow
 
-    private var backlightVeilRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var deepGlowRow: some View {
+        VStack(alignment: .leading, spacing: FilmtonePadTouchMetrics.rowSpacing) {
             HStack {
-                Text("Backlight Veil")
+                Text(FilmtoneOpticalFilterEditorCatalog.featureName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.92))
                 Spacer()
-                Text(backlightVeilDensityLabel)
+                Text(deepGlowStrengthLabel)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.62))
                     .accessibilityIdentifier("filmtone.pad.inspector.adjust.backlightVeil.value")
             }
 
-            Picker(
-                "Backlight Veil",
-                selection: Binding(
-                    get: {
-                        store.selectedOpticalFilterId
-                            ?? FilmtoneOpticalFilterEditorCatalog.noneIdentifier
-                    },
-                    set: { newValue in
-                        store.setOpticalFilterId(
-                            newValue == FilmtoneOpticalFilterEditorCatalog.noneIdentifier
-                                ? nil
-                                : newValue
-                        )
-                    }
-                )
+            LazyVGrid(
+                columns: Self.deepGlowColumns,
+                alignment: .leading,
+                spacing: FilmtonePadTouchMetrics.gridSpacing
             ) {
-                Text("Off").tag(FilmtoneOpticalFilterEditorCatalog.noneIdentifier)
-                ForEach(FilmtoneOpticalFilterEditorCatalog.entries) { entry in
-                    Text(entry.shortLabel).tag(entry.id)
+                ForEach(deepGlowOptions) { option in
+                    deepGlowChip(option)
                 }
             }
-            .pickerStyle(.segmented)
             .accessibilityIdentifier("filmtone.pad.inspector.adjust.backlightVeil.picker")
         }
     }
 
-    private var backlightVeilDensityLabel: String {
-        FilmtoneOpticalFilterEditorCatalog
-            .entry(for: store.selectedOpticalFilterId)?.shortLabel ?? "Off"
+    private var deepGlowStrengthLabel: String {
+        FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+            for: store.selectedOpticalFilterId,
+            prefersJapanese: store.strings.usesJapaneseTypography
+        )
+    }
+
+    private var selectedDeepGlowId: String {
+        store.selectedOpticalFilterId ?? FilmtoneOpticalFilterEditorCatalog.noneIdentifier
+    }
+
+    private var deepGlowOptions: [DeepGlowOption] {
+        [
+            DeepGlowOption(
+                id: FilmtoneOpticalFilterEditorCatalog.noneIdentifier,
+                label: FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                    for: nil,
+                    prefersJapanese: store.strings.usesJapaneseTypography
+                )
+            ),
+        ]
+        + FilmtoneOpticalFilterEditorCatalog.entries.map {
+            DeepGlowOption(
+                id: $0.id,
+                label: FilmtoneOpticalFilterEditorCatalog.localizedShortLabel(
+                    for: $0.id,
+                    prefersJapanese: store.strings.usesJapaneseTypography
+                )
+            )
+        }
+    }
+
+    private func deepGlowChip(_ option: DeepGlowOption) -> some View {
+        let isActive = option.id == selectedDeepGlowId
+
+        return Button {
+            store.setOpticalFilterId(
+                option.id == FilmtoneOpticalFilterEditorCatalog.noneIdentifier
+                    ? nil
+                    : option.id
+            )
+        } label: {
+            Text(option.label)
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(
+            FilmtonePadTouchButtonStyle(
+                isActive: isActive,
+                activeFill: Color.filmtoneAmber.opacity(0.86),
+                inactiveFill: Color.white.opacity(0.06),
+                inactiveStroke: Color.white.opacity(0.12)
+            )
+        )
+        .accessibilityIdentifier(
+            "filmtone.pad.inspector.adjust.backlightVeil.option.\(option.id)"
+        )
     }
 
     // MARK: Advanced Adjust
 
     private var advancedAdjustRows: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: FilmtonePadTouchMetrics.rowSpacing) {
             HStack {
                 Text(store.strings.advancedParamsLabel)
                     .font(.subheadline.weight(.semibold))
@@ -148,7 +192,7 @@ struct FilmtonePadAdjustPanel: View {
                     advancedParamSlider(control)
                 }
             }
-            .padding(.top, 8)
+            .padding(.top, FilmtonePadTouchMetrics.rowSpacing)
         } label: {
             HStack(spacing: 8) {
                 Text(advancedGroupTitle(for: group.id))
@@ -167,6 +211,20 @@ struct FilmtonePadAdjustPanel: View {
                 }
                 Spacer()
             }
+            .padding(.horizontal, 10)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: FilmtonePadTouchMetrics.minimumControlHeight,
+                alignment: .leading
+            )
+            .background(
+                RoundedRectangle(
+                    cornerRadius: FilmtonePadTouchMetrics.controlCornerRadius,
+                    style: .continuous
+                )
+                .fill(Color.white.opacity(activeCount > 0 ? 0.06 : 0.035))
+            )
+            .contentShape(Rectangle())
         }
         .tint(.white.opacity(0.86))
         .accessibilityIdentifier("filmtone.pad.inspector.adjust.advanced.\(group.rawID)")
@@ -177,9 +235,14 @@ struct FilmtonePadAdjustPanel: View {
         let activeRecipeID = activeRecipeID(for: group, base: base)
 
         return LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 68), spacing: 6)],
+            columns: [
+                GridItem(
+                    .adaptive(minimum: 86),
+                    spacing: FilmtonePadTouchMetrics.gridSpacing
+                ),
+            ],
             alignment: .leading,
-            spacing: 6
+            spacing: FilmtonePadTouchMetrics.gridSpacing
         ) {
             ForEach(group.recipes) { recipe in
                 let isActive = recipe.id == activeRecipeID
@@ -191,19 +254,16 @@ struct FilmtonePadAdjustPanel: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .foregroundStyle(isActive ? Color.black : Color.white.opacity(0.84))
-                        .background(
-                            isActive ? Color.filmtoneAmber.opacity(0.86) : Color.white.opacity(0.08),
-                            in: Capsule()
-                        )
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(Color.white.opacity(isActive ? 0 : 0.16), lineWidth: 0.75)
-                        }
-                        .contentShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(
+                    FilmtonePadTouchButtonStyle(
+                        isActive: isActive,
+                        activeFill: Color.filmtoneAmber.opacity(0.86),
+                        inactiveFill: Color.white.opacity(0.08),
+                        inactiveStroke: Color.white.opacity(0.16),
+                        minHeight: FilmtonePadTouchMetrics.minimumControlHeight
+                    )
+                )
                 .accessibilityIdentifier(
                     "filmtone.pad.inspector.adjust.advanced.\(group.rawID).recipe.\(recipe.id)"
                 )
@@ -215,49 +275,28 @@ struct FilmtonePadAdjustPanel: View {
         let value = store.effectiveParamValue(for: control.key)
         let isOverridden = store.isParamOverridden(control.key)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Circle()
-                    .fill(isOverridden ? Color.filmtoneAmber.opacity(0.92) : Color.white.opacity(0.18))
-                    .frame(width: 6, height: 6)
-                Text(store.strings.paramLabel(for: control.key))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isOverridden ? Color.filmtoneAmber.opacity(0.92) : .white.opacity(0.86))
-                Spacer()
-                Text(Self.decimalLabel(value, digits: control.digits))
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(isOverridden ? Color.filmtoneAmber.opacity(0.82) : .white.opacity(0.62))
-                    .accessibilityIdentifier(
-                        "filmtone.pad.inspector.adjust.advanced.\(control.key).value"
-                    )
-                Button {
-                    store.clearParamOverrides(for: [control.key])
-                } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(isOverridden ? .white.opacity(0.76) : .white.opacity(0.24))
-                        .frame(width: 22, height: 22)
+        return FilmtonePadSliderControl(
+            title: store.strings.paramLabel(for: control.key),
+            valueText: Self.decimalLabel(value, digits: control.digits),
+            valueAccessibilityIdentifier: "filmtone.pad.inspector.adjust.advanced.\(control.key).value",
+            sliderAccessibilityIdentifier: "filmtone.pad.inspector.adjust.advanced.\(control.key).slider",
+            value: Binding(
+                get: { store.effectiveParamValue(for: control.key) },
+                set: { value in
+                    store.setParamOverride(value, for: control.key)
                 }
-                .buttonStyle(.plain)
-                .disabled(!isOverridden)
-                .accessibilityIdentifier(
-                    "filmtone.pad.inspector.adjust.advanced.\(control.key).reset"
-                )
+            ),
+            range: control.range,
+            isActive: isOverridden,
+            leadingIndicatorColor: isOverridden
+                ? Color.filmtoneAmber.opacity(0.92)
+                : Color.white.opacity(0.18),
+            resetAccessibilityIdentifier: "filmtone.pad.inspector.adjust.advanced.\(control.key).reset",
+            resetEnabled: isOverridden,
+            resetAction: {
+                store.clearParamOverrides(for: [control.key])
             }
-            Slider(
-                value: Binding(
-                    get: { store.effectiveParamValue(for: control.key) },
-                    set: { value in
-                        store.setParamOverride(value, for: control.key)
-                    }
-                ),
-                in: control.range
-            )
-            .tint(Color.filmtoneAmber)
-            .accessibilityIdentifier(
-                "filmtone.pad.inspector.adjust.advanced.\(control.key).slider"
-            )
-        }
+        )
     }
 
     private func activeRecipeID(
@@ -323,4 +362,9 @@ struct FilmtonePadAdjustPanel: View {
     private static func decimalLabel(_ value: Double, digits: Int) -> String {
         String(format: "%.\(digits)f", value)
     }
+}
+
+private struct DeepGlowOption: Identifiable {
+    let id: String
+    let label: String
 }

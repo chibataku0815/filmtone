@@ -200,6 +200,29 @@ enum OpticsResampling {
         }
     }
 
+    static func normalizedGlowBandWeights(radius: Double, levels: Int) -> [Double] {
+        guard levels > 0 else { return [] }
+        // Filmtone-owned regularized inverse-square falloff. The offset keeps
+        // the core readable while radius moves energy toward wider octaves;
+        // normalization leaves total energy to the exposure response.
+        let spreadBias = 0.74 + (clamp(radius) * 0.62)
+        let rawWeights = (0..<levels).map { index -> Double in
+            let regularizedOctave = Double(index + 3)
+            let baseWeight = 1.0 / (regularizedOctave * regularizedOctave)
+            return baseWeight * pow(spreadBias, Double(index))
+        }
+        let total = rawWeights.reduce(0, +)
+        guard total > Double.ulpOfOne else {
+            return Array(repeating: 1.0 / Double(levels), count: levels)
+        }
+        return rawWeights.map { $0 / total }
+    }
+
+    static func radianceExposureGain(_ strength: Double) -> Double {
+        let positiveStrength = max(strength, 0)
+        return max((exp(positiveStrength * 1.25) - 1.0) * 2.4, 0)
+    }
+
     static func halationColor(for hue: Double) -> CIColor {
         let t = clamp(hue / 100.0)
         let red = (0xe8 + ((0xc8 - 0xe8) * t)) / 255.0

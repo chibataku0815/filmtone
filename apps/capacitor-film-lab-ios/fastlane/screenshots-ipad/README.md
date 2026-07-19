@@ -10,6 +10,9 @@ Staged App Store screenshots for the separate Filmtone Studio tablet app.
 - `en-GB` intentionally reuses the `en-US` image set.
 - Source campaign: `/Volumes/SamsungPortableSSDX5001/documents/life/docs/artifacts/2026-05-22-filmtone-ipad-app-store-screenshots/final/en-US/`.
 - 2026-06-02 JST: screenshot 04 was updated to include the current Film Damage control.
+- The iPad fastlane asset lane derives current App Store Connect display assets from this set before upload:
+  - 13-inch display: `2752x2064`
+  - 11-inch display: `2360x1640`
 
 ## QA Notes
 

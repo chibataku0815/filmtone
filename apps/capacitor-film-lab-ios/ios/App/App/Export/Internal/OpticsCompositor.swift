@@ -324,7 +324,8 @@ final class OpticsCompositor {
                 radius: params.bloomRadius,
                 levelCount: OpticsResampling.bloomMipLevels,
                 spreadMultiplier: OpticsResampling.bloomSpreadBoost,
-                useTentResampling: true
+                useTentResampling: true,
+                normalizedBandEnergy: backlightVeilOptical != nil
             )
         } else {
             bloomImage = black
@@ -412,7 +413,9 @@ final class OpticsCompositor {
         }
 
         if let backlightVeilOptical {
-            // Backlight Veil Phase 1c CI fallback — verbatim WGSL §4.4 port.
+            // Deep Glow compatibility CI fallback. The main radiance field
+            // uses normalized bands and an exposure response; the retained
+            // scatter coefficients preserve the established optical finish.
             // 9 args (3 spatial floats + 6 optical floats); diffusionBase
             // drops out because the new kernel multiplies diffused by the
             // hardcoded 0.24 from WGSL.
@@ -424,7 +427,7 @@ final class OpticsCompositor {
                 bloomImage,
                 halationImage,
                 diffusionImage,
-                params.bloomStrength,
+                OpticsResampling.radianceExposureGain(params.bloomStrength),
                 params.halationIntensity,
                 params.diffusion,
                 backlightVeilOptical.directTransmission,
@@ -623,7 +626,8 @@ final class OpticsCompositor {
         radius: Double,
         levelCount: Int,
         spreadMultiplier: Double,
-        useTentResampling: Bool = false
+        useTentResampling: Bool = false,
+        normalizedBandEnergy: Bool = false
     ) -> CIImage {
         let extent = image.extent.integral
         guard levelCount > 0 else {
@@ -640,16 +644,52 @@ final class OpticsCompositor {
             return OpticsResampling.blackImage(for: extent)
         }
 
-        let weights = OpticsResampling.computeMipWeights(radius: Self.clamp(radius), levels: mips.count)
-        if mips.count > 1 {
+        if normalizedBandEnergy {
+            let weights = OpticsResampling.normalizedGlowBandWeights(
+                radius: Self.clamp(radius),
+                levels: mips.count
+            )
+            let deepestIndex = mips.count - 1
+            mips[deepestIndex] = OpticsResampling.weightedImage(
+                mips[deepestIndex],
+                weight: weights[deepestIndex]
+            )
+            if mips.count > 1 {
+                for index in stride(from: mips.count - 2, through: 0, by: -1) {
+                    let lowRes = mips[index + 1]
+                    let highRes = mips[index]
+                    let restored = useTentResampling
+                        ? OpticsResampling.tentUpsampledImage(lowRes, to: highRes.extent)
+                        : OpticsResampling.upsampledImage(lowRes, to: highRes.extent)
+                    let weightedHighRes = OpticsResampling.weightedImage(
+                        highRes,
+                        weight: weights[index]
+                    )
+                    mips[index] = OpticsResampling.addImages(
+                        restored,
+                        weightedHighRes
+                    ).cropped(to: highRes.extent)
+                }
+            }
+        } else if mips.count > 1 {
+            let weights = OpticsResampling.computeMipWeights(
+                radius: Self.clamp(radius),
+                levels: mips.count
+            )
             for index in stride(from: mips.count - 2, through: 0, by: -1) {
                 let lowRes = mips[index + 1]
                 let highRes = mips[index]
                 let restored = useTentResampling
                     ? OpticsResampling.tentUpsampledImage(lowRes, to: highRes.extent)
                     : OpticsResampling.upsampledImage(lowRes, to: highRes.extent)
-                let weighted = OpticsResampling.weightedImage(restored, weight: weights[index + 1])
-                mips[index] = OpticsResampling.addImages(weighted, highRes).cropped(to: highRes.extent)
+                let weightedLowRes = OpticsResampling.weightedImage(
+                    restored,
+                    weight: weights[index + 1]
+                )
+                mips[index] = OpticsResampling.addImages(
+                    weightedLowRes,
+                    highRes
+                ).cropped(to: highRes.extent)
             }
         }
 

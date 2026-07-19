@@ -56,6 +56,16 @@ Portfolio lives at:
 Portfolio is the public web window. It consumes this repo through
 `vendor/filmtone`. Do not edit Filmtone implementation in portfolio.
 
+## Cross-Repo Motion/Effect Work
+
+When this repo consumes motion/effect capabilities or evidence from `motion-grammar-lab`, `visual-effect-core`, or related study repos, preserve Filmtone's product boundary.
+
+- Treat AE-derived or AE-informed material as external source/validation context, not as Filmtone's product identity.
+- Do not create local copies of shared motion/effect contracts, timing semantics, finish recipes, masks, or renderer assumptions. Import or hand off through the owning repo/package.
+- Before adding a borrowed capability, name the product feature responsibility and the owning source package or study. Do not name implementation after the source tool, phase, or validation sequence.
+- Host-specific ids such as AE `matchName` values must not become Filmtone model names, preset ids, copy, or UI labels. Map them to product/domain names first.
+- Unsupported sibling-repo capabilities must remain blocked, unavailable, or explicit approximations. Do not tune a local result while claiming cross-repo parity.
+
 ## Long-Running Task Model
 
 Use the 2-layer model for long-running product lanes. For each project, propose
@@ -131,6 +141,14 @@ Interrupts:
   surface is working, or when the user explicitly asks for QA/documentation.
 - Do not silently lower quality for speed. If a shortcut changes product
   quality, state the tradeoff before taking it.
+- Never encode process/order labels as durable implementation names. Names like
+  `phase0`, `phaseOne`, `stage1`, `step2`, `pass3`, `cycle4`, or similar
+  validation/implementation-order labels are forbidden in file names, directory
+  names, function names, component names, exported identifiers, script names,
+  package names, target names, and fixture ids. If a phase/order concept is
+  needed, record it in JSDoc, comments, strategy/active docs, verification
+  notes, or release notes; implementation names must describe the feature,
+  product responsibility, platform mechanism, or user-visible role.
 
 ## Copy Authoring
 
