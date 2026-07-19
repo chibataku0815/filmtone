@@ -52,6 +52,15 @@ Coordinator-owned: yes
   identity 一致・static consistency PASS・`git diff --check` clean・frozen 契約
   境界保全を確認。以降の critical path と担当ゲートは次節。2026-07-19 に owner が
   品質ゲートを **waived**(改訂 17): Breath/Weave の owner pass を待たず MON-2 へ進む。
+- **MON-6 前提の owner 決定(2026-07-19・改訂 26)**: 公開 module scope を
+  **Film-Damage-first** に確定(Breath/Weave は独立品質回復後の後続リリースへ、
+  公開コピーでは一切非言及)。公開バージョンは既存の署名済み `Filmtone-0.1.0.pkg`
+  を**再ビルドなしでそのまま使用**。対応環境表記は実測範囲(macOS 26.5.1 /
+  Resolve Studio 21.0.2)のみに確定、広い互換範囲の追加検証はしない。ローンチ日は
+  未確定のまま進行。**MON-4 row W(Worker deploy reconcile)を解消**: 本番稼働中の
+  Version ID が `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`(source `6104168`)である
+  ことを確認。install guide 作成、portfolio 製品ページ scaffold(未 commit)。
+  詳細は改訂 26 ログ。
 
 ## ローンチ実行順序と担当ゲート(2026-07-19 現在地起点)
 
@@ -66,13 +75,13 @@ Coordinator-owned: yes
 |---|---|---|---|
 | G0a | Film Breath 独立品質 iteration | — | **2026-07-19 owner 判断で waived(改訂 17)**。MON-2 前提から除外し、将来の独立 iteration へ送る |
 | G0b | Gate Weave 独立品質 iteration | — | 同上 — **waived(改訂 17)**。将来の独立 iteration へ送る |
-| G0c | 公開 module scope 確定(all-three-as-is / Film-Damage-first) | O | MON-6 前に owner が確定(改訂 17 で MON-2 前提からは外れた) |
+| G0c | 公開 module scope 確定(all-three-as-is / Film-Damage-first) | O | **完了(改訂 26)**: Film-Damage-first に確定。既存 pkg は再ビルドしないため binary は 3 モジュールのまま(Resolve 上で Breath/Weave パラメータは操作可能)だが、公開コピー(製品ページ・記事・ガイド)では Film Damage のみを説明し Breath/Weave は一切非言及とする運用で対応 |
 | H | renamed `Filmtone.ofx.bundle` の Resolve 内再検証(discovery / identity / determinism) | O | **完了(改訂 22 / 25)**: Resolve 21.0.2 で `.resolve` discovery・instance identity・license status 遷移を実測。GPU determinism は改訂 22 記載の狭い残存 |
 | M2 | MON-2 LICENSE 実装(watermark + ed25519 + expires + status) | C+auth | **Core Accepted(改訂 22)**: canonical parity 17/17、Resolve実機 enforcement両方向確認済み。GPU determinism / placeholder watermark視覚だけを残存として記録 |
 | M4 | MON-4 発売ゲート残(Resend 実送達 / Turnstile 実 token 成功 / 購入者 bridge 例外文面) | C+auth / O | 本番 endpoint 呼出しは owner authorization |
 | M5 | MON-5 .pkg 署名 + notarization | O | **完了(改訂 25)**: owner 承認下で Developer ID Application / Installer 署名、notary Accepted、staple、実機 install / Resolve smoke 済み |
 | M6 | MON-6 launch(製品ページ / 記事 / 価格公開) | C(記事 draft)/ O(portfolio・価格公開承認) | release truth gate + owner 承認 |
-| W | Worker deploy 状態の reconcile | O | docs 改訂 15(`6104168` deploy 済みと記録)と本タスク brief(`f8c4611` が現行)の矛盾を owner が確定 |
+| W | Worker deploy 状態の reconcile | O | **完了(改訂 26)**: `npx wrangler@latest deployments list`(読み取り専用、Worker endpoint は未呼び出し)で本番稼働中が Version ID `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`(2026-07-18T16:38:43Z UTC 作成、source `6104168`)であることを確認、改訂 15 の記録と一致。`f8c4611` は 1 つ前の deploy で現行ではない。**担当区分の訂正**: `bunx wrangler` はローカル cache 破損で失敗したが `npx wrangler` は owner の既存 OAuth セッションでそのまま認証済みだった — 本件は当初想定と異なり読み取り専用操作は C(Claude 自律)で完結可能 |
 
 2026-07-19 owner 判断(改訂 17)で G0 品質ゲートを waived。MON-2 は改訂 22で
 **Core Accepted**、MON-5 は改訂 25で**Accepted**。残る発売ゲートはMON-4の
@@ -89,7 +98,7 @@ Coordinator-owned: yes
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
 | MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — product identity同期版deploy・安全な失敗系・外部表示名sync完了。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | **Accepted(2026-07-19)** — local `main` `0b5669a` から `Filmtone-0.1.0.pkg` を Developer ID 署名 + notarize + staple。macOS 26.5.1 / Resolve Studio 21.0.2 で install・discovery・license status 遷移を実測(改訂 25) |
-| MON-6 | ローンチ(製品ページ・記事・価格公開) | 対応計画 §7 | MON-2〜5 + release truth | 否 | Queued |
+| MON-6 | ローンチ(製品ページ・記事・価格公開) | 対応計画 §7 | MON-2〜5 + release truth | 否 | **Running(改訂 26)**: module scope / version / 対応環境の owner 決定完了、install guide 作成、portfolio 製品ページ scaffold 済み(別 repo・未 commit・env 未設定)。残: release article、Polar checkout URL、legal review、Vercel env 設定+redeploy、MON-4 残ゲート |
 | MON-7 | 外殻(実売後のみ): 購入側自動発行(Phase L2)、marketplace 展開、edu/bundle 価格、Windows 版検討 | 対応計画 §5 L2 注記 | MON-6 後の実売データ | 一部 | Queued(着手条件未成立) |
 
 ## 実行順序
@@ -529,3 +538,83 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   Copy / History Impact: 署名・notarization・stapleと実測互換性はMON-6 release truthに
   使用可能だが、公開version / 対応範囲はowner承認まで公言しない。
   Article Opportunity: Release-note only。Change-History Opportunity: No。
+- 2026-07-19 (改訂 26 / MON-6 owner 決定 + 準備着手): owner が AskUserQuestion で
+  5 点を決定。**module scope = Film-Damage-first**(Breath/Weave は独立品質回復後の
+  後続リリースへ、公開コピーで一切非言及)。**version = 0.1.0/build 1 をそのまま
+  公開**(再ビルド・再署名・再notarize なし)。この 2 択の組み合わせにより、公開
+  pkg の binary は 3 モジュールを含んだままで、Resolve 上では Breath/Weave の
+  パラメータが引き続き操作可能な状態での発売になる — この tension を owner に
+  提示し、フォローアップ確認で「Film Damage のみをマーケティング、Breath/Weave
+  は完全非言及(binary からは削除しない)」を確定。**対応環境表記 = 狭い実測範囲
+  のみ**(macOS 26.5.1 / Resolve Studio 21.0.2)、追加検証はしない。**ローンチ日 =
+  未確定のまま進行**。
+  - **MON-4 row W 解消**: `infra/license-worker/` で `bunx wrangler whoami` が
+    ローカル cache 破損(`Cannot find module 'esbuild'`)で失敗したため
+    `npx wrangler@latest` に切替。owner の既存 OAuth セッション
+    (chiba@fores-tone.co.jp)でそのまま認証済みだった。読み取り専用の
+    `wrangler deployments list` を実行(Worker endpoint は未呼び出し)し、本番
+    稼働中が Version ID `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`
+    (2026-07-18T16:38:43Z UTC 作成 = 2026-07-19 JST 未明、source `6104168`)で
+    あることを確認 — 改訂 15 の記録と一致し、タスクブリーフが挙げていた
+    `f8c4611` は 1 つ前の deploy で現行ではないと確定した。Worker への新規
+    deploy・endpoint 呼び出しは行っていない。
+  - **install guide 作成**: `apps/filmtone-resolve-ofx/docs/installation-guide.md`
+    (JP/EN)を新規作成。progress.md 改訂 25 と implementation-plan.md §6 に厳密
+    grounding。作成後に scope 決定と時系列が前後した(dispatch 時点では
+    Film-Damage-first が未確定だったため初稿が 3 モジュール表記)ことが判明し、
+    Film Damage 単独表記へ訂正済み。残: Color ページ `Effects Library` の正確な
+    ナビゲーション、Fusion `Add Tool` ウォークスルー、ウォーターマーク文言
+    (`FILMTONE — TRIAL` はプレースホルダ)の 3 点は実機/スクリーンショット検証
+    未実施(ブロッカーではない)。
+  - **portfolio 製品ページ scaffold**(`chibatakumi-portfolio` repo、**未 commit**
+    の working tree 差分): 新ルート `/filmtone/resolve`(既存 `/filmtone` 起点
+    配下、Worker の `PRODUCT_URL`/`ALLOWED_ORIGIN` を変更せず満たす)。新規
+    `resolve-plugin-info.ts`(価格・動作確認済み構成・技術識別子の集約)、
+    `resolve/page.tsx`(LP 本体)、`FilmtoneResolveTrialForm.tsx`(Turnstile
+    explicit render → Worker `POST /trial`)、`resolve-legal-ui.tsx` +
+    `eula`/`refund`/`trial-privacy` の 3 サブページ(既存共有 `/filmtone/privacy`
+    は「no-collection/no-account」を主張しており trial のメール収集と矛盾する
+    ため統合せず独立ページ化。文面は
+    `docs/filmtone/davinci-plugin/monetization/{eula,refund-policy,trial-privacy}.md`
+    から忠実翻訳、**owner の法務レビュー未了の候補版**)。`messages/{ja,en}.json`
+    に `filmtone-resolve` namespace 追加(既存 `filmtone-signature` 踏襲、JA/EN
+    キー木一致検証済み)、`.env.example` に新規 env 4 件追記、`sitemap.ts` に
+    新規 4 ルート追加。`tsc --noEmit`・`eslint`・`next build` すべてエラー 0
+    (4 ルート ja/en 両 locale で SSG prerender 成功)。Git write なし
+    (`AGENTS.md` の既存 owner 編集・`vendor/filmtone` submodule pointer とも
+    未接触)。
+  - **導入した env var(owner がVercel側で値設定 → 設定後は SSG のため
+    再デプロイ必須)**: `NEXT_PUBLIC_FILMTONE_RESOLVE_TURNSTILE_SITE_KEY`
+    (必須、未設定時はフォーム側で「一時的に利用不可」表示にフォールバック)、
+    `NEXT_PUBLIC_FILMTONE_RESOLVE_POLAR_CHECKOUT_URL`(必須、未設定時は購入 CTA
+    を「近日公開」無効表示)、`NEXT_PUBLIC_FILMTONE_RESOLVE_TRIAL_ENDPOINT`
+    (任意、既定は本番 Worker URL)、`NEXT_PUBLIC_FILMTONE_RESOLVE_PKG_DOWNLOAD_URL`
+    (任意、配布 pkg 直リンク・version/配布先とも TBD)。
+  - **Polar 連携**: repo 内に既存の Polar 連携なし(既存決済導線は Stripe
+    donation のみ)。購入確認ページ/受領メールも Polar ダッシュボード側設定
+    でこの codebase 外のため、実装はしていない。**購入メール向けの trial
+    ブリッジ+優先再発行文面(JA/EN)は draft 済み**(MON-4 owner-operation 7 の
+    既存文面を踏襲)— owner が Polar 側に貼り付ける前提で本ログに記録:
+    JA「full ライセンスは購入確認後 24 時間以内(通常は数時間以内)にメールで
+    お届けします。待ち時間なしで使い始める場合は、14 日 trial をご利用くださ
+    い。trial 使用済みの場合は、この購入メールへ返信いただければ優先して発行
+    します。」/ EN “Your full license will be emailed within 24 hours of
+    purchase confirmation (normally within a few hours). To start
+    immediately, use the 14-day trial. If you have already used the trial,
+    reply to this purchase email for priority full-license issue.”
+  - **残る owner 手順**(MON-6 続行の前提): ① Vercel に Turnstile site key と
+    Polar checkout URL を設定し再デプロイ ② DaVinci Resolve 版の実 Polar
+    checkout URL の確定 ③ EULA/返金/trial-privacy 3 文書の法務レビュー
+    ④ Polar ダッシュボードでの返金ポリシー同期+上記購入メール文面の設定
+    ⑤ install guide 公開後、製品ページの `fullGuideNote` プレースホルダを実
+    リンクへ差し替え ⑥ portfolio 側変更のレビュー・commit(現状 working tree
+    のまま、owner 承認まで commit しない)。
+  Copy / History Impact: 製品ページ・法務ページ・install guide の draft 一式が
+  発生したが、いずれも未公開(portfolio 側は未 commit、filmtone 側の
+  install guide は本ブランチへ commit されて初めて配布可能になる)。公開クレーム
+  は追加していない。Article Opportunity: Release-note only(本改訂は準備進捗の
+  記録であり、実発売時の Full article 判断は strategy.md §10 のまま)。
+  Change-History Opportunity: No。Git: 本タスクブリーフの pre-authorization に
+  より本改訂を `claude/davinci-plugin-pricing-plan-4cb87b` へ commit/push
+  (dc1451b の merge lineage を経由しない独立コミットとして作成)。portfolio 側の
+  変更は別 repo・別ゲートのため今回 commit しない。
