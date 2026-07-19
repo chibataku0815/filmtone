@@ -118,11 +118,33 @@ MON-2 code checklist (implementation-plan §3):
   [x] Read-only License status string.
   [x] PublicKeys.h (rotation-ready) + vendored ed25519 (pin b1f19fab).
   [x] Builds arm64 (make PASS).
+  [x] TS<->C cross-verification + adversarial vectors — 14/14 PASS, 2026-07-19
+      (scripts/license/parity/run.sh). Canonical parity (crown jewel) cleared.
   [ ] watermark visual accepted by owner (default is a placeholder).
-  [ ] TS<->C cross-verification + adversarial vectors (owner testing authorization).
   [ ] runtime proof in Resolve (unlicensed->watermark, full->clean, trial->clean
       then expired->watermark, tamper->watermark) (owner authorization).
 ```
+
+## Verification results — 2026-07-19 (canonical parity: PASS)
+
+Owner authorized MON-2 testing. Cross-verification harness:
+`scripts/license/parity/{gen_vectors.ts, harness.mm, run.sh}` — the TS core.ts
+reference signs 14 envelopes (real `~/.filmtone/secrets` keys, verified against
+the embedded `PublicKeys.h`) and records each verdict; the C++
+`LicenseStore::evaluateBytes()` must reproduce all 14.
+
+Result: **14 PASS / 0 FAIL** (`sh scripts/license/parity/run.sh`). Clears the
+crown-jewel risk:
+- `full-valid -> licensed`, `trial-valid -> trial`, `trial-expired -> expired`
+  (a real full license is NOT wrongly watermarked; C++ canonicalize is byte-equal
+  to TS for canonical payloads; embedded public keys correct).
+- `non-canonical-space`, `reordered-keys`, `unknown-field`, `payload-tampered`,
+  `full-signed-with-trial-key`, `trial-future-issuedAt` (+3d skew),
+  `trial-length-over-31d`, `name-over-120`, `bad-base64`, `sig-wrong-length`,
+  `envelope-extra-field` -> all `invalid`, matching TS exactly.
+
+Still pending (need Resolve): GPU cross-command-buffer watermark ordering, the
+in-Resolve state matrix, and the watermark visual (owner judgment).
 
 ## Runtime risks to verify FIRST (owner testing authorization)
 
