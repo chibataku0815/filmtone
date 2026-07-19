@@ -148,7 +148,15 @@ crown-jewel risk:
   `envelope-extra-field` -> all `invalid`, matching TS exactly.
 
 Still pending (need Resolve): GPU cross-command-buffer watermark ordering, the
-in-Resolve state matrix, and the watermark visual (owner judgment).
+in-Resolve state matrix, and the watermark visual (owner judgment). A turnkey
+package is prepared for the owner's one Resolve session:
+[mon2-resolve-verification-runbook.md](../../monetization/mon2-resolve-verification-runbook.md)
+plus `scripts/license/parity/gen_license_files.ts` (writes full / trial /
+trial-expired / tampered `.license` files for the state matrix). Only the admin
+install (`/Library/OFX/Plugins` is root-owned) + launching Resolve + the visual
+judgment are owner actions. The GPU-ordering remedy (source->output watermark via
+a tracked intermediate) is documented, ready to apply iff the determinism export
+shows a race.
 
 ## Runtime risks to verify FIRST (owner testing authorization)
 
