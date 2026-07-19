@@ -447,8 +447,10 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   authorization を受け cross-verification harness を作成
   (`scripts/license/parity/{gen_vectors.ts, harness.mm, run.sh}`)。TS core.ts が
   実鍵(`~/.filmtone/secrets`、embedded PublicKeys.h と一致)で 14 envelope を署名
-  し各 verdict を記録、C++ `LicenseStore::evaluateBytes()` が全再現。**14 PASS /
-  0 FAIL**。crown-jewel リスク(正当 full license の Invalid 誤判定→課金顧客
+  し各 verdict を記録、C++ `LicenseStore::evaluateBytes()` が全再現。**17 PASS /
+  0 FAIL**(非 ASCII・JSON-escape・emoji surrogate の名前 3 件を含む — C++
+  escapeJsonString が TS JSON.stringify と byte 一致)。crown-jewel リスク(正当
+  full license の Invalid 誤判定→課金顧客
   watermark)を解消: full→licensed / trial→trial / expired→expired、非
   canonical・reorder・unknown・tamper・kind 越え・+3d skew・>31d・name>120・bad
   base64・sig 長・envelope 余剰 field は全て invalid で TS 一致。残(要 Resolve):

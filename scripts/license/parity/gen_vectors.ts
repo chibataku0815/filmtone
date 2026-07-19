@@ -84,6 +84,15 @@ const enc = (s: string) => new TextEncoder().encode(s);
 async function main() {
   await record("full-valid", await signLicense(basePayload, fullKey.privateKeyPkcs8Hex), NOW);
 
+  // Canonicalizer edge cases — all valid full licenses that MUST decode as
+  // licensed, i.e. C++ escapeJsonString must byte-match TS JSON.stringify.
+  await record("full-name-nonascii",
+    await signLicense({ ...basePayload, name: "田中 太郎", email: "tanaka@例え.jp" }, fullKey.privateKeyPkcs8Hex), NOW);
+  await record("full-name-json-escapes",
+    await signLicense({ ...basePayload, name: 'O\'Brien "Ace" \\ /\t x' }, fullKey.privateKeyPkcs8Hex), NOW);
+  await record("full-name-emoji-surrogate",
+    await signLicense({ ...basePayload, name: "Test 🎬 User" }, fullKey.privateKeyPkcs8Hex), NOW);
+
   const trialValid: LicensePayload = { ...basePayload, kind: "trial", issuedAt: iso(NOW - day), expiresAt: iso(NOW + 4 * day) };
   await record("trial-valid", await signLicense(trialValid, trialKey.privateKeyPkcs8Hex), NOW);
 
