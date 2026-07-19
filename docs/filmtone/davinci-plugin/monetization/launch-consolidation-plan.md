@@ -27,7 +27,7 @@ Legend: **C** = done autonomously / **C→O** = prepared, owner runs / **O** = o
 | # | Step | Who | Note |
 |---|---|---|---|
 | A1 | Unify plugin identity to `.resolve` | **C** | Done (`0b5669a`). Spatial group ids stay `.finish.group.*` (cosmetic; needs a spatial-contract regen in visual-effect-core to fully clear — optional). |
-| A2 | Fast-forward `main` → `claude/davinci-ofx-integration` | **O** | `git -C <clean checkout> merge --ff-only claude/davinci-ofx-integration`. Blocked for me by the dirty primary worktree; do it in a clean environment. |
+| A2 | Fast-forward `main` → `claude/davinci-ofx-integration` | **C** | **Done 2026-07-19**: primary worktree was clean, `main` fast-forwarded to `0b5669a` (combined plugin now on local `main`). `origin/main` push is a separate, larger decision (publishes the whole unpushed davinci+spatial+iOS lane) — owner's call. |
 | A3 | Bring monetization docs + MON-2 harness (`scripts/license/parity/`, `docs/.../monetization/`, `workstreams/license*`) onto `main` | **C→O** | These sit on the pricing-plan branch; port/merge them so `main` has the plan + verification tooling. Can be prepared on request. |
 
 ## Track B — MON-5 packaging (implementation-plan §6)
@@ -36,7 +36,7 @@ Legend: **C** = done autonomously / **C→O** = prepared, owner runs / **O** = o
 |---|---|---|---|
 | B1 | Version SoT + deployment target + sign target + `package.sh` | **C** | Done (`0b5669a`). `ProductVersion.mk` = 0.1.0 / build 1 / macOS 14.0. |
 | B2 | Owner confirms marketing/build version before public build | **O** | Edit `ProductVersion.mk` first; Info.plist + pkg + filename follow. |
-| B3 | Sign bundle + build signed .pkg + notarize + staple | **C→O** | `SIGN_APP=... SIGN_INSTALLER=... NOTARY_PROFILE=... sh apps/filmtone-resolve-ofx/Scripts/package.sh`. Identities stay in your keychain; I never see them. |
+| B3 | Sign bundle + build signed .pkg + notarize + staple | **O** | `sh apps/filmtone-resolve-ofx/Scripts/package.sh`. **Prereqs missing on this machine (2026-07-19 check)**: only a Developer ID *Application* cert exists — no Developer ID *Installer* cert (create it in your Apple Developer account) and no stored notary credential (`xcrun notarytool store-credentials <profile> --apple-id ... --team-id C3G77H8NM6 --password <app-specific-pw>`). Once both exist, the script runs end-to-end. |
 | B4 | Clean-Mac install → Resolve recognizes → trial→license→clean smoke | **O** | Verify on macOS 14.0+ / Resolve 21.x; publish only the measured range. |
 | B5 | Upload .pkg to the Polar file-delivery benefit | **O** | No self-hosted delivery. |
 

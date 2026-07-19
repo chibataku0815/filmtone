@@ -483,3 +483,13 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   notarize(Developer ID)/ monetization docs+harness の main への持ち込み。
   Copy / History Impact: 内部・配布準備のみで公開 claim なし。Article Opportunity:
   No story。Change-History Opportunity: No。Git: 記録を owner 承認で commit/push。
+- 2026-07-19 (改訂 24 / main ff 実行 + MON-5 署名前提の実測): **track A2 完了** —
+  primary worktree がクリーンだったため(改訂 23 の「dirty のため owner」は解消)
+  `main` を `claude/davinci-ofx-integration`(`0b5669a`)へ ff。統合プラグイン
+  (spatial + film + MON-2)が local `main` に前進。`origin/main` push は
+  davinci+spatial+iOS レーン全体の初公開になるため owner 判断(未実施)。**MON-5
+  署名は環境実測でブロック**: Developer ID **Application** 証明書はあるが
+  **Installer 証明書が無い**(Apple Developer で作成要)+ **notary 資格情報未設定**
+  (`notarytool store-credentials` 要、team C3G77H8NM6)。どちらも owner の Apple
+  アカウントでのみ作成可 — 揃えば `Scripts/package.sh` が end-to-end で通る。Git:
+  記録を owner 承認で commit/push。
