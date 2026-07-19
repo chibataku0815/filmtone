@@ -84,7 +84,7 @@ Worker deploy / 公開 module scope(MON-6 前に確定)/ 価格公開。
 | ID | 内容 | 仕様 | 依存 | プラグイン本体に触るか | State |
 |---|---|---|---|---|---|
 | MON-1 | 価格・ライセンス条件の確定 | strategy §3 | なし | 否 | **Accepted(2026-07-18 チャット承認)** |
-| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質ゲート waived(2026-07-19 owner・改訂 17) | **是** | **Review(2026-07-19)**: コード完了・build PASS・**TS↔C canonical parity 14/14 PASS(改訂 21)**。残は owner の watermark 視覚確定 / Resolve 実機([progress](workstreams/progress/license.md)) |
+| MON-2 | LICENSE 実装(watermark + ed25519 + expires + 状態表示) | 対応計画 §3 | 品質ゲート waived(2026-07-19 owner・改訂 17) | **是** | **Core Accepted(2026-07-19)**: build PASS・canonical parity 17/17・**Resolve 実機で enforcement 両方向 live 確認(改訂 22)**。残: GPU determinism(未実施=狭い残存)+ watermark 視覚 |
 | MON-3 | 鍵・発行ツール(keygen / issue / verify) | 対応計画 §4 | なし | 否 | **Review — 実装・鍵生成・1Password保管済み。MON-2のCクロス検証待ち** |
 | MON-4 | 販売基盤(Polar 登録・trial Worker・規約) | 対応計画 §5 | runtime gate・公開導線・法務確認 | 否 | **Running — product identity同期版deploy・安全な失敗系・外部表示名sync完了。実送達・公開導線・法務最終確認待ち** |
 | MON-5 | 配布物(署名 + notarized .pkg) | 対応計画 §6 | MON-2 | 否 | Queued |
@@ -457,3 +457,15 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   GPU cross-command-buffer watermark ordering、Resolve 状態マトリクス、watermark
   視覚。Copy / History Impact: 内部検証のみで公開 claim なし。Git: harness + 記録を
   owner 承認で commit/push。
+- 2026-07-19 (改訂 22 / MON-2 Resolve 実機 live 確認・core Accepted): 統合 bundle
+  (`com.chibatakumi.filmtone.resolve`)を `/Library/OFX/Plugins` へ install し
+  DaVinci Resolve で実クリップに適用。owner が live 確認: プラグイン load・
+  param panel(spatial + film + Node Role + License 全 group)・**無ライセンス→
+  trial watermark 描画**・**full.license→クリーン + `Licensed to Owner
+  Verification`**。enforcement の両方向が実機で実証され MON-2 の核は Accepted。
+  残 verdict 行(trial/expired/tampered)は harness 17/17 でカバー、licensed
+  identity 不変は構造的に保証。**残存(owner 判断で未実施)**: GPU determinism
+  (同フレーム二重 export の md5 比較)— watermark 帯 flicker の狭いリスクとして
+  記録、remedy(source→output tracked intermediate)は用意済み。watermark 視覚は
+  placeholder。次は MON-5(署名/notarization)。Copy / History Impact: 内部検証の
+  みで公開 claim なし。Git: 記録を owner 承認で commit/push。

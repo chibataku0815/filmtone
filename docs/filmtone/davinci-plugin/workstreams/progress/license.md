@@ -158,6 +158,29 @@ judgment are owner actions. The GPU-ordering remedy (source->output watermark vi
 a tracked intermediate) is documented, ready to apply iff the determinism export
 shows a race.
 
+## Resolve live confirmation — 2026-07-19 (owner)
+
+Integration bundle (`com.chibatakumi.filmtone.resolve`, arm64) installed to
+`/Library/OFX/Plugins` and applied on a real clip in DaVinci Resolve. Owner
+confirmed live:
+- Plugin loads; param panel shows all groups (spatial + film + Node Role) and the
+  read-only `License > Status` label.
+- **No license file -> trial watermark renders** (the diagonal FILMTONE TRIAL tile).
+- **`full.license` placed -> clean image + `Licensed to Owner Verification`.**
+
+So the core enforcement (watermark on when unlicensed, off when licensed) is
+proven live in both directions. The remaining verdict rows (trial / expired /
+tampered) are already covered by the 17/17 harness cross-check, and the licensed
+identity invariant holds by construction (watermark is skipped and the module
+graph is unchanged when licensed).
+
+Residual (owner elected not to run): **GPU determinism** — a same-frame double
+export + `md5` compare would definitively rule out the cross-command-buffer
+watermark-ordering race. Not run. Treated as a narrow residual risk
+(possible watermark-band flicker on an untracked host buffer); the source->output
+tracked-intermediate remedy is documented and ready to apply if it ever appears.
+Watermark visual is a placeholder pending owner preferences.
+
 ## Runtime risks to verify FIRST (owner testing authorization)
 
 1. **Canonical-JSON parity (crown jewel).** The C++ `canonicalize`
