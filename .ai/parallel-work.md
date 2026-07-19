@@ -44,7 +44,11 @@ verification を書く。Native v2 では `.claude/tasks/ACTIVE-PARALLEL-TASK.md
 | `packages/film-lab-renderer/` | renderer 専門 | WebGL / WebGPU / Three.js |
 | `packages/film-lab-ui/` | UI 共通 | **要調整**（Desktop と iOS 双方から参照） |
 | `packages/film-lab-smart-look/` | smart-look pipeline | look 推論 |
-| `apps/desktop-film-lab-batch/` | Desktop 専門 | Electron / Playwright |
+| `packages/film-lab-swift-core/` | 共有 Swift runtime | iOS / macOS 双方参照（`Generated/` 手編集禁止） |
+| `packages/film-lab-codex-mcp/` | MCP automation | batch export server |
+| `apps/filmtone-desktop-macos/` | 正式 Desktop 専門 | SwiftUI / Xcode |
+| `apps/desktop-film-lab-batch/` | legacy Electron | **frozen / rollback 専用** |
+| `apps/filmtone-resolve-ofx/` | Resolve OFX 専門 | C++/Metal（設計 lane: `docs/filmtone/davinci-plugin/`） |
 | `apps/capacitor-film-lab-ios/` | iOS 専門 | Capacitor / Swift / Xcode |
 | `messages/`, `public/`, `scripts/` | **要調整** | 全 workspace に波及 |
 

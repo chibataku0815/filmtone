@@ -4,7 +4,7 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 
 ## 1. プロジェクトスコープ
 
-- 目的: Filmtone Desktop + Filmtone iOS + 共有 packages (`film-lab-core` / `film-lab-renderer` / `film-lab-ui` / `film-lab-smart-look`) の独立モノレポ
+- 目的: Filmtone Desktop + Filmtone iOS + DaVinci Resolve OFX plugin (`apps/filmtone-resolve-ofx`) + 共有 packages (`film-lab-core` / `film-lab-renderer` / `film-lab-ui` / `film-lab-smart-look` / `film-lab-swift-core` / `film-lab-codex-mcp`) の独立モノレポ。全体構造は `docs/filmtone/filmtone-codemap.md` が正本
 - GitHub: `chibataku0815/filmtone`(2026-05-01 に `chibatakumi-portfolio` から `git filter-repo` で履歴付き分離、tag `migration-from-portfolio-2026-05-01`)
 - 公開窓(landing / support / privacy / release-notes / journal)は **portfolio 側** の `apps/web`(`vendor/filmtone` submodule 経由消費)。SNS 投稿は外部プラットフォーム自体で行うので portfolio スコープ外
 - 知識ハブ・truth scripts・docs/guides は **life 側** (`/Volumes/SamsungPortableSSDX5001/documents/life/`)
@@ -37,12 +37,14 @@ Filmtone — 独立モノレポ Claude Code 協業ガイド
 | パス | 内容 |
 |---|---|
 | `README.md` | official surface routing + scripts(`bun run build:core` / `verify:desktop` / `verify:ios` 等) |
+| `docs/filmtone/filmtone-codemap.md` | 全 app/package の構造・責務・入口・生成境界・verify の SSOT(code map) |
+| `docs/filmtone/filmtone-feature-matrix.md` | user-facing 機能のサーフェス別網羅表(目視検証用) |
 | `.ai/GLOBAL.md` | AI ツール共通グローバルルール(Cursor / Codex CLI 横断) |
 | `.ai/parallel-work.md` | 並列 stream / Agent Teams 協調プロトコル |
 | `apps/filmtone-desktop-macos/README.md` | 正式 Desktop app の build / Xcode / native 方針 |
 | `docs/filmtone/desktop/native-desktop-v2/strategy.md` | Native Desktop v2 の長期戦略・マイルストーン正本 |
 | `docs/filmtone/desktop/native-desktop-v2/active.md` | Native Desktop v2 の現在進行中サブタスク。存在しなければ次タスク案を作り、実装せずレビュー待ち |
-| `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS 専用 223 行(Swift / fastlane / pbxproj 不変条件・lane 番号・antipattern) |
+| `apps/capacitor-film-lab-ios/CLAUDE.md` | iOS 専用 139 行(Swift / fastlane / pbxproj 不変条件・lane 番号・antipattern) |
 | life `docs/guides/2026-05-01-filmtone-standalone-product-repo-migration-handoff.md` | 移行経緯の参照。現在状態の正本にはしない |
 | life `docs/guides/film-lab-current-index.md` | live エントリ doc(read order・active lanes) |
 
@@ -113,7 +115,7 @@ vercel deploy は portfolio 側の `apps/web` build に依存するので submod
 
 | パス | 状態 |
 |---|---|
-| `apps/capacitor-film-lab-ios/CLAUDE.md` | **既存**(223 行)。iOS の不変条件はここから引く |
+| `apps/capacitor-film-lab-ios/CLAUDE.md` | **既存**(139 行)。iOS の不変条件はここから引く |
 | `apps/filmtone-desktop-macos/README.md` | **既存**。正式 Desktop app の native build / Xcode 方針 |
 | `apps/desktop-film-lab-batch/CLAUDE.md` | **未作成**。legacy Electron 専用の不変条件が顕在化した時だけ user 指示で追加 |
 | `docs/filmtone/desktop/native-desktop-v2/strategy.md` + `active.md` | **既存**。Native Desktop v2 は正式 Desktop の 2-layer docs 正本 |

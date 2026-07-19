@@ -3497,39 +3497,791 @@ function rayAngleMaskValue(options) {
   return smoothstep(innerThreshold, 1, Math.pow(normalized, gamma));
 }
 
-// src/webgpu/WebGPUBackend.ts
-var IDENTITY_LUT_SIZE = 33;
-var BLOOM_LEVELS = 5;
-var HALATION_LEVELS = 6;
-var DIFFUSION_LEVELS = 3;
-var BLOOM_PARAMS_BYTES = 16;
-var HALATION_PARAMS_BYTES = 32;
-var DETAIL_SOFTNESS_PARAMS_BYTES = 48;
-var PYRAMID_LEVEL_UNIFORM_BYTES = 16;
-var MOTIONBLUR_FEEDBACK_UNIFORM_BYTES = 16;
-var MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
-var MOTIONBLUR_BLEND_UNIFORM_FLOATS = MOTIONBLUR_BLEND_UNIFORM_BYTES / 4;
-var CROSS_FILTER_PARAMS_BYTES = 16;
-var CROSS_FILTER_SPACING_MAX_BYTES = 32;
-var CROSS_FILTER_STREAK_BYTES = 96;
-var CROSS_FILTER_MAX_STREAKS = 4;
+// src/webgpu/passes/pyramid.ts
+function computeMipWeights(radius, levels) {
+  const weights = [];
+  for (let i = 0; i < levels; i++) {
+    const t = i / Math.max(levels - 1, 1);
+    const base = Math.exp(-3 * (1 - radius) * t);
+    const wide = Math.exp(-0.5 * radius * (1 - t));
+    weights.push(base * (1 - radius) + wide * radius);
+  }
+  return weights;
+}
+function ensurePyramidLevels(pool, labelPrefix, levels, width, height) {
+  const out = [];
+  for (let i = 0; i < levels; i++) {
+    const divisor = 2 ** (i + 1);
+    const w = Math.max(1, Math.floor(width / divisor));
+    const h = Math.max(1, Math.floor(height / divisor));
+    out.push(
+      pool.get(`${labelPrefix}.${i}`, {
+        width: w,
+        height: h,
+        format: "rgba16float"
+      })
+    );
+  }
+  return out;
+}
+function renderPyramidChain(encoder, label, prefilterPipeline, prefilterParamsBuffer, sourceView, levels, pyramid, radius, deps) {
+  const { device, layout, sampler, offscreenFlagsBindGroup, downsamplePipeline, upsampleAddPipeline } = deps;
+  const weights = computeMipWeights(radius, levels.length);
+  {
+    const bg = device.createBindGroup({
+      label: `${label}.prefilter.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: prefilterParamsBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `${label}.prefilter`,
+      colorAttachments: [
+        {
+          view: levels[0].createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(prefilterPipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = 1; i < levels.length; i++) {
+    const src = levels[i - 1];
+    const dst = levels[i];
+    const scratch = pyramid.downsampleScratch[i - 1];
+    scratch[0] = 1 / src.width;
+    scratch[1] = 1 / src.height;
+    scratch[2] = 0;
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      pyramid.downsample[i - 1],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `${label}.downsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: pyramid.downsample[i - 1] } },
+        { binding: 1, resource: src.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `${label}.downsample.${i}`,
+      colorAttachments: [
+        {
+          view: dst.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(downsamplePipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = levels.length - 2; i >= 0; i--) {
+    const lowRes = levels[i + 1];
+    const highRes = levels[i];
+    const scratch = pyramid.upsampleScratch[i];
+    scratch[0] = 1 / lowRes.width;
+    scratch[1] = 1 / lowRes.height;
+    scratch[2] = weights[i + 1];
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      pyramid.upsample[i],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `${label}.upsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: pyramid.upsample[i] } },
+        { binding: 1, resource: lowRes.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `${label}.upsample.${i}`,
+      colorAttachments: [
+        {
+          view: highRes.createView(),
+          loadOp: "load",
+          storeOp: "store"
+        }
+      ]
+    });
+    pass.setPipeline(upsampleAddPipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return levels[0];
+}
+
+// src/webgpu/passes/bloom.ts
+function renderBloomDepthPrefilter(encoder, sourceView, gain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    fitMode,
+    imgResX,
+    imgResY,
+    scratch,
+    buffer,
+    layout,
+    pipeline,
+    depthTexture,
+    sampler,
+    offscreenFlagsBindGroup,
+    packRayAngleOptics
+  } = deps;
+  const scratchRT = pool.get("rt.bloom.depth-prefiltered", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const scratchView = scratchRT.createView();
+  const s = scratch;
+  s[0] = gain;
+  s[1] = fitMode;
+  s[2] = rayAngleGain;
+  s[3] = rayAngleGamma;
+  s[4] = width;
+  s[5] = height;
+  s[6] = imgResX;
+  s[7] = imgResY;
+  s[8] = fieldPsfGain;
+  s[9] = fieldPsfRadiusPx;
+  s[10] = 0;
+  s[11] = 0;
+  packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
+  device.queue.writeBuffer(
+    buffer,
+    0,
+    s.buffer,
+    s.byteOffset,
+    s.byteLength
+  );
+  const bg = device.createBindGroup({
+    label: "bloom-depth-prefilter.bg",
+    layout,
+    entries: [
+      { binding: 0, resource: { buffer } },
+      { binding: 1, resource: sourceView },
+      { binding: 2, resource: depthTexture.createView() },
+      { binding: 3, resource: sampler }
+    ]
+  });
+  const pass = encoder.beginRenderPass({
+    label: "bloom-depth-prefilter.pass",
+    colorAttachments: [
+      {
+        view: scratchView,
+        loadOp: "clear",
+        storeOp: "store",
+        clearValue: { r: 0, g: 0, b: 0, a: 1 }
+      }
+    ]
+  });
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, offscreenFlagsBindGroup);
+  pass.setBindGroup(1, bg);
+  pass.draw(3, 1, 0, 0);
+  pass.end();
+  return scratchView;
+}
+
+// src/webgpu/passes/halation.ts
+function renderHalationDepthPrefilter(encoder, sourceView, gain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    fitMode,
+    imgResX,
+    imgResY,
+    scratch,
+    buffer,
+    layout,
+    pipeline,
+    depthTexture,
+    sampler,
+    offscreenFlagsBindGroup,
+    packRayAngleOptics
+  } = deps;
+  const scratchRT = pool.get("rt.halation.depth-prefiltered", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const scratchView = scratchRT.createView();
+  const s = scratch;
+  s[0] = gain;
+  s[1] = fitMode;
+  s[2] = rayAngleGain;
+  s[3] = rayAngleGamma;
+  s[4] = width;
+  s[5] = height;
+  s[6] = imgResX;
+  s[7] = imgResY;
+  s[8] = fieldPsfGain;
+  s[9] = fieldPsfRadiusPx;
+  s[10] = 0;
+  s[11] = 0;
+  packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
+  device.queue.writeBuffer(
+    buffer,
+    0,
+    s.buffer,
+    s.byteOffset,
+    s.byteLength
+  );
+  const bg = device.createBindGroup({
+    label: "halation-depth-prefilter.bg",
+    layout,
+    entries: [
+      { binding: 0, resource: { buffer } },
+      { binding: 1, resource: sourceView },
+      { binding: 2, resource: depthTexture.createView() },
+      { binding: 3, resource: sampler }
+    ]
+  });
+  const pass = encoder.beginRenderPass({
+    label: "halation-depth-prefilter.pass",
+    colorAttachments: [
+      {
+        view: scratchView,
+        loadOp: "clear",
+        storeOp: "store",
+        clearValue: { r: 0, g: 0, b: 0, a: 1 }
+      }
+    ]
+  });
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, offscreenFlagsBindGroup);
+  pass.setBindGroup(1, bg);
+  pass.draw(3, 1, 0, 0);
+  pass.end();
+  return scratchView;
+}
+
+// src/webgpu/passes/diffusion.ts
+function renderDiffusionDepthPrefilter(encoder, sourceView, depthMistGain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    fitMode,
+    imgResX,
+    imgResY,
+    scratch,
+    buffer,
+    layout,
+    pipeline,
+    depthTexture,
+    sampler,
+    offscreenFlagsBindGroup,
+    packRayAngleOptics
+  } = deps;
+  const scratchRT = pool.get("rt.diffusion.prefiltered", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const scratchView = scratchRT.createView();
+  const s = scratch;
+  s[0] = depthMistGain;
+  s[1] = fitMode;
+  s[2] = rayAngleGain;
+  s[3] = rayAngleGamma;
+  s[4] = width;
+  s[5] = height;
+  s[6] = imgResX;
+  s[7] = imgResY;
+  s[8] = fieldPsfGain;
+  s[9] = fieldPsfRadiusPx;
+  s[10] = 0;
+  s[11] = 0;
+  packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
+  device.queue.writeBuffer(
+    buffer,
+    0,
+    s.buffer,
+    s.byteOffset,
+    s.byteLength
+  );
+  const bg = device.createBindGroup({
+    label: "diffusion-depth-prefilter.bg",
+    layout,
+    entries: [
+      { binding: 0, resource: { buffer } },
+      { binding: 1, resource: sourceView },
+      { binding: 2, resource: depthTexture.createView() },
+      { binding: 3, resource: sampler }
+    ]
+  });
+  const pass = encoder.beginRenderPass({
+    label: "diffusion-depth-prefilter.pass",
+    colorAttachments: [
+      {
+        view: scratchView,
+        loadOp: "clear",
+        storeOp: "store",
+        clearValue: { r: 0, g: 0, b: 0, a: 1 }
+      }
+    ]
+  });
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, offscreenFlagsBindGroup);
+  pass.setBindGroup(1, bg);
+  pass.draw(3, 1, 0, 0);
+  pass.end();
+  return scratchView;
+}
+function renderDiffusionPyramid(encoder, sourceView, levels, diffusionPyramid, deps) {
+  const {
+    device,
+    layout,
+    sampler,
+    offscreenFlagsBindGroup,
+    downsamplePipeline,
+    upsampleAddPipeline,
+    width,
+    height
+  } = deps;
+  const weights = computeMipWeights(0.7, levels.length);
+  {
+    const scratch = diffusionPyramid.downsampleScratch[0];
+    scratch[0] = 1 / Math.max(width, 1);
+    scratch[1] = 1 / Math.max(height, 1);
+    scratch[2] = 0;
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      diffusionPyramid.downsample[0],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: "diffusion.downsample.0.bg",
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: diffusionPyramid.downsample[0] } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "diffusion.downsample.0",
+      colorAttachments: [
+        {
+          view: levels[0].createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(downsamplePipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = 1; i < levels.length; i++) {
+    const src = levels[i - 1];
+    const dst = levels[i];
+    const scratch = diffusionPyramid.downsampleScratch[i];
+    scratch[0] = 1 / src.width;
+    scratch[1] = 1 / src.height;
+    scratch[2] = 0;
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      diffusionPyramid.downsample[i],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `diffusion.downsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: diffusionPyramid.downsample[i] } },
+        { binding: 1, resource: src.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `diffusion.downsample.${i}`,
+      colorAttachments: [
+        {
+          view: dst.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(downsamplePipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = levels.length - 2; i >= 0; i--) {
+    const lowRes = levels[i + 1];
+    const highRes = levels[i];
+    const scratch = diffusionPyramid.upsampleScratch[i];
+    scratch[0] = 1 / lowRes.width;
+    scratch[1] = 1 / lowRes.height;
+    scratch[2] = weights[i + 1];
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      diffusionPyramid.upsample[i],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `diffusion.upsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: diffusionPyramid.upsample[i] } },
+        { binding: 1, resource: lowRes.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `diffusion.upsample.${i}`,
+      colorAttachments: [
+        {
+          view: highRes.createView(),
+          loadOp: "load",
+          storeOp: "store"
+        }
+      ]
+    });
+    pass.setPipeline(upsampleAddPipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return levels[0];
+}
+
+// src/webgpu/passes/lightShafts.ts
+var LIGHTSHAFTS_RES_DIVISOR = 4;
+var LIGHTSHAFTS_DENSITY = 0.98;
+var LIGHTSHAFTS_EXPOSURE = 0.38;
+function renderLightShafts(encoder, sourceTexture, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    lightShafts,
+    lightshaftsLayout,
+    lightshaftsBlendLayout,
+    lightshaftsPipeline,
+    lightshaftsBlendPipeline,
+    sampler,
+    crossFilterFlagsBindGroup,
+    paramNumber
+  } = deps;
+  const shaftWidth = Math.max(1, Math.floor(width / LIGHTSHAFTS_RES_DIVISOR));
+  const shaftHeight = Math.max(1, Math.floor(height / LIGHTSHAFTS_RES_DIVISOR));
+  const shaftTexture = pool.get("rt.lightshafts.quarter", {
+    width: shaftWidth,
+    height: shaftHeight,
+    format: "rgba16float"
+  });
+  const blendOutput = pool.get("rt.lightshafts.output", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const originX = Math.min(1, Math.max(0, paramNumber("shaftOriginX", 0.5)));
+  const originYParam = Math.min(1, Math.max(0, paramNumber("shaftOriginY", 0.85)));
+  const shaftDecay = Math.min(1, Math.max(0, paramNumber("shaftDecay", 0)));
+  const shaftIntensity = Math.min(
+    1,
+    Math.max(0, paramNumber("shaftIntensity", 0))
+  );
+  const decay = 0.92 + shaftDecay * 0.075;
+  const paramsScratch = lightShafts.paramsScratch;
+  paramsScratch[0] = originX;
+  paramsScratch[1] = 1 - originYParam;
+  paramsScratch[2] = decay;
+  paramsScratch[3] = LIGHTSHAFTS_DENSITY;
+  paramsScratch[4] = LIGHTSHAFTS_EXPOSURE;
+  paramsScratch[5] = 0;
+  paramsScratch[6] = 0;
+  paramsScratch[7] = 0;
+  device.queue.writeBuffer(
+    lightShafts.paramsBuffer,
+    0,
+    paramsScratch.buffer,
+    paramsScratch.byteOffset,
+    paramsScratch.byteLength
+  );
+  const sourceView = sourceTexture.createView();
+  {
+    const bg = device.createBindGroup({
+      label: "lightshafts.radial.bg",
+      layout: lightshaftsLayout,
+      entries: [
+        { binding: 0, resource: { buffer: lightShafts.paramsBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "lightshafts.radial",
+      colorAttachments: [
+        {
+          view: shaftTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(lightshaftsPipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  const blendParamsScratch = lightShafts.blendParamsScratch;
+  blendParamsScratch[0] = shaftIntensity;
+  blendParamsScratch[1] = 0;
+  blendParamsScratch[2] = 0;
+  blendParamsScratch[3] = 0;
+  device.queue.writeBuffer(
+    lightShafts.blendParamsBuffer,
+    0,
+    blendParamsScratch.buffer,
+    blendParamsScratch.byteOffset,
+    blendParamsScratch.byteLength
+  );
+  {
+    const bg = device.createBindGroup({
+      label: "lightshafts.blend.bg",
+      layout: lightshaftsBlendLayout,
+      entries: [
+        { binding: 0, resource: { buffer: lightShafts.blendParamsBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: shaftTexture.createView() },
+        { binding: 3, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "lightshafts.blend",
+      colorAttachments: [
+        {
+          view: blendOutput.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(lightshaftsBlendPipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return blendOutput;
+}
+
+// src/webgpu/passes/haloPrism.ts
+function renderHaloPrism(encoder, sceneTexture, sourceSeedTexture, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    imgResX,
+    imgResY,
+    fitMode,
+    haloPrism,
+    pyramidLayout,
+    haloPrismLayout,
+    crossFilterSourcePipeline,
+    haloPrismPipeline,
+    depthTexture,
+    sampler,
+    offscreenFlagsBindGroup,
+    crossFilterFlagsBindGroup,
+    paramNumber,
+    resolveCurrentRayAngleOptics,
+    packRayAngleOptics
+  } = deps;
+  const strength = Math.min(1, Math.max(0, paramNumber("haloPrismStrength", 0)));
+  if (strength <= 0) {
+    return sceneTexture;
+  }
+  const halfWidth = Math.max(1, Math.floor(width / 2));
+  const halfHeight = Math.max(1, Math.floor(height / 2));
+  const sourceGateTexture = pool.get("rt.halo-prism.source-gate", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const outputTexture = pool.get("rt.halo-prism.output", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const threshold = Math.min(
+    1,
+    Math.max(0, paramNumber("haloPrismThreshold", 0.9))
+  );
+  const sourceParamsScratch = haloPrism.sourceParamsScratch;
+  sourceParamsScratch[0] = threshold;
+  sourceParamsScratch[1] = 0.18;
+  sourceParamsScratch[2] = 0;
+  sourceParamsScratch[3] = 0;
+  device.queue.writeBuffer(
+    haloPrism.sourceParamsBuffer,
+    0,
+    sourceParamsScratch.buffer,
+    sourceParamsScratch.byteOffset,
+    sourceParamsScratch.byteLength
+  );
+  {
+    const bg = device.createBindGroup({
+      label: "halo-prism.source.bg",
+      layout: pyramidLayout,
+      entries: [
+        { binding: 0, resource: { buffer: haloPrism.sourceParamsBuffer } },
+        { binding: 1, resource: sourceSeedTexture.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "halo-prism.source",
+      colorAttachments: [
+        {
+          view: sourceGateTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(crossFilterSourcePipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  const paramsScratch = haloPrism.paramsScratch;
+  paramsScratch[0] = strength;
+  paramsScratch[1] = Math.min(1, Math.max(0, paramNumber("haloPrismRadius", 0.62)));
+  paramsScratch[2] = Math.min(1, Math.max(0, paramNumber("haloPrismWidth", 0.22)));
+  paramsScratch[3] = Math.min(1, Math.max(0, paramNumber("haloPrismChromatic", 0.65)));
+  paramsScratch[4] = Math.min(
+    1,
+    Math.max(0, paramNumber("haloPrismSourceReactivity", 0.85))
+  );
+  paramsScratch[5] = Math.min(1, Math.max(0, paramNumber("haloPrismSplit", 0.7)));
+  paramsScratch[6] = paramNumber("haloPrismAngle", 0) * Math.PI / 180;
+  paramsScratch[7] = 0;
+  paramsScratch[8] = width;
+  paramsScratch[9] = height;
+  paramsScratch[10] = imgResX;
+  paramsScratch[11] = imgResY;
+  paramsScratch[12] = fitMode;
+  paramsScratch[13] = threshold;
+  paramsScratch[14] = 0;
+  paramsScratch[15] = 0;
+  packRayAngleOptics(
+    paramsScratch,
+    16,
+    resolveCurrentRayAngleOptics(),
+    DEFAULT_RAY_ANGLE_INNER_THRESHOLD
+  );
+  device.queue.writeBuffer(
+    haloPrism.paramsBuffer,
+    0,
+    paramsScratch.buffer,
+    paramsScratch.byteOffset,
+    paramsScratch.byteLength
+  );
+  {
+    const bg = device.createBindGroup({
+      label: "halo-prism.blend.bg",
+      layout: haloPrismLayout,
+      entries: [
+        { binding: 0, resource: { buffer: haloPrism.paramsBuffer } },
+        { binding: 1, resource: sceneTexture.createView() },
+        { binding: 2, resource: sourceGateTexture.createView() },
+        { binding: 3, resource: depthTexture.createView() },
+        { binding: 4, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "halo-prism.blend",
+      colorAttachments: [
+        {
+          view: outputTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(haloPrismPipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return outputTexture;
+}
+
+// src/webgpu/passes/crossFilter.ts
 var CROSS_FILTER_SPACING_RADIUS_MAX_PX = 48;
 var CROSS_FILTER_SPACING_RADIUS_STEP_PX = 24;
 var CROSS_FILTER_THRESHOLD_HARD_BASELINE = 0.7;
 var CROSS_FILTER_THRESHOLD_CONTROL_BASELINE = 0.92;
-var CROSS_FILTER_MIN_SPACING_MIN = 1;
-var CROSS_FILTER_MIN_SPACING_MAX = 10;
 var CROSS_FILTER_HISTORY_SLOTS = 2;
 var WEBGPU_CROSS_FILTER_TEMPORAL_HOLD_ENABLED = false;
-var CENTRAL_BLOOM_LEVELS = 4;
 var CENTRAL_BLOOM_RADIUS = 0.5;
-var LIGHTSHAFTS_RES_DIVISOR = 4;
-var LIGHTSHAFTS_DENSITY = 0.98;
-var LIGHTSHAFTS_EXPOSURE = 0.38;
-var LIGHTSHAFTS_PARAMS_BYTES = 32;
-var LIGHTSHAFTS_BLEND_PARAMS_BYTES = 16;
-var HALO_PRISM_PARAMS_BYTES = 80;
-var HALO_PRISM_PARAMS_FLOATS = HALO_PRISM_PARAMS_BYTES / 4;
+var DEFAULT_CROSS_FILTER_DEPTH_GAIN = 0.25;
+var DEFAULT_CROSS_FILTER_ANGLE_GAIN = 0.35;
+var DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN = 0.45;
+var DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN = 0.25;
 function smoothstep01(value) {
   const clamped = Math.min(1, Math.max(0, value));
   return clamped * clamped * (3 - 2 * clamped);
@@ -3546,17 +4298,907 @@ function computeCrossFilterEffectiveThreshold(threshold, hardModeActive) {
     )
   );
 }
-function computeCrossFilterSpacingRadiusPx(minSpacing) {
+function computeCrossFilterSpacingRadiusPx(minSpacing, minSpacingMin, minSpacingMax) {
   const clamped = Math.min(
-    CROSS_FILTER_MIN_SPACING_MAX,
-    Math.max(CROSS_FILTER_MIN_SPACING_MIN, minSpacing)
+    minSpacingMax,
+    Math.max(minSpacingMin, minSpacing)
   );
   let extraRadius = 0;
-  for (let stepStart = CROSS_FILTER_MIN_SPACING_MIN; stepStart < CROSS_FILTER_MIN_SPACING_MAX; stepStart += 1) {
+  for (let stepStart = minSpacingMin; stepStart < minSpacingMax; stepStart += 1) {
     extraRadius += CROSS_FILTER_SPACING_RADIUS_STEP_PX * smoothstep01(clamped - stepStart);
   }
   return Math.round(CROSS_FILTER_SPACING_RADIUS_MAX_PX + extraRadius);
 }
+function renderCentralBloom(encoder, heldPeakTexture, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    levels: levelCount,
+    centralBloomPyramid,
+    layout,
+    sampler,
+    downsamplePipeline,
+    upsampleAddPipeline,
+    crossFilterFlagsBindGroup
+  } = deps;
+  const halfWidth = Math.max(1, Math.floor(width / 2));
+  const halfHeight = Math.max(1, Math.floor(height / 2));
+  const levels = [];
+  for (let i = 0; i < levelCount; i++) {
+    const divisor = 2 ** (i + 1);
+    const w = Math.max(1, Math.floor(halfWidth / divisor));
+    const h = Math.max(1, Math.floor(halfHeight / divisor));
+    levels.push(
+      pool.get(`rt.crossfilter.central-bloom.${i}`, {
+        width: w,
+        height: h,
+        format: "rgba16float"
+      })
+    );
+  }
+  const weights = computeMipWeights(
+    CENTRAL_BLOOM_RADIUS,
+    levels.length
+  );
+  const sourceView = heldPeakTexture.createView();
+  {
+    const scratch = centralBloomPyramid.downsampleScratch[0];
+    scratch[0] = 1 / heldPeakTexture.width;
+    scratch[1] = 1 / heldPeakTexture.height;
+    scratch[2] = 0;
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      centralBloomPyramid.downsample[0],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: "centralBloom.seed.bg",
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: centralBloomPyramid.downsample[0] } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "centralBloom.seed",
+      colorAttachments: [
+        {
+          view: levels[0].createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(downsamplePipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = 1; i < levels.length; i++) {
+    const src = levels[i - 1];
+    const dst = levels[i];
+    const scratch = centralBloomPyramid.downsampleScratch[i];
+    scratch[0] = 1 / src.width;
+    scratch[1] = 1 / src.height;
+    scratch[2] = 0;
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      centralBloomPyramid.downsample[i],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `centralBloom.downsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: centralBloomPyramid.downsample[i] } },
+        { binding: 1, resource: src.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `centralBloom.downsample.${i}`,
+      colorAttachments: [
+        {
+          view: dst.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(downsamplePipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  for (let i = levels.length - 2; i >= 0; i--) {
+    const lowRes = levels[i + 1];
+    const highRes = levels[i];
+    const scratch = centralBloomPyramid.upsampleScratch[i];
+    scratch[0] = 1 / lowRes.width;
+    scratch[1] = 1 / lowRes.height;
+    scratch[2] = weights[i + 1];
+    scratch[3] = 0;
+    device.queue.writeBuffer(
+      centralBloomPyramid.upsample[i],
+      0,
+      scratch.buffer,
+      scratch.byteOffset,
+      scratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `centralBloom.upsample.${i}.bg`,
+      layout,
+      entries: [
+        { binding: 0, resource: { buffer: centralBloomPyramid.upsample[i] } },
+        { binding: 1, resource: lowRes.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `centralBloom.upsample.${i}`,
+      colorAttachments: [
+        {
+          view: highRes.createView(),
+          loadOp: "load",
+          storeOp: "store"
+        }
+      ]
+    });
+    pass.setPipeline(upsampleAddPipeline);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return levels[0];
+}
+function renderCrossFilter(encoder, sourceTexture, deps) {
+  const {
+    device,
+    pool,
+    width,
+    height,
+    fitMode,
+    imgResX,
+    imgResY,
+    time,
+    maxStreaks,
+    minSpacingMin,
+    minSpacingMax,
+    defaultDepthRayAngleGamma,
+    crossFilter,
+    layouts,
+    pipelines,
+    depthTexture,
+    sampler,
+    offscreenFlagsBindGroup,
+    crossFilterFlagsBindGroup,
+    centralBloomPyramid,
+    centralBloomLevels,
+    paramNumber,
+    resolveCurrentRayAngleOptics,
+    packRayAngleOptics,
+    history
+  } = deps;
+  let peakHistoryWriteIndex = history.peakHistoryWriteIndex;
+  let peakHistoryFilledFrames = history.peakHistoryFilledFrames;
+  let lastHistoryTime = history.lastHistoryTime;
+  const strength = Math.min(1, Math.max(0, paramNumber("crossFilterStrength", 0)));
+  if (strength <= 0) {
+    return {
+      texture: sourceTexture,
+      history: { peakHistoryWriteIndex, peakHistoryFilledFrames, lastHistoryTime }
+    };
+  }
+  const halfWidth = Math.max(1, Math.floor(width / 2));
+  const halfHeight = Math.max(1, Math.floor(height / 2));
+  const sourceGateTexture = pool.get("rt.crossfilter.source-gate", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const peakTexture = pool.get("rt.crossfilter.peak", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const spacingWorkTexture = pool.get("rt.crossfilter.spacing-work", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const spacingMaxTexture = pool.get("rt.crossfilter.spacing-max", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const spacingTexture = pool.get("rt.crossfilter.spacing", {
+    width: halfWidth,
+    height: halfHeight,
+    format: "rgba16float"
+  });
+  const streakTextures = Array.from(
+    { length: maxStreaks },
+    (_, index) => pool.get(`rt.crossfilter.streak.${index}`, {
+      width: halfWidth,
+      height: halfHeight,
+      format: "rgba16float"
+    })
+  );
+  const outputTexture = pool.get("rt.crossfilter.output", {
+    width,
+    height,
+    format: "rgba16float"
+  });
+  const hardModeActive = paramNumber("crossFilterHardMode", 0) >= 0.5;
+  const hardModeUniform = hardModeActive ? 1 : 0;
+  const threshold = Math.min(1, Math.max(0, paramNumber("crossFilterThreshold", 0.8)));
+  const sizeLimit = Math.min(1, Math.max(0, paramNumber("crossFilterSizeLimit", 0)));
+  const randomness = Math.min(1, Math.max(0, paramNumber("crossFilterRandomness", 1)));
+  const length = Math.min(1, Math.max(0, paramNumber("crossFilterLength", 0.5)));
+  const chromatic = Math.min(1, Math.max(0, paramNumber("crossFilterChromatic", 0.3)));
+  const crossFilterDepthGain = Math.min(
+    1,
+    Math.max(0, paramNumber("crossFilterDepthGain", DEFAULT_CROSS_FILTER_DEPTH_GAIN))
+  );
+  const crossFilterAngleGain = Math.min(
+    1,
+    Math.max(0, paramNumber("crossFilterAngleGain", DEFAULT_CROSS_FILTER_ANGLE_GAIN))
+  );
+  const crossFilterAngleGamma = Math.max(
+    1e-3,
+    paramNumber("crossFilterAngleGamma", defaultDepthRayAngleGamma)
+  );
+  const crossFilterAngleInnerThreshold = Math.min(
+    0.8,
+    Math.max(
+      0,
+      paramNumber(
+        "crossFilterAngleInnerThreshold",
+        DEFAULT_RAY_ANGLE_INNER_THRESHOLD
+      )
+    )
+  );
+  const crossFilterEdgeLengthGain = Math.min(
+    1,
+    Math.max(
+      0,
+      paramNumber("crossFilterEdgeLengthGain", DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN)
+    )
+  );
+  const crossFilterEdgeStrengthGain = Math.min(
+    1,
+    Math.max(
+      0,
+      paramNumber(
+        "crossFilterEdgeStrengthGain",
+        DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN
+      )
+    )
+  );
+  const minSpacing = Math.min(
+    minSpacingMax,
+    Math.max(minSpacingMin, paramNumber("crossFilterMinSpacing", 1))
+  );
+  const rawSpikes = Math.max(2, Math.round(paramNumber("crossFilterSpikes", 4)));
+  const spikeCount = rawSpikes % 2 === 0 ? rawSpikes : rawSpikes + 1;
+  const dirCount = Math.max(
+    1,
+    Math.min(maxStreaks, Math.floor(spikeCount / 2))
+  );
+  const angleRad = paramNumber("crossFilterAngle", 0) * Math.PI / 180;
+  const effectiveThreshold = computeCrossFilterEffectiveThreshold(
+    threshold,
+    hardModeActive
+  );
+  const effectiveSizeLimit = hardModeActive ? 1 : sizeLimit;
+  const effectiveRandomness = hardModeActive ? 1 : randomness;
+  const rayAngleOptics = resolveCurrentRayAngleOptics();
+  const sourceView = sourceTexture.createView();
+  const depthView = depthTexture.createView();
+  const blackView = crossFilter.blackTexture.createView();
+  crossFilter.thresholdScratch[0] = effectiveThreshold;
+  crossFilter.thresholdScratch[1] = 0.12;
+  crossFilter.thresholdScratch[2] = hardModeUniform;
+  crossFilter.thresholdScratch[3] = 0;
+  device.queue.writeBuffer(
+    crossFilter.thresholdBuffer,
+    0,
+    crossFilter.thresholdScratch.buffer,
+    crossFilter.thresholdScratch.byteOffset,
+    crossFilter.thresholdScratch.byteLength
+  );
+  {
+    const bg = device.createBindGroup({
+      label: "crossfilter.source.bg",
+      layout: layouts.pyramid,
+      entries: [
+        { binding: 0, resource: { buffer: crossFilter.thresholdBuffer } },
+        { binding: 1, resource: sourceView },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "crossfilter.source",
+      colorAttachments: [
+        {
+          view: sourceGateTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(pipelines.crossFilterSource);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  crossFilter.peakScratch[0] = 1 / halfWidth;
+  crossFilter.peakScratch[1] = 1 / halfHeight;
+  crossFilter.peakScratch[2] = effectiveSizeLimit;
+  crossFilter.peakScratch[3] = 0;
+  device.queue.writeBuffer(
+    crossFilter.peakBuffer,
+    0,
+    crossFilter.peakScratch.buffer,
+    crossFilter.peakScratch.byteOffset,
+    crossFilter.peakScratch.byteLength
+  );
+  {
+    const bg = device.createBindGroup({
+      label: "crossfilter.peak.bg",
+      layout: layouts.pyramid,
+      entries: [
+        { binding: 0, resource: { buffer: crossFilter.peakBuffer } },
+        { binding: 1, resource: sourceGateTexture.createView() },
+        { binding: 2, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "crossfilter.peak",
+      colorAttachments: [
+        {
+          view: peakTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(pipelines.crossFilterPeak);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  let currentPeakTexture = peakTexture;
+  if (minSpacing >= 1e-3) {
+    const radiusPx = computeCrossFilterSpacingRadiusPx(minSpacing, minSpacingMin, minSpacingMax);
+    const spacingMaxScratchX = crossFilter.spacingMaxScratch[0];
+    spacingMaxScratchX[0] = 1 / halfWidth;
+    spacingMaxScratchX[1] = 1 / halfHeight;
+    spacingMaxScratchX[2] = 1;
+    spacingMaxScratchX[3] = 0;
+    spacingMaxScratchX[4] = radiusPx;
+    spacingMaxScratchX[5] = 0;
+    spacingMaxScratchX[6] = 0;
+    spacingMaxScratchX[7] = 0;
+    device.queue.writeBuffer(
+      crossFilter.spacingMaxBuffers[0],
+      0,
+      spacingMaxScratchX.buffer,
+      spacingMaxScratchX.byteOffset,
+      spacingMaxScratchX.byteLength
+    );
+    {
+      const bg = device.createBindGroup({
+        label: "crossfilter.spacing-max-x.bg",
+        layout: layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: crossFilter.spacingMaxBuffers[0] } },
+          { binding: 1, resource: peakTexture.createView() },
+          { binding: 2, resource: sampler }
+        ]
+      });
+      const pass = encoder.beginRenderPass({
+        label: "crossfilter.spacing-max-x",
+        colorAttachments: [
+          {
+            view: spacingWorkTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }
+          }
+        ]
+      });
+      pass.setPipeline(pipelines.crossFilterPeakSpacingMax);
+      pass.setBindGroup(0, crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+    const spacingMaxScratchY = crossFilter.spacingMaxScratch[1];
+    spacingMaxScratchY[0] = 1 / halfWidth;
+    spacingMaxScratchY[1] = 1 / halfHeight;
+    spacingMaxScratchY[2] = 0;
+    spacingMaxScratchY[3] = 1;
+    spacingMaxScratchY[4] = radiusPx;
+    spacingMaxScratchY[5] = 1;
+    spacingMaxScratchY[6] = 0;
+    spacingMaxScratchY[7] = 0;
+    device.queue.writeBuffer(
+      crossFilter.spacingMaxBuffers[1],
+      0,
+      spacingMaxScratchY.buffer,
+      spacingMaxScratchY.byteOffset,
+      spacingMaxScratchY.byteLength
+    );
+    {
+      const bg = device.createBindGroup({
+        label: "crossfilter.spacing-max-y.bg",
+        layout: layouts.pyramid,
+        entries: [
+          { binding: 0, resource: { buffer: crossFilter.spacingMaxBuffers[1] } },
+          { binding: 1, resource: spacingWorkTexture.createView() },
+          { binding: 2, resource: sampler }
+        ]
+      });
+      const pass = encoder.beginRenderPass({
+        label: "crossfilter.spacing-max-y",
+        colorAttachments: [
+          {
+            view: spacingMaxTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }
+          }
+        ]
+      });
+      pass.setPipeline(pipelines.crossFilterPeakSpacingMax);
+      pass.setBindGroup(0, crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+    crossFilter.spacingScratch[0] = 1 / halfWidth;
+    crossFilter.spacingScratch[1] = 1 / halfHeight;
+    crossFilter.spacingScratch[2] = minSpacing;
+    crossFilter.spacingScratch[3] = 0;
+    device.queue.writeBuffer(
+      crossFilter.spacingBuffer,
+      0,
+      crossFilter.spacingScratch.buffer,
+      crossFilter.spacingScratch.byteOffset,
+      crossFilter.spacingScratch.byteLength
+    );
+    {
+      const bg = device.createBindGroup({
+        label: "crossfilter.spacing.bg",
+        layout: layouts.crossFilterPeakSpacing,
+        entries: [
+          { binding: 0, resource: { buffer: crossFilter.spacingBuffer } },
+          { binding: 1, resource: peakTexture.createView() },
+          { binding: 2, resource: spacingMaxTexture.createView() },
+          { binding: 3, resource: sampler }
+        ]
+      });
+      const pass = encoder.beginRenderPass({
+        label: "crossfilter.spacing",
+        colorAttachments: [
+          {
+            view: spacingTexture.createView(),
+            loadOp: "clear",
+            storeOp: "store",
+            clearValue: { r: 0, g: 0, b: 0, a: 1 }
+          }
+        ]
+      });
+      pass.setPipeline(pipelines.crossFilterPeakSpacing);
+      pass.setBindGroup(0, crossFilterFlagsBindGroup);
+      pass.setBindGroup(1, bg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+    currentPeakTexture = spacingTexture;
+  }
+  let heldPeakTexture = currentPeakTexture;
+  if (hardModeActive && WEBGPU_CROSS_FILTER_TEMPORAL_HOLD_ENABLED) {
+    const historyTextures = [
+      pool.get("rt.crossfilter.peak-history.0", {
+        width: halfWidth,
+        height: halfHeight,
+        format: "rgba16float"
+      }),
+      pool.get("rt.crossfilter.peak-history.1", {
+        width: halfWidth,
+        height: halfHeight,
+        format: "rgba16float"
+      })
+    ];
+    const writeIndex = peakHistoryWriteIndex % CROSS_FILTER_HISTORY_SLOTS;
+    const prevIndex = (writeIndex + CROSS_FILTER_HISTORY_SLOTS - 1) % CROSS_FILTER_HISTORY_SLOTS;
+    const prevTexture = peakHistoryFilledFrames > 0 ? historyTextures[prevIndex] : crossFilter.blackTexture;
+    const writeTexture = historyTextures[writeIndex];
+    const temporalDeltaSeconds = lastHistoryTime === null ? 1 / CROSS_FILTER_TEMPORAL_REFERENCE_FPS : time - lastHistoryTime;
+    const temporalDecay = computeCrossFilterTemporalDecay(temporalDeltaSeconds);
+    crossFilter.temporalScratch[0] = temporalDecay;
+    crossFilter.temporalScratch[1] = 0;
+    crossFilter.temporalScratch[2] = 0;
+    crossFilter.temporalScratch[3] = 0;
+    device.queue.writeBuffer(
+      crossFilter.temporalBuffer,
+      0,
+      crossFilter.temporalScratch.buffer,
+      crossFilter.temporalScratch.byteOffset,
+      crossFilter.temporalScratch.byteLength
+    );
+    const temporalBg = device.createBindGroup({
+      label: "crossfilter.temporal.bg",
+      layout: layouts.crossFilterTemporal,
+      entries: [
+        { binding: 0, resource: { buffer: crossFilter.temporalBuffer } },
+        { binding: 1, resource: currentPeakTexture.createView() },
+        { binding: 2, resource: prevTexture.createView() },
+        { binding: 3, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: "crossfilter.temporal",
+      colorAttachments: [
+        {
+          view: writeTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(pipelines.crossFilterTemporal);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, temporalBg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+    heldPeakTexture = writeTexture;
+    peakHistoryWriteIndex = (writeIndex + 1) % CROSS_FILTER_HISTORY_SLOTS;
+    peakHistoryFilledFrames = Math.min(
+      peakHistoryFilledFrames + 1,
+      CROSS_FILTER_HISTORY_SLOTS
+    );
+    lastHistoryTime = time;
+  }
+  let centralBloomTexture = null;
+  if (hardModeActive) {
+    centralBloomTexture = renderCentralBloom(encoder, heldPeakTexture, {
+      device,
+      pool,
+      width,
+      height,
+      levels: centralBloomLevels,
+      centralBloomPyramid,
+      layout: layouts.pyramid,
+      sampler,
+      downsamplePipeline: pipelines.downsample,
+      upsampleAddPipeline: pipelines.upsampleAdd,
+      crossFilterFlagsBindGroup
+    });
+  }
+  const hash = (seed) => {
+    const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  for (let i = 0; i < dirCount; i++) {
+    const seed = i * 17 + 7;
+    const angleJitter = (hash(seed) - 0.5) * 2 * (5 * Math.PI / 180);
+    const lengthMul = 1 + (hash(seed + 1) - 0.5) * 0.5;
+    const brightMul = 1 + (hash(seed + 2) - 0.5) * 0.4;
+    const dirAngle = angleRad + i * Math.PI / dirCount + angleJitter;
+    const streakScratch = crossFilter.streakScratch[i];
+    streakScratch[0] = Math.cos(dirAngle);
+    streakScratch[1] = Math.sin(dirAngle);
+    streakScratch[2] = 1 / heldPeakTexture.width;
+    streakScratch[3] = 1 / heldPeakTexture.height;
+    streakScratch[4] = length * lengthMul;
+    streakScratch[5] = chromatic;
+    streakScratch[6] = brightMul;
+    streakScratch[7] = effectiveRandomness;
+    streakScratch[8] = hardModeUniform;
+    streakScratch[9] = crossFilterDepthGain;
+    streakScratch[10] = crossFilterAngleGain;
+    streakScratch[11] = crossFilterAngleGamma;
+    streakScratch[12] = crossFilterEdgeLengthGain;
+    streakScratch[13] = crossFilterEdgeStrengthGain;
+    streakScratch[14] = fitMode;
+    streakScratch[15] = 0;
+    streakScratch[16] = width;
+    streakScratch[17] = height;
+    streakScratch[18] = imgResX;
+    streakScratch[19] = imgResY;
+    packRayAngleOptics(
+      streakScratch,
+      20,
+      rayAngleOptics,
+      crossFilterAngleInnerThreshold
+    );
+    device.queue.writeBuffer(
+      crossFilter.streakBuffers[i],
+      0,
+      streakScratch.buffer,
+      streakScratch.byteOffset,
+      streakScratch.byteLength
+    );
+    const bg = device.createBindGroup({
+      label: `crossfilter.streak.${i}.bg`,
+      layout: layouts.crossFilterStreak,
+      entries: [
+        { binding: 0, resource: { buffer: crossFilter.streakBuffers[i] } },
+        { binding: 1, resource: heldPeakTexture.createView() },
+        { binding: 2, resource: depthView },
+        { binding: 3, resource: sampler }
+      ]
+    });
+    const pass = encoder.beginRenderPass({
+      label: `crossfilter.streak.${i}`,
+      colorAttachments: [
+        {
+          view: streakTextures[i].createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(pipelines.crossFilterStreak);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  crossFilter.blendScratch[0] = dirCount;
+  crossFilter.blendScratch[1] = strength;
+  crossFilter.blendScratch[2] = hardModeUniform;
+  crossFilter.blendScratch[3] = 0;
+  device.queue.writeBuffer(
+    crossFilter.blendBuffer,
+    0,
+    crossFilter.blendScratch.buffer,
+    crossFilter.blendScratch.byteOffset,
+    crossFilter.blendScratch.byteLength
+  );
+  {
+    const centralBloomView = centralBloomTexture ? centralBloomTexture.createView() : blackView;
+    const blendEntries = [
+      { binding: 0, resource: { buffer: crossFilter.blendBuffer } },
+      { binding: 1, resource: sourceView },
+      { binding: 2, resource: dirCount >= 1 ? streakTextures[0].createView() : blackView },
+      { binding: 3, resource: dirCount >= 2 ? streakTextures[1].createView() : blackView },
+      { binding: 4, resource: dirCount >= 3 ? streakTextures[2].createView() : blackView },
+      { binding: 5, resource: dirCount >= 4 ? streakTextures[3].createView() : blackView },
+      { binding: 6, resource: centralBloomView },
+      { binding: 7, resource: sampler }
+    ];
+    const bg = device.createBindGroup({
+      label: "crossfilter.blend.bg",
+      layout: layouts.crossFilterBlend,
+      entries: blendEntries
+    });
+    const pass = encoder.beginRenderPass({
+      label: "crossfilter.blend",
+      colorAttachments: [
+        {
+          view: outputTexture.createView(),
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(pipelines.crossFilterBlend);
+    pass.setBindGroup(0, crossFilterFlagsBindGroup);
+    pass.setBindGroup(1, bg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  return {
+    texture: outputTexture,
+    history: { peakHistoryWriteIndex, peakHistoryFilledFrames, lastHistoryTime }
+  };
+}
+
+// src/webgpu/passes/motionBlur.ts
+function activeMotionBlurFrames(shutterAngle) {
+  return activeMotionBlurFramesForShutter(
+    shutterAngle,
+    MOTION_BLUR_RING_SLOTS
+  );
+}
+function computeMotionBlurWeights2(shutterAngle, activeFrames, validSlots) {
+  return computeMotionBlurWeights(
+    shutterAngle,
+    activeFrames,
+    validSlots,
+    MOTION_BLUR_RING_SLOTS
+  );
+}
+function renderMotionBlurChain(encoder, postCompositeView, swapView, readbackView, shutterAngle, deps) {
+  const {
+    device,
+    ringBuffer,
+    motionblurFeedbackBuffer,
+    motionblurFeedbackScratch,
+    motionblurBlendBuffer,
+    motionblurBlendScratch,
+    motionblurFeedbackLayout,
+    motionblurBlendLayout,
+    motionblurFeedbackPipeline,
+    motionblurBlendPipeline,
+    sampler,
+    offscreenFlagsBindGroup,
+    displayFlagsBindGroup,
+    paramNumber
+  } = deps;
+  const prevSlot = ringBuffer.validSlots > 0 ? (
+    // Most recently written slot is `(writeIndex - 1 + N) % N`;
+    // when the ring is empty we fall through to the new slot and
+    // let hasPrev=0 zero out the trail contribution.
+    void 0
+  ) : void 0;
+  const nextSlot = ringBuffer.nextSlot();
+  const validSlots = ringBuffer.validSlots;
+  const hasPrev = validSlots > 1 ? 1 : 0;
+  const prevSlotIndex = (nextSlot - 1 + MOTION_BLUR_RING_SLOTS) % MOTION_BLUR_RING_SLOTS;
+  void prevSlot;
+  const trailIntensity = paramNumber("trailIntensity", 0);
+  motionblurFeedbackScratch[0] = trailIntensity;
+  motionblurFeedbackScratch[1] = hasPrev;
+  motionblurFeedbackScratch[2] = 0;
+  motionblurFeedbackScratch[3] = 0;
+  device.queue.writeBuffer(
+    motionblurFeedbackBuffer,
+    0,
+    motionblurFeedbackScratch.buffer,
+    motionblurFeedbackScratch.byteOffset,
+    motionblurFeedbackScratch.byteLength
+  );
+  const prevView = ringBuffer.viewForSlot(hasPrev === 1 ? prevSlotIndex : nextSlot);
+  const nextView = ringBuffer.viewForSlot(nextSlot);
+  const feedbackBg = device.createBindGroup({
+    label: "motionblur.feedback.bg",
+    layout: motionblurFeedbackLayout,
+    entries: [
+      { binding: 0, resource: { buffer: motionblurFeedbackBuffer } },
+      { binding: 1, resource: postCompositeView },
+      { binding: 2, resource: prevView },
+      { binding: 3, resource: sampler }
+    ]
+  });
+  {
+    const pass = encoder.beginRenderPass({
+      label: "motionblur.feedback.pass",
+      colorAttachments: [
+        {
+          view: nextView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(motionblurFeedbackPipeline);
+    pass.setBindGroup(0, offscreenFlagsBindGroup);
+    pass.setBindGroup(1, feedbackBg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+  const activeFrames = Math.min(
+    activeMotionBlurFrames(shutterAngle),
+    validSlots
+  );
+  const weights = computeMotionBlurWeights2(
+    shutterAngle,
+    activeFrames,
+    validSlots
+  );
+  const oldestSlot = (nextSlot - (activeFrames - 1) + MOTION_BLUR_RING_SLOTS * 2) % MOTION_BLUR_RING_SLOTS;
+  const motionThreshold = paramNumber("motionThreshold", 0);
+  for (let i = 0; i < MOTION_BLUR_RING_SLOTS; i++) {
+    motionblurBlendScratch[i] = weights[i] ?? 0;
+  }
+  motionblurBlendScratch[8] = nextSlot;
+  motionblurBlendScratch[9] = oldestSlot;
+  motionblurBlendScratch[10] = motionThreshold;
+  motionblurBlendScratch[11] = 0;
+  device.queue.writeBuffer(
+    motionblurBlendBuffer,
+    0,
+    motionblurBlendScratch.buffer,
+    motionblurBlendScratch.byteOffset,
+    motionblurBlendScratch.byteLength
+  );
+  const blendBg = device.createBindGroup({
+    label: "motionblur.blend.bg",
+    layout: motionblurBlendLayout,
+    entries: [
+      { binding: 0, resource: { buffer: motionblurBlendBuffer } },
+      { binding: 1, resource: ringBuffer.arrayView() },
+      { binding: 2, resource: sampler }
+    ]
+  });
+  if (readbackView) {
+    const readbackPass = encoder.beginRenderPass({
+      label: "motionblur.blend.readback.pass",
+      colorAttachments: [
+        {
+          view: readbackView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    readbackPass.setPipeline(motionblurBlendPipeline);
+    readbackPass.setBindGroup(0, displayFlagsBindGroup);
+    readbackPass.setBindGroup(1, blendBg);
+    readbackPass.draw(3, 1, 0, 0);
+    readbackPass.end();
+  }
+  {
+    const pass = encoder.beginRenderPass({
+      label: "motionblur.blend.present.pass",
+      colorAttachments: [
+        {
+          view: swapView,
+          loadOp: "clear",
+          storeOp: "store",
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }
+        }
+      ]
+    });
+    pass.setPipeline(motionblurBlendPipeline);
+    pass.setBindGroup(0, displayFlagsBindGroup);
+    pass.setBindGroup(1, blendBg);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+}
+
+// src/webgpu/WebGPUBackend.ts
+var IDENTITY_LUT_SIZE = 33;
+var BLOOM_LEVELS = 5;
+var HALATION_LEVELS = 6;
+var DIFFUSION_LEVELS = 3;
+var BLOOM_PARAMS_BYTES = 16;
+var HALATION_PARAMS_BYTES = 32;
+var DETAIL_SOFTNESS_PARAMS_BYTES = 48;
+var PYRAMID_LEVEL_UNIFORM_BYTES = 16;
+var MOTIONBLUR_FEEDBACK_UNIFORM_BYTES = 16;
+var MOTIONBLUR_BLEND_UNIFORM_BYTES = 48;
+var MOTIONBLUR_BLEND_UNIFORM_FLOATS = MOTIONBLUR_BLEND_UNIFORM_BYTES / 4;
+var CROSS_FILTER_PARAMS_BYTES = 16;
+var CROSS_FILTER_SPACING_MAX_BYTES = 32;
+var CROSS_FILTER_STREAK_BYTES = 96;
+var CROSS_FILTER_MAX_STREAKS = 4;
+var CROSS_FILTER_MIN_SPACING_MIN = 1;
+var CROSS_FILTER_MIN_SPACING_MAX = 10;
+var CENTRAL_BLOOM_LEVELS = 4;
+var LIGHTSHAFTS_PARAMS_BYTES = 32;
+var LIGHTSHAFTS_BLEND_PARAMS_BYTES = 16;
+var HALO_PRISM_PARAMS_BYTES = 80;
+var HALO_PRISM_PARAMS_FLOATS = HALO_PRISM_PARAMS_BYTES / 4;
 var DEFAULT_BLOOM_THRESHOLD = 0.8;
 var DEFAULT_BLOOM_KNEE = 0.5;
 var DEFAULT_BLOOM_RADIUS = 0.5;
@@ -3574,10 +5216,6 @@ var DEFAULT_DEPTH_HALATION_FIELD_PSF_GAIN = 1;
 var DEFAULT_DEPTH_MIST_FIELD_PSF_RADIUS_PX = 18;
 var DEFAULT_DEPTH_BLOOM_FIELD_PSF_RADIUS_PX = 9;
 var DEFAULT_DEPTH_HALATION_FIELD_PSF_RADIUS_PX = 12;
-var DEFAULT_CROSS_FILTER_DEPTH_GAIN = 0.25;
-var DEFAULT_CROSS_FILTER_ANGLE_GAIN = 0.35;
-var DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN = 0.45;
-var DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN = 0.25;
 var WebGPUBackend = class _WebGPUBackend {
   ctx;
   capabilities;
@@ -5007,143 +6645,36 @@ var WebGPUBackend = class _WebGPUBackend {
    * spreads it outward to the low-freq tails.
    */
   static computeMipWeights(radius, levels) {
-    const weights = [];
-    for (let i = 0; i < levels; i++) {
-      const t = i / Math.max(levels - 1, 1);
-      const base = Math.exp(-3 * (1 - radius) * t);
-      const wide = Math.exp(-0.5 * radius * (1 - t));
-      weights.push(base * (1 - radius) + wide * radius);
-    }
-    return weights;
+    return computeMipWeights(radius, levels);
   }
   ensurePyramidLevels(labelPrefix, levels) {
-    const out = [];
-    for (let i = 0; i < levels; i++) {
-      const divisor = 2 ** (i + 1);
-      const w = Math.max(1, Math.floor(this._width / divisor));
-      const h = Math.max(1, Math.floor(this._height / divisor));
-      out.push(
-        this.pool.get(`${labelPrefix}.${i}`, {
-          width: w,
-          height: h,
-          format: "rgba16float"
-        })
-      );
-    }
-    return out;
+    return ensurePyramidLevels(
+      this.pool,
+      labelPrefix,
+      levels,
+      this._width,
+      this._height
+    );
   }
   renderPyramidChain(encoder, label, prefilterPipeline, prefilterParamsBuffer, sourceView, levels, pyramid, radius) {
-    const { device } = this.ctx;
-    const weights = _WebGPUBackend.computeMipWeights(radius, levels.length);
-    {
-      const bg = device.createBindGroup({
-        label: `${label}.prefilter.bg`,
+    return renderPyramidChain(
+      encoder,
+      label,
+      prefilterPipeline,
+      prefilterParamsBuffer,
+      sourceView,
+      levels,
+      pyramid,
+      radius,
+      {
+        device: this.ctx.device,
         layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: prefilterParamsBuffer } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `${label}.prefilter`,
-        colorAttachments: [
-          {
-            view: levels[0].createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(prefilterPipeline);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = 1; i < levels.length; i++) {
-      const src = levels[i - 1];
-      const dst = levels[i];
-      const scratch = pyramid.downsampleScratch[i - 1];
-      scratch[0] = 1 / src.width;
-      scratch[1] = 1 / src.height;
-      scratch[2] = 0;
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        pyramid.downsample[i - 1],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `${label}.downsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: pyramid.downsample[i - 1] } },
-          { binding: 1, resource: src.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `${label}.downsample.${i}`,
-        colorAttachments: [
-          {
-            view: dst.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.downsample);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = levels.length - 2; i >= 0; i--) {
-      const lowRes = levels[i + 1];
-      const highRes = levels[i];
-      const scratch = pyramid.upsampleScratch[i];
-      scratch[0] = 1 / lowRes.width;
-      scratch[1] = 1 / lowRes.height;
-      scratch[2] = weights[i + 1];
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        pyramid.upsample[i],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `${label}.upsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: pyramid.upsample[i] } },
-          { binding: 1, resource: lowRes.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `${label}.upsample.${i}`,
-        colorAttachments: [
-          {
-            view: highRes.createView(),
-            loadOp: "load",
-            storeOp: "store"
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.upsampleAdd);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return levels[0];
+        sampler: this.sampler,
+        offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+        downsamplePipeline: this.pipelines.downsample,
+        upsampleAddPipeline: this.pipelines.upsampleAdd
+      }
+    );
   }
   /**
    * Shared depth-aware Mist path — produce a depth-weighted source mask feeding
@@ -5158,61 +6689,34 @@ var WebGPUBackend = class _WebGPUBackend {
    * image along silhouette edges.
    */
   renderDiffusionDepthPrefilter(encoder, sourceView, depthMistGain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics) {
-    const { device } = this.ctx;
-    const scratchRT = this.pool.get("rt.diffusion.prefiltered", {
-      width: this._width,
-      height: this._height,
-      format: "rgba16float"
-    });
-    const scratchView = scratchRT.createView();
-    const s = this.diffusionDepthPrefilterScratch;
-    s[0] = depthMistGain;
-    s[1] = this.frameState.fitMode;
-    s[2] = rayAngleGain;
-    s[3] = rayAngleGamma;
-    s[4] = this._width;
-    s[5] = this._height;
-    s[6] = this.frameState.imgResX;
-    s[7] = this.frameState.imgResY;
-    s[8] = fieldPsfGain;
-    s[9] = fieldPsfRadiusPx;
-    s[10] = 0;
-    s[11] = 0;
-    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
-    device.queue.writeBuffer(
-      this.diffusionDepthPrefilterBuffer,
-      0,
-      s.buffer,
-      s.byteOffset,
-      s.byteLength
+    return renderDiffusionDepthPrefilter(
+      encoder,
+      sourceView,
+      depthMistGain,
+      rayAngleGain,
+      rayAngleGamma,
+      rayAngleInnerThreshold,
+      fieldPsfGain,
+      fieldPsfRadiusPx,
+      optics,
+      {
+        device: this.ctx.device,
+        pool: this.pool,
+        width: this._width,
+        height: this._height,
+        fitMode: this.frameState.fitMode,
+        imgResX: this.frameState.imgResX,
+        imgResY: this.frameState.imgResY,
+        scratch: this.diffusionDepthPrefilterScratch,
+        buffer: this.diffusionDepthPrefilterBuffer,
+        layout: this.layouts.diffusionDepthPrefilter,
+        pipeline: this.pipelines.diffusionDepthPrefilter,
+        depthTexture: this.depthTexture,
+        sampler: this.sampler,
+        offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+        packRayAngleOptics: (target, offset, o, innerThreshold) => this.packRayAngleOptics(target, offset, o, innerThreshold)
+      }
     );
-    const bg = device.createBindGroup({
-      label: "diffusion-depth-prefilter.bg",
-      layout: this.layouts.diffusionDepthPrefilter,
-      entries: [
-        { binding: 0, resource: { buffer: this.diffusionDepthPrefilterBuffer } },
-        { binding: 1, resource: sourceView },
-        { binding: 2, resource: this.depthTexture.createView() },
-        { binding: 3, resource: this.sampler }
-      ]
-    });
-    const pass = encoder.beginRenderPass({
-      label: "diffusion-depth-prefilter.pass",
-      colorAttachments: [
-        {
-          view: scratchView,
-          loadOp: "clear",
-          storeOp: "store",
-          clearValue: { r: 0, g: 0, b: 0, a: 1 }
-        }
-      ]
-    });
-    pass.setPipeline(this.pipelines.diffusionDepthPrefilter);
-    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-    pass.setBindGroup(1, bg);
-    pass.draw(3, 1, 0, 0);
-    pass.end();
-    return scratchView;
   }
   /**
    * Shared depth-aware Glow path — depth-weighted source mask feeding the
@@ -5223,61 +6727,34 @@ var WebGPUBackend = class _WebGPUBackend {
    * (`bloom-depth-prefilter.frag.wgsl.ts`).
    */
   renderBloomDepthPrefilter(encoder, sourceView, gain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics) {
-    const { device } = this.ctx;
-    const scratchRT = this.pool.get("rt.bloom.depth-prefiltered", {
-      width: this._width,
-      height: this._height,
-      format: "rgba16float"
-    });
-    const scratchView = scratchRT.createView();
-    const s = this.bloomDepthPrefilterScratch;
-    s[0] = gain;
-    s[1] = this.frameState.fitMode;
-    s[2] = rayAngleGain;
-    s[3] = rayAngleGamma;
-    s[4] = this._width;
-    s[5] = this._height;
-    s[6] = this.frameState.imgResX;
-    s[7] = this.frameState.imgResY;
-    s[8] = fieldPsfGain;
-    s[9] = fieldPsfRadiusPx;
-    s[10] = 0;
-    s[11] = 0;
-    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
-    device.queue.writeBuffer(
-      this.bloomDepthPrefilterBuffer,
-      0,
-      s.buffer,
-      s.byteOffset,
-      s.byteLength
+    return renderBloomDepthPrefilter(
+      encoder,
+      sourceView,
+      gain,
+      rayAngleGain,
+      rayAngleGamma,
+      rayAngleInnerThreshold,
+      fieldPsfGain,
+      fieldPsfRadiusPx,
+      optics,
+      {
+        device: this.ctx.device,
+        pool: this.pool,
+        width: this._width,
+        height: this._height,
+        fitMode: this.frameState.fitMode,
+        imgResX: this.frameState.imgResX,
+        imgResY: this.frameState.imgResY,
+        scratch: this.bloomDepthPrefilterScratch,
+        buffer: this.bloomDepthPrefilterBuffer,
+        layout: this.layouts.diffusionDepthPrefilter,
+        pipeline: this.pipelines.bloomDepthPrefilter,
+        depthTexture: this.depthTexture,
+        sampler: this.sampler,
+        offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+        packRayAngleOptics: (target, offset, o, innerThreshold) => this.packRayAngleOptics(target, offset, o, innerThreshold)
+      }
     );
-    const bg = device.createBindGroup({
-      label: "bloom-depth-prefilter.bg",
-      layout: this.layouts.diffusionDepthPrefilter,
-      entries: [
-        { binding: 0, resource: { buffer: this.bloomDepthPrefilterBuffer } },
-        { binding: 1, resource: sourceView },
-        { binding: 2, resource: this.depthTexture.createView() },
-        { binding: 3, resource: this.sampler }
-      ]
-    });
-    const pass = encoder.beginRenderPass({
-      label: "bloom-depth-prefilter.pass",
-      colorAttachments: [
-        {
-          view: scratchView,
-          loadOp: "clear",
-          storeOp: "store",
-          clearValue: { r: 0, g: 0, b: 0, a: 1 }
-        }
-      ]
-    });
-    pass.setPipeline(this.pipelines.bloomDepthPrefilter);
-    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-    pass.setBindGroup(1, bg);
-    pass.draw(3, 1, 0, 0);
-    pass.end();
-    return scratchView;
   }
   /**
    * Shared depth-aware Glow path — depth-weighted source mask feeding the
@@ -5286,186 +6763,46 @@ var WebGPUBackend = class _WebGPUBackend {
    * pyramid to avoid writeBuffer aliasing).
    */
   renderHalationDepthPrefilter(encoder, sourceView, gain, rayAngleGain, rayAngleGamma, rayAngleInnerThreshold, fieldPsfGain, fieldPsfRadiusPx, optics) {
-    const { device } = this.ctx;
-    const scratchRT = this.pool.get("rt.halation.depth-prefiltered", {
-      width: this._width,
-      height: this._height,
-      format: "rgba16float"
-    });
-    const scratchView = scratchRT.createView();
-    const s = this.halationDepthPrefilterScratch;
-    s[0] = gain;
-    s[1] = this.frameState.fitMode;
-    s[2] = rayAngleGain;
-    s[3] = rayAngleGamma;
-    s[4] = this._width;
-    s[5] = this._height;
-    s[6] = this.frameState.imgResX;
-    s[7] = this.frameState.imgResY;
-    s[8] = fieldPsfGain;
-    s[9] = fieldPsfRadiusPx;
-    s[10] = 0;
-    s[11] = 0;
-    this.packRayAngleOptics(s, 12, optics, rayAngleInnerThreshold);
-    device.queue.writeBuffer(
-      this.halationDepthPrefilterBuffer,
-      0,
-      s.buffer,
-      s.byteOffset,
-      s.byteLength
+    return renderHalationDepthPrefilter(
+      encoder,
+      sourceView,
+      gain,
+      rayAngleGain,
+      rayAngleGamma,
+      rayAngleInnerThreshold,
+      fieldPsfGain,
+      fieldPsfRadiusPx,
+      optics,
+      {
+        device: this.ctx.device,
+        pool: this.pool,
+        width: this._width,
+        height: this._height,
+        fitMode: this.frameState.fitMode,
+        imgResX: this.frameState.imgResX,
+        imgResY: this.frameState.imgResY,
+        scratch: this.halationDepthPrefilterScratch,
+        buffer: this.halationDepthPrefilterBuffer,
+        layout: this.layouts.diffusionDepthPrefilter,
+        pipeline: this.pipelines.halationDepthPrefilter,
+        depthTexture: this.depthTexture,
+        sampler: this.sampler,
+        offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+        packRayAngleOptics: (target, offset, o, innerThreshold) => this.packRayAngleOptics(target, offset, o, innerThreshold)
+      }
     );
-    const bg = device.createBindGroup({
-      label: "halation-depth-prefilter.bg",
-      layout: this.layouts.diffusionDepthPrefilter,
-      entries: [
-        { binding: 0, resource: { buffer: this.halationDepthPrefilterBuffer } },
-        { binding: 1, resource: sourceView },
-        { binding: 2, resource: this.depthTexture.createView() },
-        { binding: 3, resource: this.sampler }
-      ]
-    });
-    const pass = encoder.beginRenderPass({
-      label: "halation-depth-prefilter.pass",
-      colorAttachments: [
-        {
-          view: scratchView,
-          loadOp: "clear",
-          storeOp: "store",
-          clearValue: { r: 0, g: 0, b: 0, a: 1 }
-        }
-      ]
-    });
-    pass.setPipeline(this.pipelines.halationDepthPrefilter);
-    pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-    pass.setBindGroup(1, bg);
-    pass.draw(3, 1, 0, 0);
-    pass.end();
-    return scratchView;
   }
   renderDiffusionPyramid(encoder, sourceView, levels) {
-    const { device } = this.ctx;
-    const weights = _WebGPUBackend.computeMipWeights(0.7, levels.length);
-    {
-      const scratch = this.diffusionPyramid.downsampleScratch[0];
-      scratch[0] = 1 / Math.max(this._width, 1);
-      scratch[1] = 1 / Math.max(this._height, 1);
-      scratch[2] = 0;
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.diffusionPyramid.downsample[0],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: "diffusion.downsample.0.bg",
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.diffusionPyramid.downsample[0] } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "diffusion.downsample.0",
-        colorAttachments: [
-          {
-            view: levels[0].createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.downsample);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = 1; i < levels.length; i++) {
-      const src = levels[i - 1];
-      const dst = levels[i];
-      const scratch = this.diffusionPyramid.downsampleScratch[i];
-      scratch[0] = 1 / src.width;
-      scratch[1] = 1 / src.height;
-      scratch[2] = 0;
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.diffusionPyramid.downsample[i],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `diffusion.downsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.diffusionPyramid.downsample[i] } },
-          { binding: 1, resource: src.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `diffusion.downsample.${i}`,
-        colorAttachments: [
-          {
-            view: dst.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.downsample);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = levels.length - 2; i >= 0; i--) {
-      const lowRes = levels[i + 1];
-      const highRes = levels[i];
-      const scratch = this.diffusionPyramid.upsampleScratch[i];
-      scratch[0] = 1 / lowRes.width;
-      scratch[1] = 1 / lowRes.height;
-      scratch[2] = weights[i + 1];
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.diffusionPyramid.upsample[i],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `diffusion.upsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.diffusionPyramid.upsample[i] } },
-          { binding: 1, resource: lowRes.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `diffusion.upsample.${i}`,
-        colorAttachments: [
-          {
-            view: highRes.createView(),
-            loadOp: "load",
-            storeOp: "store"
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.upsampleAdd);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return levels[0];
+    return renderDiffusionPyramid(encoder, sourceView, levels, this.diffusionPyramid, {
+      device: this.ctx.device,
+      layout: this.layouts.pyramid,
+      sampler: this.sampler,
+      offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+      downsamplePipeline: this.pipelines.downsample,
+      upsampleAddPipeline: this.pipelines.upsampleAdd,
+      width: this._width,
+      height: this._height
+    });
   }
   /**
    * WebGL and the preserved dormant WebGPU temporal path use a 2-slot
@@ -5496,163 +6833,8 @@ var WebGPUBackend = class _WebGPUBackend {
     this.lastCrossFilterHardMode = hardMode;
     this.lastCrossFilterMinSpacing = minSpacing;
   }
-  /**
-   * Hard-mode central bloom, 4-level pyramid.
-   *   1. seed mip 0 by downsampling the active peak mask (WebGL used held
-   *      peaks; active WebGPU currently passes current peaks because the
-   *      temporal hold is intentionally bypassed).
-   *   2. progressive downsample mip 0 → mip 3.
-   *   3. additive upsample back to mip 0 with fixed radius 0.5.
-   *
-   * Returns mip 0 so the caller can feed it to the cross-filter blend
-   * shader's `uCentralBloom` binding. Mip 0 runs at quarter-resolution of
-   * the full output (the peak texture is half-res, then we halve again on
-   * seed).
-   */
-  renderCentralBloom(encoder, heldPeakTexture) {
-    const { device } = this.ctx;
-    const halfWidth = Math.max(1, Math.floor(this._width / 2));
-    const halfHeight = Math.max(1, Math.floor(this._height / 2));
-    const levels = [];
-    for (let i = 0; i < CENTRAL_BLOOM_LEVELS; i++) {
-      const divisor = 2 ** (i + 1);
-      const w = Math.max(1, Math.floor(halfWidth / divisor));
-      const h = Math.max(1, Math.floor(halfHeight / divisor));
-      levels.push(
-        this.pool.get(`rt.crossfilter.central-bloom.${i}`, {
-          width: w,
-          height: h,
-          format: "rgba16float"
-        })
-      );
-    }
-    const weights = _WebGPUBackend.computeMipWeights(
-      CENTRAL_BLOOM_RADIUS,
-      levels.length
-    );
-    const sourceView = heldPeakTexture.createView();
-    {
-      const scratch = this.centralBloomPyramid.downsampleScratch[0];
-      scratch[0] = 1 / heldPeakTexture.width;
-      scratch[1] = 1 / heldPeakTexture.height;
-      scratch[2] = 0;
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.centralBloomPyramid.downsample[0],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: "centralBloom.seed.bg",
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.centralBloomPyramid.downsample[0] } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "centralBloom.seed",
-        colorAttachments: [
-          {
-            view: levels[0].createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.downsample);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = 1; i < levels.length; i++) {
-      const src = levels[i - 1];
-      const dst = levels[i];
-      const scratch = this.centralBloomPyramid.downsampleScratch[i];
-      scratch[0] = 1 / src.width;
-      scratch[1] = 1 / src.height;
-      scratch[2] = 0;
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.centralBloomPyramid.downsample[i],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `centralBloom.downsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.centralBloomPyramid.downsample[i] } },
-          { binding: 1, resource: src.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `centralBloom.downsample.${i}`,
-        colorAttachments: [
-          {
-            view: dst.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.downsample);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    for (let i = levels.length - 2; i >= 0; i--) {
-      const lowRes = levels[i + 1];
-      const highRes = levels[i];
-      const scratch = this.centralBloomPyramid.upsampleScratch[i];
-      scratch[0] = 1 / lowRes.width;
-      scratch[1] = 1 / lowRes.height;
-      scratch[2] = weights[i + 1];
-      scratch[3] = 0;
-      device.queue.writeBuffer(
-        this.centralBloomPyramid.upsample[i],
-        0,
-        scratch.buffer,
-        scratch.byteOffset,
-        scratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `centralBloom.upsample.${i}.bg`,
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.centralBloomPyramid.upsample[i] } },
-          { binding: 1, resource: lowRes.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `centralBloom.upsample.${i}`,
-        colorAttachments: [
-          {
-            view: highRes.createView(),
-            loadOp: "load",
-            storeOp: "store"
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.upsampleAdd);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return levels[0];
-  }
+  // `renderCentralBloom` moved to `./passes/crossFilter` (module-private
+  // there too — its sole caller, `renderCrossFilter`, moved alongside it).
   /**
    * Light shafts two-sub-pass rendering (WebGL parity):
    *   9a: radial blur at 1/4 resolution (64 taps, luminance threshold).
@@ -5664,767 +6846,84 @@ var WebGPUBackend = class _WebGPUBackend {
    * motionBlur) active` gate.
    */
   renderLightShafts(encoder, sourceTexture) {
-    const { device } = this.ctx;
-    const shaftWidth = Math.max(1, Math.floor(this._width / LIGHTSHAFTS_RES_DIVISOR));
-    const shaftHeight = Math.max(1, Math.floor(this._height / LIGHTSHAFTS_RES_DIVISOR));
-    const shaftTexture = this.pool.get("rt.lightshafts.quarter", {
-      width: shaftWidth,
-      height: shaftHeight,
-      format: "rgba16float"
-    });
-    const blendOutput = this.pool.get("rt.lightshafts.output", {
+    return renderLightShafts(encoder, sourceTexture, {
+      device: this.ctx.device,
+      pool: this.pool,
       width: this._width,
       height: this._height,
-      format: "rgba16float"
+      lightShafts: this.lightShafts,
+      lightshaftsLayout: this.layouts.lightshafts,
+      lightshaftsBlendLayout: this.layouts.lightshaftsBlend,
+      lightshaftsPipeline: this.pipelines.lightshafts,
+      lightshaftsBlendPipeline: this.pipelines.lightshaftsBlend,
+      sampler: this.sampler,
+      crossFilterFlagsBindGroup: this.crossFilterFlagsBindGroup,
+      paramNumber: (key, fallback) => this.paramNumber(key, fallback)
     });
-    const originX = Math.min(1, Math.max(0, this.paramNumber("shaftOriginX", 0.5)));
-    const originYParam = Math.min(1, Math.max(0, this.paramNumber("shaftOriginY", 0.85)));
-    const shaftDecay = Math.min(1, Math.max(0, this.paramNumber("shaftDecay", 0)));
-    const shaftIntensity = Math.min(
-      1,
-      Math.max(0, this.paramNumber("shaftIntensity", 0))
-    );
-    const decay = 0.92 + shaftDecay * 0.075;
-    const paramsScratch = this.lightShafts.paramsScratch;
-    paramsScratch[0] = originX;
-    paramsScratch[1] = 1 - originYParam;
-    paramsScratch[2] = decay;
-    paramsScratch[3] = LIGHTSHAFTS_DENSITY;
-    paramsScratch[4] = LIGHTSHAFTS_EXPOSURE;
-    paramsScratch[5] = 0;
-    paramsScratch[6] = 0;
-    paramsScratch[7] = 0;
-    device.queue.writeBuffer(
-      this.lightShafts.paramsBuffer,
-      0,
-      paramsScratch.buffer,
-      paramsScratch.byteOffset,
-      paramsScratch.byteLength
-    );
-    const sourceView = sourceTexture.createView();
-    {
-      const bg = device.createBindGroup({
-        label: "lightshafts.radial.bg",
-        layout: this.layouts.lightshafts,
-        entries: [
-          { binding: 0, resource: { buffer: this.lightShafts.paramsBuffer } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "lightshafts.radial",
-        colorAttachments: [
-          {
-            view: shaftTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.lightshafts);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    const blendParamsScratch = this.lightShafts.blendParamsScratch;
-    blendParamsScratch[0] = shaftIntensity;
-    blendParamsScratch[1] = 0;
-    blendParamsScratch[2] = 0;
-    blendParamsScratch[3] = 0;
-    device.queue.writeBuffer(
-      this.lightShafts.blendParamsBuffer,
-      0,
-      blendParamsScratch.buffer,
-      blendParamsScratch.byteOffset,
-      blendParamsScratch.byteLength
-    );
-    {
-      const bg = device.createBindGroup({
-        label: "lightshafts.blend.bg",
-        layout: this.layouts.lightshaftsBlend,
-        entries: [
-          { binding: 0, resource: { buffer: this.lightShafts.blendParamsBuffer } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: shaftTexture.createView() },
-          { binding: 3, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "lightshafts.blend",
-        colorAttachments: [
-          {
-            view: blendOutput.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.lightshaftsBlend);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return blendOutput;
   }
   renderHaloPrism(encoder, sceneTexture, sourceSeedTexture) {
-    const { device } = this.ctx;
-    const strength = Math.min(1, Math.max(0, this.paramNumber("haloPrismStrength", 0)));
-    if (strength <= 0) {
-      return sceneTexture;
-    }
-    const halfWidth = Math.max(1, Math.floor(this._width / 2));
-    const halfHeight = Math.max(1, Math.floor(this._height / 2));
-    const sourceGateTexture = this.pool.get("rt.halo-prism.source-gate", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const outputTexture = this.pool.get("rt.halo-prism.output", {
+    return renderHaloPrism(encoder, sceneTexture, sourceSeedTexture, {
+      device: this.ctx.device,
+      pool: this.pool,
       width: this._width,
       height: this._height,
-      format: "rgba16float"
+      imgResX: this.frameState.imgResX,
+      imgResY: this.frameState.imgResY,
+      fitMode: this.frameState.fitMode,
+      haloPrism: this.haloPrism,
+      pyramidLayout: this.layouts.pyramid,
+      haloPrismLayout: this.layouts.haloPrism,
+      crossFilterSourcePipeline: this.pipelines.crossFilterSource,
+      haloPrismPipeline: this.pipelines.haloPrism,
+      depthTexture: this.depthTexture,
+      sampler: this.sampler,
+      offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+      crossFilterFlagsBindGroup: this.crossFilterFlagsBindGroup,
+      paramNumber: (key, fallback) => this.paramNumber(key, fallback),
+      resolveCurrentRayAngleOptics: () => this.resolveCurrentRayAngleOptics(),
+      packRayAngleOptics: (target, offset, optics, innerThreshold) => this.packRayAngleOptics(target, offset, optics, innerThreshold)
     });
-    const threshold = Math.min(
-      1,
-      Math.max(0, this.paramNumber("haloPrismThreshold", 0.9))
-    );
-    const sourceParamsScratch = this.haloPrism.sourceParamsScratch;
-    sourceParamsScratch[0] = threshold;
-    sourceParamsScratch[1] = 0.18;
-    sourceParamsScratch[2] = 0;
-    sourceParamsScratch[3] = 0;
-    device.queue.writeBuffer(
-      this.haloPrism.sourceParamsBuffer,
-      0,
-      sourceParamsScratch.buffer,
-      sourceParamsScratch.byteOffset,
-      sourceParamsScratch.byteLength
-    );
-    {
-      const bg = device.createBindGroup({
-        label: "halo-prism.source.bg",
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.haloPrism.sourceParamsBuffer } },
-          { binding: 1, resource: sourceSeedTexture.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "halo-prism.source",
-        colorAttachments: [
-          {
-            view: sourceGateTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterSource);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    const paramsScratch = this.haloPrism.paramsScratch;
-    paramsScratch[0] = strength;
-    paramsScratch[1] = Math.min(1, Math.max(0, this.paramNumber("haloPrismRadius", 0.62)));
-    paramsScratch[2] = Math.min(1, Math.max(0, this.paramNumber("haloPrismWidth", 0.22)));
-    paramsScratch[3] = Math.min(1, Math.max(0, this.paramNumber("haloPrismChromatic", 0.65)));
-    paramsScratch[4] = Math.min(
-      1,
-      Math.max(0, this.paramNumber("haloPrismSourceReactivity", 0.85))
-    );
-    paramsScratch[5] = Math.min(1, Math.max(0, this.paramNumber("haloPrismSplit", 0.7)));
-    paramsScratch[6] = this.paramNumber("haloPrismAngle", 0) * Math.PI / 180;
-    paramsScratch[7] = 0;
-    paramsScratch[8] = this._width;
-    paramsScratch[9] = this._height;
-    paramsScratch[10] = this.frameState.imgResX;
-    paramsScratch[11] = this.frameState.imgResY;
-    paramsScratch[12] = this.frameState.fitMode;
-    paramsScratch[13] = threshold;
-    paramsScratch[14] = 0;
-    paramsScratch[15] = 0;
-    this.packRayAngleOptics(
-      paramsScratch,
-      16,
-      this.resolveCurrentRayAngleOptics(),
-      DEFAULT_RAY_ANGLE_INNER_THRESHOLD
-    );
-    device.queue.writeBuffer(
-      this.haloPrism.paramsBuffer,
-      0,
-      paramsScratch.buffer,
-      paramsScratch.byteOffset,
-      paramsScratch.byteLength
-    );
-    {
-      const bg = device.createBindGroup({
-        label: "halo-prism.blend.bg",
-        layout: this.layouts.haloPrism,
-        entries: [
-          { binding: 0, resource: { buffer: this.haloPrism.paramsBuffer } },
-          { binding: 1, resource: sceneTexture.createView() },
-          { binding: 2, resource: sourceGateTexture.createView() },
-          { binding: 3, resource: this.depthTexture.createView() },
-          { binding: 4, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "halo-prism.blend",
-        colorAttachments: [
-          {
-            view: outputTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.haloPrism);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return outputTexture;
   }
   renderCrossFilter(encoder, sourceTexture) {
-    const { device } = this.ctx;
-    const strength = Math.min(1, Math.max(0, this.paramNumber("crossFilterStrength", 0)));
-    if (strength <= 0) {
-      return sourceTexture;
-    }
-    const halfWidth = Math.max(1, Math.floor(this._width / 2));
-    const halfHeight = Math.max(1, Math.floor(this._height / 2));
-    const sourceGateTexture = this.pool.get("rt.crossfilter.source-gate", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const peakTexture = this.pool.get("rt.crossfilter.peak", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const spacingWorkTexture = this.pool.get("rt.crossfilter.spacing-work", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const spacingMaxTexture = this.pool.get("rt.crossfilter.spacing-max", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const spacingTexture = this.pool.get("rt.crossfilter.spacing", {
-      width: halfWidth,
-      height: halfHeight,
-      format: "rgba16float"
-    });
-    const streakTextures = Array.from(
-      { length: CROSS_FILTER_MAX_STREAKS },
-      (_, index) => this.pool.get(`rt.crossfilter.streak.${index}`, {
-        width: halfWidth,
-        height: halfHeight,
-        format: "rgba16float"
-      })
-    );
-    const outputTexture = this.pool.get("rt.crossfilter.output", {
+    const result = renderCrossFilter(encoder, sourceTexture, {
+      device: this.ctx.device,
+      pool: this.pool,
       width: this._width,
       height: this._height,
-      format: "rgba16float"
+      fitMode: this.frameState.fitMode,
+      imgResX: this.frameState.imgResX,
+      imgResY: this.frameState.imgResY,
+      time: this.frameState.time,
+      maxStreaks: CROSS_FILTER_MAX_STREAKS,
+      minSpacingMin: CROSS_FILTER_MIN_SPACING_MIN,
+      minSpacingMax: CROSS_FILTER_MIN_SPACING_MAX,
+      defaultDepthRayAngleGamma: DEFAULT_DEPTH_RAY_ANGLE_GAMMA,
+      crossFilter: this.crossFilter,
+      layouts: this.layouts,
+      pipelines: this.pipelines,
+      depthTexture: this.depthTexture,
+      sampler: this.sampler,
+      offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+      crossFilterFlagsBindGroup: this.crossFilterFlagsBindGroup,
+      centralBloomPyramid: this.centralBloomPyramid,
+      centralBloomLevels: CENTRAL_BLOOM_LEVELS,
+      paramNumber: (key, fallback) => this.paramNumber(key, fallback),
+      resolveCurrentRayAngleOptics: () => this.resolveCurrentRayAngleOptics(),
+      packRayAngleOptics: (target, offset, optics, innerThreshold) => this.packRayAngleOptics(target, offset, optics, innerThreshold),
+      history: {
+        peakHistoryWriteIndex: this.crossFilterPeakHistoryWriteIndex,
+        peakHistoryFilledFrames: this.crossFilterPeakHistoryFilledFrames,
+        lastHistoryTime: this.lastCrossFilterHistoryTime
+      }
     });
-    const hardModeActive = this.paramNumber("crossFilterHardMode", 0) >= 0.5;
-    const hardModeUniform = hardModeActive ? 1 : 0;
-    const threshold = Math.min(1, Math.max(0, this.paramNumber("crossFilterThreshold", 0.8)));
-    const sizeLimit = Math.min(1, Math.max(0, this.paramNumber("crossFilterSizeLimit", 0)));
-    const randomness = Math.min(1, Math.max(0, this.paramNumber("crossFilterRandomness", 1)));
-    const length = Math.min(1, Math.max(0, this.paramNumber("crossFilterLength", 0.5)));
-    const chromatic = Math.min(1, Math.max(0, this.paramNumber("crossFilterChromatic", 0.3)));
-    const crossFilterDepthGain = Math.min(
-      1,
-      Math.max(0, this.paramNumber("crossFilterDepthGain", DEFAULT_CROSS_FILTER_DEPTH_GAIN))
-    );
-    const crossFilterAngleGain = Math.min(
-      1,
-      Math.max(0, this.paramNumber("crossFilterAngleGain", DEFAULT_CROSS_FILTER_ANGLE_GAIN))
-    );
-    const crossFilterAngleGamma = Math.max(
-      1e-3,
-      this.paramNumber("crossFilterAngleGamma", DEFAULT_DEPTH_RAY_ANGLE_GAMMA)
-    );
-    const crossFilterAngleInnerThreshold = Math.min(
-      0.8,
-      Math.max(
-        0,
-        this.paramNumber(
-          "crossFilterAngleInnerThreshold",
-          DEFAULT_RAY_ANGLE_INNER_THRESHOLD
-        )
-      )
-    );
-    const crossFilterEdgeLengthGain = Math.min(
-      1,
-      Math.max(
-        0,
-        this.paramNumber("crossFilterEdgeLengthGain", DEFAULT_CROSS_FILTER_EDGE_LENGTH_GAIN)
-      )
-    );
-    const crossFilterEdgeStrengthGain = Math.min(
-      1,
-      Math.max(
-        0,
-        this.paramNumber(
-          "crossFilterEdgeStrengthGain",
-          DEFAULT_CROSS_FILTER_EDGE_STRENGTH_GAIN
-        )
-      )
-    );
-    const minSpacing = Math.min(
-      CROSS_FILTER_MIN_SPACING_MAX,
-      Math.max(CROSS_FILTER_MIN_SPACING_MIN, this.paramNumber("crossFilterMinSpacing", 1))
-    );
-    const rawSpikes = Math.max(2, Math.round(this.paramNumber("crossFilterSpikes", 4)));
-    const spikeCount = rawSpikes % 2 === 0 ? rawSpikes : rawSpikes + 1;
-    const dirCount = Math.max(
-      1,
-      Math.min(CROSS_FILTER_MAX_STREAKS, Math.floor(spikeCount / 2))
-    );
-    const angleRad = this.paramNumber("crossFilterAngle", 0) * Math.PI / 180;
-    const effectiveThreshold = computeCrossFilterEffectiveThreshold(
-      threshold,
-      hardModeActive
-    );
-    const effectiveSizeLimit = hardModeActive ? 1 : sizeLimit;
-    const effectiveRandomness = hardModeActive ? 1 : randomness;
-    const rayAngleOptics = this.resolveCurrentRayAngleOptics();
-    const sourceView = sourceTexture.createView();
-    const depthView = this.depthTexture.createView();
-    const blackView = this.crossFilter.blackTexture.createView();
-    this.crossFilter.thresholdScratch[0] = effectiveThreshold;
-    this.crossFilter.thresholdScratch[1] = 0.12;
-    this.crossFilter.thresholdScratch[2] = hardModeUniform;
-    this.crossFilter.thresholdScratch[3] = 0;
-    device.queue.writeBuffer(
-      this.crossFilter.thresholdBuffer,
-      0,
-      this.crossFilter.thresholdScratch.buffer,
-      this.crossFilter.thresholdScratch.byteOffset,
-      this.crossFilter.thresholdScratch.byteLength
-    );
-    {
-      const bg = device.createBindGroup({
-        label: "crossfilter.source.bg",
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.crossFilter.thresholdBuffer } },
-          { binding: 1, resource: sourceView },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "crossfilter.source",
-        colorAttachments: [
-          {
-            view: sourceGateTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterSource);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    this.crossFilter.peakScratch[0] = 1 / halfWidth;
-    this.crossFilter.peakScratch[1] = 1 / halfHeight;
-    this.crossFilter.peakScratch[2] = effectiveSizeLimit;
-    this.crossFilter.peakScratch[3] = 0;
-    device.queue.writeBuffer(
-      this.crossFilter.peakBuffer,
-      0,
-      this.crossFilter.peakScratch.buffer,
-      this.crossFilter.peakScratch.byteOffset,
-      this.crossFilter.peakScratch.byteLength
-    );
-    {
-      const bg = device.createBindGroup({
-        label: "crossfilter.peak.bg",
-        layout: this.layouts.pyramid,
-        entries: [
-          { binding: 0, resource: { buffer: this.crossFilter.peakBuffer } },
-          { binding: 1, resource: sourceGateTexture.createView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "crossfilter.peak",
-        colorAttachments: [
-          {
-            view: peakTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterPeak);
-      pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    let currentPeakTexture = peakTexture;
-    if (minSpacing >= 1e-3) {
-      const radiusPx = computeCrossFilterSpacingRadiusPx(minSpacing);
-      const spacingMaxScratchX = this.crossFilter.spacingMaxScratch[0];
-      spacingMaxScratchX[0] = 1 / halfWidth;
-      spacingMaxScratchX[1] = 1 / halfHeight;
-      spacingMaxScratchX[2] = 1;
-      spacingMaxScratchX[3] = 0;
-      spacingMaxScratchX[4] = radiusPx;
-      spacingMaxScratchX[5] = 0;
-      spacingMaxScratchX[6] = 0;
-      spacingMaxScratchX[7] = 0;
-      device.queue.writeBuffer(
-        this.crossFilter.spacingMaxBuffers[0],
-        0,
-        spacingMaxScratchX.buffer,
-        spacingMaxScratchX.byteOffset,
-        spacingMaxScratchX.byteLength
-      );
-      {
-        const bg = device.createBindGroup({
-          label: "crossfilter.spacing-max-x.bg",
-          layout: this.layouts.pyramid,
-          entries: [
-            { binding: 0, resource: { buffer: this.crossFilter.spacingMaxBuffers[0] } },
-            { binding: 1, resource: peakTexture.createView() },
-            { binding: 2, resource: this.sampler }
-          ]
-        });
-        const pass = encoder.beginRenderPass({
-          label: "crossfilter.spacing-max-x",
-          colorAttachments: [
-            {
-              view: spacingWorkTexture.createView(),
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        pass.setPipeline(this.pipelines.crossFilterPeakSpacingMax);
-        pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-        pass.setBindGroup(1, bg);
-        pass.draw(3, 1, 0, 0);
-        pass.end();
-      }
-      const spacingMaxScratchY = this.crossFilter.spacingMaxScratch[1];
-      spacingMaxScratchY[0] = 1 / halfWidth;
-      spacingMaxScratchY[1] = 1 / halfHeight;
-      spacingMaxScratchY[2] = 0;
-      spacingMaxScratchY[3] = 1;
-      spacingMaxScratchY[4] = radiusPx;
-      spacingMaxScratchY[5] = 1;
-      spacingMaxScratchY[6] = 0;
-      spacingMaxScratchY[7] = 0;
-      device.queue.writeBuffer(
-        this.crossFilter.spacingMaxBuffers[1],
-        0,
-        spacingMaxScratchY.buffer,
-        spacingMaxScratchY.byteOffset,
-        spacingMaxScratchY.byteLength
-      );
-      {
-        const bg = device.createBindGroup({
-          label: "crossfilter.spacing-max-y.bg",
-          layout: this.layouts.pyramid,
-          entries: [
-            { binding: 0, resource: { buffer: this.crossFilter.spacingMaxBuffers[1] } },
-            { binding: 1, resource: spacingWorkTexture.createView() },
-            { binding: 2, resource: this.sampler }
-          ]
-        });
-        const pass = encoder.beginRenderPass({
-          label: "crossfilter.spacing-max-y",
-          colorAttachments: [
-            {
-              view: spacingMaxTexture.createView(),
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        pass.setPipeline(this.pipelines.crossFilterPeakSpacingMax);
-        pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-        pass.setBindGroup(1, bg);
-        pass.draw(3, 1, 0, 0);
-        pass.end();
-      }
-      this.crossFilter.spacingScratch[0] = 1 / halfWidth;
-      this.crossFilter.spacingScratch[1] = 1 / halfHeight;
-      this.crossFilter.spacingScratch[2] = minSpacing;
-      this.crossFilter.spacingScratch[3] = 0;
-      device.queue.writeBuffer(
-        this.crossFilter.spacingBuffer,
-        0,
-        this.crossFilter.spacingScratch.buffer,
-        this.crossFilter.spacingScratch.byteOffset,
-        this.crossFilter.spacingScratch.byteLength
-      );
-      {
-        const bg = device.createBindGroup({
-          label: "crossfilter.spacing.bg",
-          layout: this.layouts.crossFilterPeakSpacing,
-          entries: [
-            { binding: 0, resource: { buffer: this.crossFilter.spacingBuffer } },
-            { binding: 1, resource: peakTexture.createView() },
-            { binding: 2, resource: spacingMaxTexture.createView() },
-            { binding: 3, resource: this.sampler }
-          ]
-        });
-        const pass = encoder.beginRenderPass({
-          label: "crossfilter.spacing",
-          colorAttachments: [
-            {
-              view: spacingTexture.createView(),
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        pass.setPipeline(this.pipelines.crossFilterPeakSpacing);
-        pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-        pass.setBindGroup(1, bg);
-        pass.draw(3, 1, 0, 0);
-        pass.end();
-      }
-      currentPeakTexture = spacingTexture;
-    }
-    let heldPeakTexture = currentPeakTexture;
-    if (hardModeActive && WEBGPU_CROSS_FILTER_TEMPORAL_HOLD_ENABLED) {
-      const historyTextures = [
-        this.pool.get("rt.crossfilter.peak-history.0", {
-          width: halfWidth,
-          height: halfHeight,
-          format: "rgba16float"
-        }),
-        this.pool.get("rt.crossfilter.peak-history.1", {
-          width: halfWidth,
-          height: halfHeight,
-          format: "rgba16float"
-        })
-      ];
-      const writeIndex = this.crossFilterPeakHistoryWriteIndex % CROSS_FILTER_HISTORY_SLOTS;
-      const prevIndex = (writeIndex + CROSS_FILTER_HISTORY_SLOTS - 1) % CROSS_FILTER_HISTORY_SLOTS;
-      const prevTexture = this.crossFilterPeakHistoryFilledFrames > 0 ? historyTextures[prevIndex] : this.crossFilter.blackTexture;
-      const writeTexture = historyTextures[writeIndex];
-      const temporalDeltaSeconds = this.lastCrossFilterHistoryTime === null ? 1 / CROSS_FILTER_TEMPORAL_REFERENCE_FPS : this.frameState.time - this.lastCrossFilterHistoryTime;
-      const temporalDecay = computeCrossFilterTemporalDecay(temporalDeltaSeconds);
-      this.crossFilter.temporalScratch[0] = temporalDecay;
-      this.crossFilter.temporalScratch[1] = 0;
-      this.crossFilter.temporalScratch[2] = 0;
-      this.crossFilter.temporalScratch[3] = 0;
-      device.queue.writeBuffer(
-        this.crossFilter.temporalBuffer,
-        0,
-        this.crossFilter.temporalScratch.buffer,
-        this.crossFilter.temporalScratch.byteOffset,
-        this.crossFilter.temporalScratch.byteLength
-      );
-      const temporalBg = device.createBindGroup({
-        label: "crossfilter.temporal.bg",
-        layout: this.layouts.crossFilterTemporal,
-        entries: [
-          { binding: 0, resource: { buffer: this.crossFilter.temporalBuffer } },
-          { binding: 1, resource: currentPeakTexture.createView() },
-          { binding: 2, resource: prevTexture.createView() },
-          { binding: 3, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: "crossfilter.temporal",
-        colorAttachments: [
-          {
-            view: writeTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterTemporal);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, temporalBg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-      heldPeakTexture = writeTexture;
-      this.crossFilterPeakHistoryWriteIndex = (writeIndex + 1) % CROSS_FILTER_HISTORY_SLOTS;
-      this.crossFilterPeakHistoryFilledFrames = Math.min(
-        this.crossFilterPeakHistoryFilledFrames + 1,
-        CROSS_FILTER_HISTORY_SLOTS
-      );
-      this.lastCrossFilterHistoryTime = this.frameState.time;
-    }
-    let centralBloomTexture = null;
-    if (hardModeActive) {
-      centralBloomTexture = this.renderCentralBloom(encoder, heldPeakTexture);
-    }
-    const hash = (seed) => {
-      const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
-      return value - Math.floor(value);
-    };
-    for (let i = 0; i < dirCount; i++) {
-      const seed = i * 17 + 7;
-      const angleJitter = (hash(seed) - 0.5) * 2 * (5 * Math.PI / 180);
-      const lengthMul = 1 + (hash(seed + 1) - 0.5) * 0.5;
-      const brightMul = 1 + (hash(seed + 2) - 0.5) * 0.4;
-      const dirAngle = angleRad + i * Math.PI / dirCount + angleJitter;
-      const streakScratch = this.crossFilter.streakScratch[i];
-      streakScratch[0] = Math.cos(dirAngle);
-      streakScratch[1] = Math.sin(dirAngle);
-      streakScratch[2] = 1 / heldPeakTexture.width;
-      streakScratch[3] = 1 / heldPeakTexture.height;
-      streakScratch[4] = length * lengthMul;
-      streakScratch[5] = chromatic;
-      streakScratch[6] = brightMul;
-      streakScratch[7] = effectiveRandomness;
-      streakScratch[8] = hardModeUniform;
-      streakScratch[9] = crossFilterDepthGain;
-      streakScratch[10] = crossFilterAngleGain;
-      streakScratch[11] = crossFilterAngleGamma;
-      streakScratch[12] = crossFilterEdgeLengthGain;
-      streakScratch[13] = crossFilterEdgeStrengthGain;
-      streakScratch[14] = this.frameState.fitMode;
-      streakScratch[15] = 0;
-      streakScratch[16] = this._width;
-      streakScratch[17] = this._height;
-      streakScratch[18] = this.frameState.imgResX;
-      streakScratch[19] = this.frameState.imgResY;
-      this.packRayAngleOptics(
-        streakScratch,
-        20,
-        rayAngleOptics,
-        crossFilterAngleInnerThreshold
-      );
-      device.queue.writeBuffer(
-        this.crossFilter.streakBuffers[i],
-        0,
-        streakScratch.buffer,
-        streakScratch.byteOffset,
-        streakScratch.byteLength
-      );
-      const bg = device.createBindGroup({
-        label: `crossfilter.streak.${i}.bg`,
-        layout: this.layouts.crossFilterStreak,
-        entries: [
-          { binding: 0, resource: { buffer: this.crossFilter.streakBuffers[i] } },
-          { binding: 1, resource: heldPeakTexture.createView() },
-          { binding: 2, resource: depthView },
-          { binding: 3, resource: this.sampler }
-        ]
-      });
-      const pass = encoder.beginRenderPass({
-        label: `crossfilter.streak.${i}`,
-        colorAttachments: [
-          {
-            view: streakTextures[i].createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterStreak);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    this.crossFilter.blendScratch[0] = dirCount;
-    this.crossFilter.blendScratch[1] = strength;
-    this.crossFilter.blendScratch[2] = hardModeUniform;
-    this.crossFilter.blendScratch[3] = 0;
-    device.queue.writeBuffer(
-      this.crossFilter.blendBuffer,
-      0,
-      this.crossFilter.blendScratch.buffer,
-      this.crossFilter.blendScratch.byteOffset,
-      this.crossFilter.blendScratch.byteLength
-    );
-    {
-      const centralBloomView = centralBloomTexture ? centralBloomTexture.createView() : blackView;
-      const blendEntries = [
-        { binding: 0, resource: { buffer: this.crossFilter.blendBuffer } },
-        { binding: 1, resource: sourceView },
-        { binding: 2, resource: dirCount >= 1 ? streakTextures[0].createView() : blackView },
-        { binding: 3, resource: dirCount >= 2 ? streakTextures[1].createView() : blackView },
-        { binding: 4, resource: dirCount >= 3 ? streakTextures[2].createView() : blackView },
-        { binding: 5, resource: dirCount >= 4 ? streakTextures[3].createView() : blackView },
-        { binding: 6, resource: centralBloomView },
-        { binding: 7, resource: this.sampler }
-      ];
-      const bg = device.createBindGroup({
-        label: "crossfilter.blend.bg",
-        layout: this.layouts.crossFilterBlend,
-        entries: blendEntries
-      });
-      const pass = encoder.beginRenderPass({
-        label: "crossfilter.blend",
-        colorAttachments: [
-          {
-            view: outputTexture.createView(),
-            loadOp: "clear",
-            storeOp: "store",
-            clearValue: { r: 0, g: 0, b: 0, a: 1 }
-          }
-        ]
-      });
-      pass.setPipeline(this.pipelines.crossFilterBlend);
-      pass.setBindGroup(0, this.crossFilterFlagsBindGroup);
-      pass.setBindGroup(1, bg);
-      pass.draw(3, 1, 0, 0);
-      pass.end();
-    }
-    return outputTexture;
+    this.crossFilterPeakHistoryWriteIndex = result.history.peakHistoryWriteIndex;
+    this.crossFilterPeakHistoryFilledFrames = result.history.peakHistoryFilledFrames;
+    this.lastCrossFilterHistoryTime = result.history.lastHistoryTime;
+    return result.texture;
   }
-  /**
-   * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL:
-   * 180° is the no-added-blur baseline, 360° = 2 slots, 720° = 3 slots.
-   */
-  activeMotionBlurFrames(shutterAngle) {
-    return activeMotionBlurFramesForShutter(
-      shutterAngle,
-      MOTION_BLUR_RING_SLOTS
-    );
-  }
-  /**
-   * Pre-normalized motion-blur weights (sum = 1 across active slots, 0
-   * elsewhere). Triangle/box mix follows the WebGL path: shutterAngle ≤
-   * 360° is pure triangle; > 360° smoothly flattens to box by 720°.
-   */
-  computeMotionBlurWeights(shutterAngle, activeFrames, validSlots) {
-    return computeMotionBlurWeights(
-      shutterAngle,
-      activeFrames,
-      validSlots,
-      MOTION_BLUR_RING_SLOTS
-    );
-  }
+  // `activeMotionBlurFrames` / `computeMotionBlurWeights` moved to
+  // `./passes/motionBlur` (sole caller was the motion-blur-ON branch in
+  // `renderFrame`, which moved alongside them).
   render() {
     this.renderInternal("render-failed");
   }
@@ -6856,129 +7355,29 @@ var WebGPUBackend = class _WebGPUBackend {
       pass.draw(3, 1, 0, 0);
       pass.end();
     } else {
-      const prevSlot = this.ringBuffer.validSlots > 0 ? (
-        // Most recently written slot is `(writeIndex - 1 + N) % N`;
-        // when the ring is empty we fall through to the new slot and
-        // let hasPrev=0 zero out the trail contribution.
-        void 0
-      ) : void 0;
-      const nextSlot = this.ringBuffer.nextSlot();
-      const validSlots = this.ringBuffer.validSlots;
-      const hasPrev = validSlots > 1 ? 1 : 0;
-      const prevSlotIndex = (nextSlot - 1 + MOTION_BLUR_RING_SLOTS) % MOTION_BLUR_RING_SLOTS;
-      void prevSlot;
-      const trailIntensity = this.paramNumber("trailIntensity", 0);
-      this.motionblurFeedbackScratch[0] = trailIntensity;
-      this.motionblurFeedbackScratch[1] = hasPrev;
-      this.motionblurFeedbackScratch[2] = 0;
-      this.motionblurFeedbackScratch[3] = 0;
-      device.queue.writeBuffer(
-        this.motionblurFeedbackBuffer,
-        0,
-        this.motionblurFeedbackScratch.buffer,
-        this.motionblurFeedbackScratch.byteOffset,
-        this.motionblurFeedbackScratch.byteLength
-      );
-      const prevView = this.ringBuffer.viewForSlot(hasPrev === 1 ? prevSlotIndex : nextSlot);
-      const nextView = this.ringBuffer.viewForSlot(nextSlot);
-      const feedbackBg = device.createBindGroup({
-        label: "motionblur.feedback.bg",
-        layout: this.layouts.motionblurFeedback,
-        entries: [
-          { binding: 0, resource: { buffer: this.motionblurFeedbackBuffer } },
-          { binding: 1, resource: postCompositeView },
-          { binding: 2, resource: prevView },
-          { binding: 3, resource: this.sampler }
-        ]
-      });
-      {
-        const pass = encoder.beginRenderPass({
-          label: "motionblur.feedback.pass",
-          colorAttachments: [
-            {
-              view: nextView,
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        pass.setPipeline(this.pipelines.motionblurFeedback);
-        pass.setBindGroup(0, this.offscreenFlagsBindGroup);
-        pass.setBindGroup(1, feedbackBg);
-        pass.draw(3, 1, 0, 0);
-        pass.end();
-      }
-      const activeFrames = Math.min(
-        this.activeMotionBlurFrames(shutterAngle),
-        validSlots
-      );
-      const weights = this.computeMotionBlurWeights(
+      renderMotionBlurChain(
+        encoder,
+        postCompositeView,
+        swapView,
+        readbackView,
         shutterAngle,
-        activeFrames,
-        validSlots
+        {
+          device: this.ctx.device,
+          ringBuffer: this.ringBuffer,
+          motionblurFeedbackBuffer: this.motionblurFeedbackBuffer,
+          motionblurFeedbackScratch: this.motionblurFeedbackScratch,
+          motionblurBlendBuffer: this.motionblurBlendBuffer,
+          motionblurBlendScratch: this.motionblurBlendScratch,
+          motionblurFeedbackLayout: this.layouts.motionblurFeedback,
+          motionblurBlendLayout: this.layouts.motionblurBlend,
+          motionblurFeedbackPipeline: this.pipelines.motionblurFeedback,
+          motionblurBlendPipeline: this.pipelines.motionblurBlend,
+          sampler: this.sampler,
+          offscreenFlagsBindGroup: this.offscreenFlagsBindGroup,
+          displayFlagsBindGroup: this.displayFlagsBindGroup,
+          paramNumber: (key, fallback) => this.paramNumber(key, fallback)
+        }
       );
-      const oldestSlot = (nextSlot - (activeFrames - 1) + MOTION_BLUR_RING_SLOTS * 2) % MOTION_BLUR_RING_SLOTS;
-      const motionThreshold = this.paramNumber("motionThreshold", 0);
-      for (let i = 0; i < MOTION_BLUR_RING_SLOTS; i++) {
-        this.motionblurBlendScratch[i] = weights[i] ?? 0;
-      }
-      this.motionblurBlendScratch[8] = nextSlot;
-      this.motionblurBlendScratch[9] = oldestSlot;
-      this.motionblurBlendScratch[10] = motionThreshold;
-      this.motionblurBlendScratch[11] = 0;
-      device.queue.writeBuffer(
-        this.motionblurBlendBuffer,
-        0,
-        this.motionblurBlendScratch.buffer,
-        this.motionblurBlendScratch.byteOffset,
-        this.motionblurBlendScratch.byteLength
-      );
-      const blendBg = device.createBindGroup({
-        label: "motionblur.blend.bg",
-        layout: this.layouts.motionblurBlend,
-        entries: [
-          { binding: 0, resource: { buffer: this.motionblurBlendBuffer } },
-          { binding: 1, resource: this.ringBuffer.arrayView() },
-          { binding: 2, resource: this.sampler }
-        ]
-      });
-      if (readbackView) {
-        const readbackPass = encoder.beginRenderPass({
-          label: "motionblur.blend.readback.pass",
-          colorAttachments: [
-            {
-              view: readbackView,
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        readbackPass.setPipeline(this.pipelines.motionblurBlend);
-        readbackPass.setBindGroup(0, this.displayFlagsBindGroup);
-        readbackPass.setBindGroup(1, blendBg);
-        readbackPass.draw(3, 1, 0, 0);
-        readbackPass.end();
-      }
-      {
-        const pass = encoder.beginRenderPass({
-          label: "motionblur.blend.present.pass",
-          colorAttachments: [
-            {
-              view: swapView,
-              loadOp: "clear",
-              storeOp: "store",
-              clearValue: { r: 0, g: 0, b: 0, a: 1 }
-            }
-          ]
-        });
-        pass.setPipeline(this.pipelines.motionblurBlend);
-        pass.setBindGroup(0, this.displayFlagsBindGroup);
-        pass.setBindGroup(1, blendBg);
-        pass.draw(3, 1, 0, 0);
-        pass.end();
-      }
     }
     device.queue.submit([encoder.finish()]);
     this.hasReadableFrame = this.readbackEnabled;
@@ -7112,5 +7511,8 @@ export {
   DEFAULT_RAY_ANGLE_INNER_THRESHOLD,
   resolveRayAngleOptics,
   rayAngleMaskValue,
+  CROSS_FILTER_MIN_SPACING_MIN,
+  CROSS_FILTER_MIN_SPACING_MAX,
+  DEFAULT_DEPTH_RAY_ANGLE_GAMMA,
   WebGPUBackend
 };

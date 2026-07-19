@@ -466,20 +466,6 @@ declare class WebGPUBackend implements RenderBackend {
      */
     private maybeResetCrossFilterHistory;
     /**
-     * Hard-mode central bloom, 4-level pyramid.
-     *   1. seed mip 0 by downsampling the active peak mask (WebGL used held
-     *      peaks; active WebGPU currently passes current peaks because the
-     *      temporal hold is intentionally bypassed).
-     *   2. progressive downsample mip 0 → mip 3.
-     *   3. additive upsample back to mip 0 with fixed radius 0.5.
-     *
-     * Returns mip 0 so the caller can feed it to the cross-filter blend
-     * shader's `uCentralBloom` binding. Mip 0 runs at quarter-resolution of
-     * the full output (the peak texture is half-res, then we halve again on
-     * seed).
-     */
-    private renderCentralBloom;
-    /**
      * Light shafts two-sub-pass rendering (WebGL parity):
      *   9a: radial blur at 1/4 resolution (64 taps, luminance threshold).
      *   9b: additive blend at full resolution.
@@ -492,17 +478,6 @@ declare class WebGPUBackend implements RenderBackend {
     private renderLightShafts;
     private renderHaloPrism;
     private renderCrossFilter;
-    /**
-     * `shutterAngle` (degrees, 0..720) → active slot count. Matches WebGL:
-     * 180° is the no-added-blur baseline, 360° = 2 slots, 720° = 3 slots.
-     */
-    private activeMotionBlurFrames;
-    /**
-     * Pre-normalized motion-blur weights (sum = 1 across active slots, 0
-     * elsewhere). Triangle/box mix follows the WebGL path: shutterAngle ≤
-     * 360° is pure triangle; > 360° smoothly flattens to box by 720°.
-     */
-    private computeMotionBlurWeights;
     render(): void;
     private renderInternal;
     private renderFrame;

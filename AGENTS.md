@@ -25,7 +25,8 @@ then work on the product surface.
      request explicitly says legacy Electron, old Desktop, or rollback
    - iOS: `apps/capacitor-film-lab-ios/CLAUDE.md`, then the exact Swift/TS
      surface
-   - shared packages: the specific package under `packages/`
+   - shared packages: the specific package under `packages/`; full structure
+     map: `docs/filmtone/filmtone-codemap.md`
    - release/version claims: `docs/filmtone/filmtone-release-version-sources.md`
 4. Start the requested product work. Do not turn orientation into a separate
    task.
@@ -45,6 +46,9 @@ there directly after this file.
 | renderer, WebGL, WebGPU, shader parity | `packages/film-lab-renderer/` | `bun run build:renderer` |
 | shared UI controls | `packages/film-lab-ui/` | package build/typecheck plus the affected app smoke |
 | Smart Look package | `packages/film-lab-smart-look/` | `bun run build:smart-look` |
+| DaVinci Resolve, OFX plugin, spatial optics | `apps/filmtone-resolve-ofx/` plus live lane `docs/filmtone/davinci-plugin/` | `make` in the app dir (no root `verify:*` script yet) |
+| shared Swift runtime, Phase 0 data layer | `packages/film-lab-swift-core/` (`Generated/` is code-generated, do not hand-edit) | Swift Package build via `bun run verify:ios` / `verify:macos` |
+| MCP automation, batch export server | `packages/film-lab-codex-mcp/` | `bun run verify:filmtone-mcp` |
 | public LP, support, privacy, release notes web pages | portfolio repo, not this repo | update `vendor/filmtone` only after this repo is pushed |
 
 Portfolio lives at:
