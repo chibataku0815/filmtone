@@ -61,6 +61,13 @@ Coordinator-owned: yes
   Version ID が `31e8956b-0ee6-4b67-8a79-5b4cf13618b0`(source `6104168`)である
   ことを確認。install guide 作成、portfolio 製品ページ scaffold(未 commit)。
   詳細は改訂 26 ログ。
+- **MON-6 準備 3 stream 並列完了(2026-07-19・改訂 27)**: 発売記事(標準 5 媒体
+  JP/EN draft)、owner runbook(Vercel/Polar 設定手順)、MON-4 検証手順書(実行なし)
+  が出揃った。**新規判明**: Vercel は git auto-deploy 無効で GitHub Actions か
+  CLI 経由の再デプロイが必要、Polar 購入メール文面は Custom Benefit の
+  Private note が唯一の差し込み口、Gate 3(テスト購入)は Polar Sandbox で実金銭
+  不要、**trial 利用者向け pkg 公開ホスト先が未決定の新規ギャップ**。詳細は
+  改訂 27 ログ。
 
 ## ローンチ実行順序と担当ゲート(2026-07-19 現在地起点)
 
@@ -618,3 +625,60 @@ MON-3 / MON-4の未deploy作業はMON-2と並行可能(プラグインに触ら�
   より本改訂を `claude/davinci-plugin-pricing-plan-4cb87b` へ commit/push
   (dc1451b の merge lineage を経由しない独立コミットとして作成)。portfolio 側の
   変更は別 repo・別ゲートのため今回 commit しない。
+- 2026-07-19 (改訂 27 / MON-6 準備を並列 3 stream で実行・director 統合): owner の
+  指示で並列作業計画書 [launch-parallel-work-plan.md](launch-parallel-work-plan.md)
+  と lock board `.claude/tasks/ACTIVE-PARALLEL-TASK.md` を作成し、`.ai/parallel-work.md`
+  協調プロトコルに従い 3 stream を本チャット内で background 並列実行(ディレクター
+  = 本チャット)。全 stream ともファイル非重複・production 操作なし・commit なし。
+  各成果物はディレクターが通読・grounding 検証してから採用。
+  - **S1(記事 JP/EN)**: `docs/filmtone/articles/2026-07-19-davinci-resolve-film-damage-release/`
+    に note-ja / zenn-ja / medium-en / hashnode-en / behance-case の標準 5 媒体を
+    draft(Behance のみ visual asset が実レンダー待ち placeholder)。`filmtone-release-articles`
+    skill 本体(`.claude/skills/filmtone-release-articles/SKILL.md`)を直接読んで
+    house style に従った(agent 側に Skill tool が無かったため)。Breath/Weave =
+    0 件・絶対語 = 0 件・競合名 = 0 件・grain/vignette を feature として言及 = 0 件を
+    grep で機構化確認。発売日は全記事で `〔発売日 TBD〕` placeholder。iOS/Desktop 用
+    truth script は本製品に適用対象外と判断(理由: 消費者アプリ専用のスクリプトで
+    DaVinci プラグインには不整合)、本製品の truth は本 progress.md に依拠。
+  - **S2(owner runbook)**: `mon6-owner-runbook.md` を新規作成。**新規判明事項**:
+    (1) portfolio の Vercel deploy は **git auto-deploy 無効**(`vercel.json` の
+    `deploymentEnabled: false`、private submodule `vendor/filmtone` を Vercel 側
+    build が取得不可のため)。env 設定後の反映には GitHub Actions
+    `vercel-production-deploy.yml`(`workflow_dispatch` 対応)か、repo root での
+    `bunx vercel deploy --prod --yes` が必要 — **ダッシュボードの「Redeploy」単独
+    では新しい `NEXT_PUBLIC_*` が焼き込まれない**。
+    (2) Polar の確認メール本文は編集不可(docs 確認済み)。購入メール文面
+    (trial ブリッジ+優先再発行 note)の唯一の差し込み口は **Custom Benefit の
+    Private note**(checkout success page + 確認メール + Customer Portal の 3 箇所に
+    レンダリング)。返金ポリシーも Polar に設定項目は無く、製品 Description への
+    明記+手動返金が実務。
+    (3) Checkout Link に $10 固定 discount を preset すれば $39 が自動適用され、
+    ローンチ終了時は preset を外すだけで URL 不変・再デプロイ不要。
+    (4) **新規ギャップ(未解決の owner 判断事項)**: trial 利用者が pkg 本体を入手する
+    公開経路が現状ない。Worker は trial に `.license` のみ送付し、Polar の
+    File Downloads benefit は購入者限定の個別署名 URL のため trial には使えない。
+    `NEXT_PUBLIC_FILMTONE_RESOLVE_PKG_DOWNLOAD_URL` に公開 HTTPS 直リンク
+    (例: Cloudflare R2 / Vercel Blob)を設定するか、trial 導線の pkg 配布方法を
+    別途決める owner 判断が必要。
+  - **S3(MON-4 検証手順書、実行なし)**: `mon4-verification-runbook.md` を新規作成。
+    **Gate 1**: garbage token は Siteverify の `success` 判定で短絡するため
+    action/hostname mismatch 分岐を検証できない — 実 widget solve が必須と明記
+    (curl のみでは既確認の invalid-token ケースの再現に留まる)。**Gate 2**: 実行には
+    portfolio 側 scaffold の commit + Vercel env 設定 + redeploy が前提のため
+    現状 blocked。**Gate 3**: **Polar Sandbox**(`sandbox.polar.sh`、Stripe test card
+    `4242 4242 4242 4242`)を primary path として発見 — 実金銭不要でテスト購入から
+    manual issuance までの一巡を検証可能(本番実購入+返金は fallback)。**Gate 4**:
+    `LicenseStore::evaluate()` が render 毎に `::time(nullptr)` から Trial/Expired を
+    再導出することを source(`LicenseStore.h:40-43,66-67` / `.mm:286-287,343-344,401-402`)
+    で確認し、clock-forward 手順を具体化(1 日 trial での低擾乱 variant も用意)。
+    macOS `date` set-operand の年-先頭フォーマット bug を自己検出・修正済み
+    (誤ると年が大きくずれる高リスク行だった)。owner 確認前の実行はしていない。
+  - **並列化しなかった項目**(引き続き owner 専任、次節参照): Vercel env 実設定、
+    Polar checkout URL 確定・pkg アップロード、法務レビュー、MON-4 実実行、
+    trial pkg 公開ホスト先の決定、portfolio 側 commit。
+  Copy / History Impact: 記事 draft 一式が発生したが、いずれも
+  candidate/pre-launch framing で未公開(publish switch 手順を各記事末尾に記載)。
+  Article Opportunity: 本改訂で Full article(標準 5 媒体)の draft 化が完了 —
+  公開判断は owner 承認待ち。Change-History Opportunity: No。Git: 本タスクブリーフの
+  pre-authorization により `claude/davinci-plugin-pricing-plan-4cb87b` へ
+  commit/push(dc1451b の merge lineage を経由しない独立コミット)。
